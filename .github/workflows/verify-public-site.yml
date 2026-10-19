@@ -1,0 +1,23 @@
+name: Verify public workbench loads
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check deployed HTML and static assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://cherishxie.github.io/JW3-Work-Pages"
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 "$base/" -o /tmp/jw3-index.html
+          grep -q '剑网三 · 效率工作台' /tmp/jw3-index.html
+          for asset in app.js styles.css model.js storage.js vendor/jszip.min.js; do
+            curl --fail --location --silent --show-error --retry 5 --retry-delay 2 "$base/$asset" -o /dev/null
+          done
+          echo "PASS: public GitHub Pages HTML and 5 key assets can be fetched."
