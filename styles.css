@@ -242,3 +242,66 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 @media(max-width:850px){.tc-v2-main{grid-template-columns:1fr}.tc-v2-aside{padding:13px}.tc-v2-alerts{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:9px}}
 @media(max-width:767px){.tc-v2-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.tc-v2-stat{padding:11px}.tc-v2-stat strong{font-size:19px}.tc-v2-focus{padding:14px}.tc-v2-focus-heading h2{font-size:18px}.tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tc-v2-main{gap:9px}.tc-v2-plan-batches,.tc-v2-unassigned-grid,.tc-v2-role-grid{grid-template-columns:1fr}.tc-v2-focus-actions>.primary{max-width:none;flex-basis:100%}.tc-v2-actions .muted{width:100%}.tc-v2-section-title{align-items:flex-start;flex-wrap:wrap}.tc-v2-alerts button{min-height:44px}}
 @media(prefers-reduced-motion:reduce){.tc-v2-track i{transition:none}}
+
+/* Keep the selected batch beside its queue, with one clear execution action. */
+.tc-v2-summary button.tc-v2-stat{display:block;text-align:left;white-space:normal;transition:border-color .15s,background .15s}
+.tc-v2-summary button.tc-v2-stat:hover{border-color:var(--wb-primary)}
+.tc-v2-stat.is-active{border-color:var(--wb-primary);background:var(--wb-primary-soft)}
+.tc-v2-stat.is-active strong{color:var(--wb-primary-label)}
+.tc-v2-stat[data-value="review"] strong,.tc-v2-stat[data-value="unmeasured"] strong{color:var(--wb-warning)}
+.tc-v2-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:18px;align-items:start}
+.tc-v2-queue,.tc-v2-inspector{min-width:0}
+.tc-v2-queue>.tc-v2-section-title{margin:0 0 12px}
+.tc-v2-section-title h2 small{margin-left:5px;color:var(--wb-text-secondary);font-weight:400;font-size:11px;white-space:nowrap}
+.tc-v2-workspace .tc-v2-plan-grid{grid-template-columns:1fr}
+.tc-v2-inspector{position:sticky;top:76px;max-height:calc(100dvh - 92px);overflow:auto;scrollbar-width:thin;border-radius:12px}
+.tc-v2-inspector .tc-v2-focus{height:auto;border-color:var(--wb-notice-border)}
+.tc-v2-focus-heading h2{font-size:20px;overflow-wrap:anywhere}
+.tc-v2-focus-top{margin-bottom:12px}
+.tc-v2-navigation{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--wb-border);padding-bottom:12px}
+.tc-v2-navigation>span{font-size:11px;color:var(--wb-text-secondary);font-variant-numeric:tabular-nums}
+.tc-v2-navigation button{min-height:34px}
+.tc-v2-person-account{font-size:10px;color:var(--wb-primary-label);overflow-wrap:anywhere}
+.tc-v2-person .combat-tag{font-size:10px;align-self:flex-start;padding:0 5px;margin-top:3px}
+.tc-v2-team-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:12px}
+.tc-v2-focus-actions{padding-top:12px;border-top:1px solid var(--wb-border)}
+.tc-v2-focus-actions>.primary{max-width:none;flex-basis:100%}
+.tc-v2-focus .tc-v2-more{flex:1}
+.tc-v2-focus .tc-v2-more>summary{min-height:34px;width:max-content}
+.tc-v2-compact{min-height:106px;gap:5px;padding:10px 12px;position:relative}
+.tc-v2-compact.is-selected{box-shadow:inset 3px 0 var(--wb-primary)}
+.tc-v2-compact-footer{font-size:10px}
+.tc-v2-workspace.is-list{grid-template-columns:1fr}
+.tc-v2-workspace.is-list .tc-v2-inspector{position:static;max-height:none;order:-1}
+.tc-v2-workspace.is-list .tc-v2-person-grid{grid-template-columns:repeat(auto-fit,minmax(125px,1fr))}
+.tc-v2-role-bulk{flex-wrap:wrap;font-size:12px}
+.tc-v2-role-bulk label{display:flex;align-items:center;gap:6px}
+.tc-v2-role-task .is-skipped{color:var(--wb-text-muted)}
+.import-conflict{border-left:3px solid var(--wb-warning)}
+.import-conflict p{margin:6px 0 0;overflow-wrap:anywhere}
+@media(min-width:1100px){.tc-v2-inspector .tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1099px){
+  .tc-v2-workspace{grid-template-columns:1fr;gap:16px}
+  .tc-v2-inspector{order:-1;position:static;max-height:none;overflow:visible}
+  .tc-v2-focus{scroll-margin-top:80px}
+  .tc-v2-person-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+}
+@media(max-width:767px){
+  .tc-v2-summary{gap:8px}.tc-v2-stat{border-radius:10px}
+  .tc-v2-inspector .tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tc-v2-workspace .tc-v2-plan-batches{grid-template-columns:repeat(2,minmax(0,1fr));padding:9px;gap:7px}
+  .tc-v2-compact{min-height:120px;padding:9px}
+  .tc-v2-compact-head{align-items:flex-start;flex-wrap:wrap}
+  .tc-v2-compact-members{font-size:11px}
+  .tc-v2-section-title>span{font-size:11px}
+  .tc-v2-actions>div{width:100%;gap:6px}.tc-v2-actions>div>.primary{margin-left:auto}
+  .tc-v2-focus-actions>button,.tc-v2-team-tools>button{min-height:40px}
+  .tc-v2-person{padding:9px}
+}
+.tc-v2-compact{align-items:stretch;justify-content:flex-start}
+@media(min-width:1400px){.tc-v2-inspector .tc-v2-person-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tc-v2-measured{padding:11px 12px;margin:0 0 16px;border-radius:9px;background:var(--wb-success-bg);border:1px solid var(--wb-success-border)}
+.tc-v2-measured>small{color:var(--wb-success);font-size:11px}
+.tc-v2-measured>div{display:flex;gap:12px;flex-wrap:wrap;margin-top:7px}
+.tc-v2-measured span{font-size:10px;color:var(--wb-text-secondary);flex:1;min-width:86px}
+.tc-v2-measured b{display:block;font-size:14px;color:var(--wb-text);font-variant-numeric:tabular-nums}

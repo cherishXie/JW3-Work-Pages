@@ -210,20 +210,21 @@
     return `<div class="tc-summary"><span><b>${pendingRows.length}</b> 批待做</span><span>预计剩余 <b>${minutes?num(minutes,1):'待补'}</b>${minutes?' 分钟':''}</span><span><b>${live.filter(p=>p.requiresReview&&!planFinished(p)).length}</b> 项需复核</span><span><b>${pendingFacts.length}</b> 批待补实测</span>${overdue?button('逾期 '+overdue+' 批','show-overdue','small'):''}<span class="muted">${range} · 范围合计</span>${button('安排新任务','work-view','primary small','data-value="planning"')}</div>${shown.length?`<div class="plan-queue">${shown.map(p=>savedPlanCard(p,next?.key)).join('')}</div>`:empty(ui.queueStatus==='unmeasured'&&closed.length?'待补记录在下方已完成清单':'当前筛选没有待执行批次',ui.queueRange==='day'?'可切换本周查看其他日期，或安排当天任务。':'可调整状态筛选或安排任务。')}${closed.length?`<details class="tc-archive" ${['all','unmeasured'].includes(ui.queueStatus)?'open':''}><summary>已完成 / 已结束（${closed.length} 项${closed.flatMap(planFacts).length?' · '+closed.flatMap(planFacts).length+' 批待补实测':''}）</summary><div class="plan-queue">${closed.map(p=>savedPlanCard(p)).join('')}</div></details>`:''}<section class="card tc-unassigned">${head('待安排目标',`${ui.taskDate} 对应周期 · 已扣除完成与排程占用`)}${pending.length?table(['任务','未安排','操作'],pending.map(({task:t,remaining})=>{const previous=[...state.plans].reverse().find(p=>p.taskId===t.id&&!p.cancelled);return `<tr><td><b>${esc(t.name)}</b><small>${t.period==='daily'?'日常':'周常'} · ${M.cycle(t,ui.taskDate)}</small></td><td>${remaining} 角色次</td><td>${button('安排此任务','replan','primary small',`data-id="${t.id}"`)}${previous?button('沿用上次','reuse-plan','small',`data-id="${previous.id}"`):''}${button('调整目标','schedule-edit','ghost small',`data-task="${t.id}" data-date="${ui.taskDate}"`)}</td></tr>`;})):empty('该周期没有待安排目标','已完成、已排程或已跳过的目标不会重复列出。')}</section>${archived.length?`<details class="tc-archive"><summary>已取消排程（${archived.length}）</summary><div class="plan-queue">${archived.map(p=>savedPlanCard(p)).join('')}</div></details>`:''}`;
   }
 
-  // V2 card-only presentation. All mutations remain in the existing Daily and Model operations.
+  // Card cockpit with a compact fallback; business changes use Daily and Model.
   function taskV2BatchStatus(x){
     if(x.p.cancelled)return 'cancelled';
     if(x.closed)return 'closed';
     if(x.pending)return x.p.requiresReview?'review':x.p.date<today?'overdue':'pending';
-    return x.fact?'unmeasured':'measured';
+    return x.fact?'unmeasured':state.records.some(r=>r.planId===x.p.id&&r.taskId===x.id&&(!r.planBatchIndices||r.planBatchIndices.includes(x.i)))?'measured':'completed';
   }
   function taskV2StatusLabel(status){
-    return {pending:'待执行',review:'需复核',overdue:'已逾期',unmeasured:'待补实测',measured:'实测已录',closed:'已移出 / 终止',cancelled:'已取消'}[status]||'待确认';
+    return {pending:'待执行',review:'需复核',overdue:'已逾期',unmeasured:'待补实测',measured:'实测已录',completed:'已完成 · 历史标记',closed:'已移出 / 终止',cancelled:'已取消'}[status]||'待确认';
   }
   function taskV2Name(x){return esc(x.t?.name||x.p.taskName||x.id);}
   function taskV2Action(x,compact=false){
     const attrs='data-plan="'+esc(x.p.id)+'" data-task="'+esc(x.id)+'" data-index="'+x.i+'"';
     const status=taskV2BatchStatus(x);
+    if(x.p.cancelled||x.closed)return '';
     if(x.pending&&!x.p.requiresReview)return button(compact?'登记完成':'登记本批完成','quick-batch','primary '+(compact?'small':'') ,attrs);
     if(x.pending&&x.p.requiresReview)return button('复核剩余批次','review-pending','primary small','data-id="'+esc(x.p.id)+'"');
     if(x.fact)return button('补录实测','quick-batch','primary small',attrs);
@@ -233,95 +234,91 @@
   function taskV2MemberSummary(ids){
     return ids.map(id=>{
       const role=state.roles.find(r=>r.id===id),account=state.accounts.find(a=>a.id===role?.accountId);
-      return '<span class="tc-v2-person"><strong>'+esc(role?.name||'未知角色')+'</strong><small>'+esc(account?.name||'未知账号')+' · '+esc(role?.stance||duty(Catalog.profile(role||{}).duty))+'</small></span>';
+      return '<span class="tc-v2-person"><span class="tc-v2-person-account">'+esc(account?.name||'未知账号')+'</span><strong>'+esc(role?.name||'未知角色')+'</strong><small>'+esc(role?.stance||duty(Catalog.profile(role||{}).duty))+'</small>'+gongzhanTag(role)+'</span>';
     }).join('');
   }
-  function taskV2FocusCard(x){
+  function taskV2FocusCard(x,navigation=[]){
     if(!x)return '<section class="card tc-v2-empty-focus">'+empty('当前范围没有可执行批次','可以切换日期或状态，或安排新的任务。',button('安排新任务','work-view','primary small','data-value="planning"'))+'</section>';
-    const status=taskV2BatchStatus(x),t=x.t,companions=x.p.companionAssignments?.[x.i]||[];
+    const status=taskV2BatchStatus(x),t=x.t,companions=x.p.companionAssignments?.[x.i]||[],locked=x.p.lockedBatches?.includes(x.i),position=navigation.findIndex(row=>row.key===x.key);
+    const measured=state.records.find(r=>r.planId===x.p.id&&r.taskId===x.id&&(!r.planBatchIndices||r.planBatchIndices.includes(x.i)));
+    const adjacent=offset=>{const row=navigation[position+offset];return button(offset<0?'‹ 上一批':'下一批 ›','focus-batch','small',row?'data-key="'+esc(row.key)+'"':'disabled');};
     const names=x.p.routeTaskIds?.length>1?'<small class="tc-v2-route">串本 · '+(x.p.routeTaskIds||[]).map(id=>esc(state.tasks.find(t=>t.id===id)?.name||id)).join(' → ')+'</small>':'';
     const attrs='data-plan="'+esc(x.p.id)+'" data-task="'+esc(x.id)+'" data-index="'+x.i+'"';
     return '<section id="tc-v2-focus" class="card tc-v2-focus" aria-label="当前关注批次">'+
-      '<div class="tc-v2-focus-top"><span class="tc-v2-eyebrow">'+icon('bolt')+' 当前关注批次</span><span class="tc-v2-status '+status+'">'+taskV2StatusLabel(status)+'</span></div>'+
+      '<div class="tc-v2-focus-top"><span class="tc-v2-eyebrow">'+icon('bolt')+' 当前批次</span><span class="tc-v2-status '+status+'">'+taskV2StatusLabel(status)+'</span></div>'+
+      '<div class="tc-v2-navigation">'+adjacent(-1)+'<span>'+(position>=0?(position+1)+' / '+navigation.length:'已结束批次')+'</span>'+adjacent(1)+'</div>'+
       '<div class="tc-v2-focus-heading"><div><h2>'+taskV2Name(x)+' · 第 '+(x.i+1)+' 批</h2>'+names+
       '<p class="panel-sub">'+esc(x.p.date)+(x.p.teamConfigs?.[x.i]?.name?' · '+esc(x.p.teamConfigs[x.i].name):'')+' · '+x.members.length+' 个角色 / '+new Set(x.members.map(id=>state.roles.find(r=>r.id===id)?.accountId)).size+' 个账号 · 预计 '+(x.minutes?num(x.minutes,1)+' 分钟':'耗时待补')+'</p></div></div>'+
+      (measured?'<div class="tc-v2-measured"><small>已保存实测'+(measured.batches>1?' · 本条覆盖 '+measured.batches+' 批':'')+'</small><div><span>金币收益<b>'+num(measured.gold)+' G</b></span><span>操作时间<b>'+num(measured.minutes,1)+' 分钟</b></span><span>累计在线<b>'+num(measured.onlineMinutes,1)+' 分钟</b></span></div></div>':'')+
       '<div class="tc-v2-member-head"><strong>本批登录角色</strong><span>'+x.members.length+' 个角色</span></div>'+
       '<div class="tc-v2-person-grid">'+taskV2MemberSummary(x.members)+'</div>'+
+      raidGongzhanNote(t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))+
+      raidPowerNote(x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean),x.p.rulesSnapshot?.raidMode,x.p.rulesSnapshot?.powerBasis)+
+      (x.pending?'<div class="tc-v2-team-tools">'+batchEditControls(x.p,x.i)+'</div>':locked?'<div class="tc-v2-team-tools">'+button('解锁队伍','lock-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'" aria-pressed="true"')+'</div>':'')+
       (companions.length?'<p class="tc-v2-companion">侠客助战：'+companions.map(c=>esc(c.name)+' · '+duty(c.duty)).join('、')+'</p>':'')+
       worldPartyNote(t,x.members.length)+
       '<div class="tc-v2-switch">'+icon('arrow')+'<div><strong>换号建议</strong>'+savedBatchSwitchNote(x)+'</div></div>'+
       '<div class="tc-v2-focus-actions">'+taskV2Action(x)+
       button('复制本批名单','copy-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'"')+
       '<details class="tc-v2-more"><summary>更多操作</summary><div class="tc-v2-more-body">'+
-      (x.pending?button('改期 / 换人','adjust-batch','small',attrs)+button('删除本批','delete-batch','ghost small',attrs):(!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',attrs)+button('撤销完成','reopen-execution','ghost small',attrs):''))+
+      (x.pending?button('改期 / 调整','adjust-batch','small',attrs+(locked?' disabled title="请先解锁队伍"':''))+button('删除本批','delete-batch','ghost small',attrs+(locked?' disabled title="请先解锁队伍"':'')):(!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',attrs)+button('撤销完成','reopen-execution','ghost small',attrs):''))+
       button('查看周期进度','plan-progress','small','data-id="'+esc(x.p.id)+'"')+'</div></details></div>'+
       (x.fact?'<p class="tc-v2-measure-note">本批已登记完成，实际金币和耗时尚未提供；未填不等于 0。</p>':'')+
       '</section>';
   }
   function taskV2CompactBatch(x,selectedKey){
     const status=taskV2BatchStatus(x),selected=x.key===selectedKey,companions=x.p.companionAssignments?.[x.i]||[];
-    return '<button type="button" class="tc-v2-compact '+(selected?'is-selected ':'')+status+'" data-action="focus-batch" data-key="'+esc(x.key)+'" aria-pressed="'+(selected?'true':'false')+'">'+
+    return '<button type="button" class="tc-v2-compact '+(selected?'is-selected ':'')+status+'" data-action="focus-batch" data-key="'+esc(x.key)+'" data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'" aria-label="查看 '+taskV2Name(x)+' 第 '+(x.i+1)+' 批，'+taskV2StatusLabel(status)+'" aria-pressed="'+(selected?'true':'false')+'">'+
       '<span class="tc-v2-compact-head"><b>第 '+(x.i+1)+' 批'+(x.p.routeTaskIds?.length>1?' · '+taskV2Name(x):'')+'</b><span class="tc-v2-status '+status+'">'+taskV2StatusLabel(status)+'</span></span>'+
-      '<span class="tc-v2-compact-meta">'+x.members.length+' 人 · 预计 '+(x.minutes?num(x.minutes,1)+' 分钟':'耗时待补')+(companions.length?' · '+companions.length+' 侠客':'')+'</span>'+
+      '<span class="tc-v2-compact-meta">'+(x.p.lockedBatches?.includes(x.i)?'已锁定 · ':'')+x.members.length+' 人 · 预计 '+(x.minutes?num(x.minutes,1)+' 分钟':'耗时待补')+(companions.length?' · '+companions.length+' 侠客':'')+'</span>'+
       '<span class="tc-v2-compact-members">'+x.members.map(id=>{const r=state.roles.find(r=>r.id===id);return esc(r?.name||id);}).join(' · ')+'</span>'+
-      '<span class="tc-v2-compact-footer">查看角色 / 换号安排 <span aria-hidden="true">→</span></span></button>';
+      '<span class="tc-v2-compact-footer">'+(selected?'当前批次':'查看详情')+' <span aria-hidden="true">→</span></span></button>';
   }
   function savedPlanCard(p,selectedKey){
     if(ui.taskLayout==='list')return savedPlanTableCard(p,selectedKey);
-    const rows=planBatchRows(p),pending=rows.filter(x=>x.pending),done=rows.filter(x=>!x.pending),facts=planFacts(p);
+    const rows=planBatchRows(p),pending=rows.filter(x=>x.pending&&!p.cancelled),done=rows.filter(x=>!x.pending),facts=planFacts(p);
     const completed=done.filter(x=>!x.closed).length,hasRecords=Daily.hasExecution(state,p);
     const title=(p.routeTaskIds||[p.taskId]).map(id=>esc(state.tasks.find(t=>t.id===id)?.name||p.taskName)).join(' → ');
     return '<article class="card tc-v2-plan" data-plan-id="'+esc(p.id)+'">'+
       '<header class="tc-v2-plan-heading"><div><h3>'+title+'</h3><p class="panel-sub">'+esc(p.date)+' · '+p.batches.length+' 轮队伍 · '+completed+'/'+rows.length+' 个执行单元已完成'+(p.favorite?' · ★ 常用组':'')+'</p></div><span class="tc-v2-status '+(p.requiresReview?'review':pending.length?'pending':'measured')+'">'+(p.requiresReview?'需复核':pending.length?'执行中':'已结束')+'</span></header>'+
       '<div class="tc-v2-track" role="progressbar" aria-label="执行进度" aria-valuemin="0" aria-valuemax="'+rows.length+'" aria-valuenow="'+completed+'"><i style="width:'+(rows.length?Math.min(100,completed/rows.length*100):0)+'%"></i></div>'+
-      (pending.length?'<div class="tc-v2-plan-batches">'+pending.map(x=>taskV2CompactBatch(x,selectedKey)).join('')+'</div>':'')+
-      (done.length||p.cancelled?'<details class="tc-v2-done" '+(!pending.length?'open':'')+'><summary>已完成 / 已结束（'+done.length+'）'+(facts.length?' · '+facts.length+' 批待补实测':'')+'</summary><div class="tc-v2-plan-batches">'+(p.cancelled?rows:done).map(x=>taskV2CompactBatch(x,selectedKey)).join('')+'</div></details>':'')+
+      (pending.length&&ui.queueStatus!=='unmeasured'?'<div class="tc-v2-plan-batches">'+pending.map(x=>taskV2CompactBatch(x,selectedKey)).join('')+'</div>':'')+
+      (done.length||p.cancelled?'<details class="tc-v2-done" '+(!pending.length||ui.queueStatus==='unmeasured'||done.some(x=>x.key===selectedKey)?'open':'')+'><summary>已完成 / 已结束（'+done.length+'）'+(facts.length?' · '+facts.length+' 批待补实测':'')+'</summary><div class="tc-v2-plan-batches">'+(p.cancelled?rows:ui.queueStatus==='unmeasured'?done.filter(x=>x.fact):done).map(x=>taskV2CompactBatch(x,selectedKey)).join('')+'</div></details>':'')+
       '<details class="tc-v2-plan-tools"><summary>排程管理与批量操作</summary><div class="tc-v2-tool-row">'+
       (pending.length&&!p.cancelled?(p.requiresReview?button('复核剩余批次','review-pending','small','data-id="'+esc(p.id)+'"'):planExecutionButtons(p)):'')+
-      (!hasRecords&&!done.length&&!p.cancelled?button('整体重排','replan','small','data-id="'+esc(p.taskId)+'" data-plan="'+esc(p.id)+'"')+button('取消排程','cancel-plan','small','data-id="'+esc(p.id)+'"'):'')+
+      (!hasRecords&&!done.length&&!p.cancelled?button('整体重排','replan','small','data-id="'+esc(p.taskId)+'" data-plan="'+esc(p.id)+'" '+(p.lockedBatches?.length?'disabled title="请先解锁队伍"':''))+button('取消排程','cancel-plan','small','data-id="'+esc(p.id)+'" '+(p.lockedBatches?.length?'disabled title="请先解锁队伍"':'')):'')+
       (pending.length?button('管理剩余批次','manage-remaining','small','data-id="'+esc(p.id)+'"'):'')+
       button(p.favorite?'取消常用组':'设为常用组','favorite-plan','small','data-id="'+esc(p.id)+'"')+
       button('复用分批','reuse-plan','small','data-id="'+esc(p.id)+'"')+
       button('查看周期进度','plan-progress','small','data-id="'+esc(p.id)+'"')+
-      button('删除排程','delete-plan','ghost small','data-id="'+esc(p.id)+'"')+
+      button('删除排程','delete-plan','ghost small','data-id="'+esc(p.id)+'" '+(p.lockedBatches?.length?'disabled title="请先解锁队伍"':''))+
       '</div></details>'+
       (p.changes?.length?'<details class="tc-v2-plan-tools"><summary>调整记录（'+p.changes.length+'）</summary>'+p.changes.map(c=>'<p class="panel-sub">'+esc(c.reason)+' · '+(c.action==='stop'?'终止':'移出至 '+esc(c.date))+'</p>').join('')+'</details>':'')+
       '</article>';
   }
   function executionQueue(){
     const plans=visiblePlans(),live=plans.filter(p=>!p.cancelled),archived=plans.filter(p=>p.cancelled);
-    const finished=live.filter(planFinished),open=live.filter(p=>!planFinished(p));
-    const allPending=open.flatMap(p=>planBatchRows(p).filter(x=>x.pending));
-    const pendingFacts=live.flatMap(planFacts);
-    const matches=p=>ui.queueStatus==='review'?p.requiresReview:ui.queueStatus==='overdue'?p.date<today:ui.queueStatus==='unmeasured'?planFacts(p).length>0:true;
-    const shown=open.filter(matches),closed=finished.filter(matches);
-    const shownRows=shown.flatMap(p=>planBatchRows(p).filter(x=>x.pending)),allVisibleRows=plans.flatMap(p=>planBatchRows(p));
+    const allPending=live.flatMap(p=>planBatchRows(p).filter(x=>x.pending)),pendingFacts=live.flatMap(planFacts);
+    const matchesRow=x=>ui.queueStatus==='review'?x.pending&&x.p.requiresReview:ui.queueStatus==='overdue'?x.pending&&x.p.date<today:ui.queueStatus==='unmeasured'?!!x.fact:ui.queueStatus==='pending'?x.pending:true;
+    const shown=live.filter(p=>!planFinished(p)&&planBatchRows(p).some(matchesRow)),closed=live.filter(p=>planFinished(p)&&(['pending','all'].includes(ui.queueStatus)||planBatchRows(p).some(matchesRow)));
+    const navigation=live.flatMap(p=>planBatchRows(p).filter(matchesRow)),allVisibleRows=plans.flatMap(p=>planBatchRows(p));
     let focus=allVisibleRows.find(x=>x.key===ui.focusBatchKey);
-    if(focus&&(!matches(focus.p)||(!focus.pending&&ui.queueStatus==='pending')))focus=null;
-    if(!focus)focus=shownRows.find(x=>!x.p.requiresReview)||shownRows[0]||(ui.queueStatus==='unmeasured'?allVisibleRows.find(x=>x.fact):null);
-    const minutes=allPending.reduce((n,x)=>n+x.minutes,0);
+    if(focus&&!['pending','all'].includes(ui.queueStatus)&&!matchesRow(focus))focus=null;
+    if(!focus)focus=navigation.find(x=>x.pending&&!x.p.requiresReview)||navigation.find(x=>x.fact)||navigation[0];
+    const minutes=allPending.reduce((n,x)=>n+x.minutes,0),review=live.filter(p=>p.requiresReview&&!planFinished(p)).length;
     const overdue=visiblePlans(true).filter(p=>!p.cancelled&&p.date<today&&!planFinished(p)).flatMap(p=>planBatchRows(p).filter(x=>x.pending)).length;
     const pending=Ops.assignedTasks(state,scope()).filter(t=>(t.period==='weekly'||t.days.includes(M.weekday(ui.taskDate)))&&(!ui.taskFilter||ui.taskFilter===t.id)&&(!ui.search||t.name.toLowerCase().includes(ui.search.toLowerCase())||M.eligible(state,t,scope()).some(r=>(r.name+' '+state.accounts.find(a=>a.id===r.accountId)?.name).toLowerCase().includes(ui.search.toLowerCase())))).map(t=>({task:t,remaining:M.eligible(state,t,scope()).reduce((n,r)=>n+M.availableCount(state,t,r,ui.taskDate),0)})).filter(x=>x.remaining>0);
     const range=ui.queueRange==='all'?'全部日期':ui.queueRange==='day'?ui.taskDate:M.weekStart(ui.taskDate)+' — '+M.addDays(M.weekStart(ui.taskDate),6);
+    const archive=closed.length||ui.queueStatus==='all'&&archived.length?'<details class="tc-v2-archive" '+(['all','unmeasured'].includes(ui.queueStatus)||closed.some(p=>p.id===focus?.p.id)?'open':'')+'><summary>已完成 / 已结束排程（'+(closed.length+(ui.queueStatus==='all'?archived.length:0))+'）</summary><div class="tc-v2-plan-grid">'+[...closed,...(ui.queueStatus==='all'?archived:[])].map(p=>savedPlanCard(p,focus?.key)).join('')+'</div></details>':'';
     return '<div class="tc-v2">'+
       '<div class="tc-v2-summary">'+
-      [['待执行批次',allPending.length,'primary'],['预计剩余',minutes?num(minutes,1)+' 分钟':'待补',''],['需复核',live.filter(p=>p.requiresReview&&!planFinished(p)).length,'warning'],['待补实测',pendingFacts.length,'']].map(x=>'<div class="tc-v2-stat"><small>'+x[0]+'</small><strong class="'+x[2]+'">'+x[1]+'</strong></div>').join('')+
-      '</div>'+
-      '<div class="tc-v2-actions"><span class="muted">'+esc(range)+' · 数据来自已确认排程</span><div class="flex wrap">'+button('卡片视图','task-layout',ui.taskLayout==='cards'?'active small':'small','data-value="cards"')+button('紧凑列表','task-layout',ui.taskLayout==='list'?'active small':'small','data-value="list"')+button('安排新任务','work-view','primary small','data-value="planning"')+'</div></div>'+
-      '<div class="tc-v2-main"><div class="tc-v2-main-focus">'+taskV2FocusCard(focus)+'</div>'+
-      '<aside class="tc-v2-aside card"><h3>执行提醒</h3><p class="panel-sub">需要优先处理的情况</p>'+
-      '<div class="tc-v2-alerts">'+
-      '<button type="button" data-action="queue-status-button" data-value="review"><span>需复核方案</span><b>'+live.filter(p=>p.requiresReview&&!planFinished(p)).length+'</b></button>'+
-      '<button type="button" data-action="show-overdue"><span>逾期未执行</span><b>'+overdue+'</b></button>'+
-      '<button type="button" data-action="queue-status-button" data-value="unmeasured"><span>待补实测</span><b>'+pendingFacts.length+'</b></button>'+
-      '<button type="button" data-action="work-view" data-value="planning"><span>尚未安排目标</span><b>'+pending.reduce((n,x)=>n+x.remaining,0)+'</b></button>'+
-      '</div><p class="tc-v2-hint">完成登记与收益实测分别保存，未知数据不等于零。</p></aside></div>'+
-      '<div class="tc-v2-section-title"><h2>执行队列</h2><span>点击批次卡切换当前关注</span></div>'+
-      (shown.length?'<div class="tc-v2-plan-grid">'+shown.map(p=>savedPlanCard(p,focus?.key)).join('')+'</div>':empty('当前筛选没有待执行批次','可以切换本周或查看已完成的计划。'))+
-      (closed.length||archived.length?'<details class="tc-v2-archive"><summary>已完成 / 已结束排程（'+(closed.length+archived.length)+'）</summary><div class="tc-v2-plan-grid">'+[...closed,...archived].map(p=>savedPlanCard(p,focus?.key)).join('')+'</div></details>':'')+
-      '<section class="card tc-v2-unassigned"><div class="tc-v2-section-title"><h2>待安排目标</h2><span>'+esc(ui.taskDate)+' 对应周期 · 已扣除完成与排程占用</span></div>'+
-      (pending.length?'<div class="tc-v2-unassigned-grid">'+pending.map(x=>'<div class="tc-v2-unassigned-item"><div><strong>'+esc(x.task.name)+'</strong><p class="panel-sub">尚未排入计划：'+x.remaining+' 角色次</p></div>'+button('安排','plan-for-task','small','data-id="'+esc(x.task.id)+'"')+'</div>').join('')+'</div>':empty('当前没有未安排目标','可以切换日期或调整任务范围。'))+'</section>'+
-      '</div>';
+      [['待执行批次',allPending.length,'pending'],['预计剩余',minutes?num(minutes,1)+' 分钟':allPending.length?'待补':'0 分钟',''],['需复核',review,'review'],['待补实测',pendingFacts.length,'unmeasured']].map(([label,value,status])=>status?button('<small>'+label+'</small><strong>'+value+'</strong>','queue-status-button','tc-v2-stat '+(status===ui.queueStatus?'is-active':''),'data-value="'+status+'" aria-pressed="'+(status===ui.queueStatus)+'"'):'<div class="tc-v2-stat"><small>'+label+'</small><strong>'+value+'</strong></div>').join('')+'</div>'+
+      '<div class="tc-v2-actions"><span class="muted">'+esc(range)+' · 已确认排程'+(overdue?' · '+button('逾期 '+overdue+' 批','show-overdue','ghost small'):'')+'</span><div class="flex wrap">'+button('卡片视图','task-layout',ui.taskLayout==='cards'?'active small':'small','data-value="cards" aria-pressed="'+(ui.taskLayout==='cards')+'"')+button('紧凑列表','task-layout',ui.taskLayout==='list'?'active small':'small','data-value="list" aria-pressed="'+(ui.taskLayout==='list')+'"')+button('安排新任务','work-view','primary small','data-value="planning"')+'</div></div>'+
+      '<div class="tc-v2-workspace '+(ui.taskLayout==='list'?'is-list':'')+'"><section class="tc-v2-queue"><div class="tc-v2-section-title"><h2>执行队列 <small>'+navigation.length+' 批</small></h2><span>选择批次，查看角色与操作</span></div>'+
+      (shown.length?'<div class="tc-v2-plan-grid">'+shown.map(p=>savedPlanCard(p,focus?.key)).join('')+'</div>':closed.length?'':empty('当前筛选没有待执行批次','可调整日期或状态筛选。',button('查看全部状态','queue-status-button','small','data-value="all"')))+archive+'</section>'+
+      '<aside class="tc-v2-inspector" aria-label="批次详情">'+taskV2FocusCard(focus,navigation)+'</aside></div>'+
+      '<section class="card tc-v2-unassigned"><div class="tc-v2-section-title"><h2>待安排目标 <small>'+pending.reduce((n,x)=>n+x.remaining,0)+' 角色次</small></h2><span>'+esc(ui.taskDate)+' 对应周期</span></div>'+
+      (pending.length?'<div class="tc-v2-unassigned-grid">'+pending.map(x=>'<div class="tc-v2-unassigned-item"><div><strong>'+esc(x.task.name)+'</strong><p class="panel-sub">尚未安排 '+x.remaining+' 角色次</p></div>'+button('安排','replan','small','data-id="'+esc(x.task.id)+'"')+'</div>').join('')+'</div>':empty('当前没有未安排目标','已扣除完成、跳过与排程占用。'))+'</section></div>';
   }
   function roleProgressCards(){
     const date=ui.taskDate,q=ui.search.trim().toLowerCase();
@@ -330,22 +327,22 @@
     const items=roles.map(r=>{
       const tasks=active.filter(t=>M.eligible(state,t,scope()).some(x=>x.id===r.id)).map(t=>({t,p:M.effectiveProgress(state,t,r,date)})).filter(x=>x.p?.target>0);
       const shown=tasks.filter(x=>ui.progressStatus==='all'||x.p.status!=='skipped'&&x.p.completed<x.p.target&&(ui.progressStatus!=='unassigned'||M.availableCount(state,x.t,r,date)>0));
-      return {r,tasks:shown};
+      return {r,tasks:shown,allTasks:tasks};
     }).filter(x=>x.tasks.length);
     const controls='<div class="tc-role-controls">'+tabs([['role','按角色'],['task','按任务'],['account','按账号']],ui.taskView,'task-view')+
       '<span class="tc-v2-toggle">'+button('卡片','progress-layout','active small','data-value="cards"')+button('矩阵','progress-layout','small','data-value="matrix"')+'</span>'+
       '<select id="progress-status" aria-label="角色进度筛选">'+[['pending','只看未完成'],['unassigned','只看尚未安排'],['all','全部进度']].map(([value,label])=>'<option value="'+value+'" '+(ui.progressStatus===value?'selected':'')+'>'+label+'</option>').join('')+'</select>'+
       '<select id="progress-task" aria-label="筛选任务"><option value="">全部任务</option>'+all.map(t=>'<option value="'+esc(t.id)+'" '+(ui.taskFilter===t.id?'selected':'')+'>'+esc(t.name)+'</option>').join('')+'</select>'+
       '<span class="muted">'+items.length+' 角色</span></div>';
-    const cards=items.map(({r,tasks})=>{
-      const a=state.accounts.find(a=>a.id===r.accountId),done=tasks.reduce((n,x)=>n+Math.min(x.p.completed,x.p.target),0),total=tasks.reduce((n,x)=>n+x.p.target,0);
+    const cards=items.map(({r,tasks,allTasks})=>{
+      const a=state.accounts.find(a=>a.id===r.accountId),done=allTasks.filter(x=>x.p.status!=='skipped').reduce((n,x)=>n+Math.min(x.p.completed,x.p.target),0),total=allTasks.filter(x=>x.p.status!=='skipped').reduce((n,x)=>n+x.p.target,0);
       return '<article class="card tc-v2-role"><header><div><h3>'+esc(r.name)+'</h3><small>'+esc(a?.name||'未知账号')+' · '+esc(r.stance||duty(Catalog.profile(r).duty))+'</small></div><b>'+done+'/'+total+'</b></header>'+
         '<div class="tc-v2-track"><i style="width:'+(total?Math.min(100,done/total*100):0)+'%"></i></div>'+
         '<div class="tc-v2-role-tasks">'+tasks.map(({t,p})=>
-        '<button type="button" data-action="progress" data-role="'+esc(r.id)+'" data-task="'+esc(t.id)+'" class="tc-v2-role-task"><span>'+esc(t.name)+'</span><span class="'+(p.completed>=p.target?'is-complete':'')+'">'+p.completed+'/'+p.target+(p.completionOnly?' · 待补实测':'')+'</span></button>').join('')+'</div>'+
+        '<button type="button" data-action="progress" data-role="'+esc(r.id)+'" data-task="'+esc(t.id)+'" class="tc-v2-role-task"><span>'+esc(t.name)+'</span><span class="'+(p.status==='skipped'?'is-skipped':p.completed>=p.target?'is-complete':'')+'">'+(p.status==='skipped'?'已跳过':p.completed+'/'+p.target)+(p.completionOnly?' · 待补实测':'')+'</span></button>').join('')+'</div>'+
         '<div class="tc-v2-role-tools">'+button('角色详情','role-detail','small','data-id="'+esc(r.id)+'"')+'<label><input type="checkbox" name="progress-role" value="'+esc(r.id)+'" '+(ui.progressSelection.includes(r.id)?'checked':'')+'> 批量选择</label></div></article>';
     }).join('');
-    return controls+'<div class="tc-v2-role-bulk">'+button('批量跳过 / 恢复','bulk-progress','small',ui.progressSelection.length?'':'disabled')+'<small>仅修改周期进度，不产生收益或实测。</small></div>'+
+    return controls+'<div class="tc-v2-role-bulk"><label><input id="all-progress-roles" type="checkbox" '+(items.length&&items.every(x=>ui.progressSelection.includes(x.r.id))?'checked':'')+'> 选择当前角色</label>'+button('批量跳过 / 恢复','bulk-progress','small',ui.progressSelection.length?'':'disabled')+'<small>仅修改周期进度，不产生收益或实测。</small></div>'+
       (items.length?'<div class="tc-v2-role-grid">'+cards+'</div>':empty('当前筛选没有角色','可切换全部进度或调整任务筛选。',button('显示全部进度','all-progress','small')));
   }
 
@@ -874,12 +871,14 @@
     try{
       if(file.size>10*1024*1024)throw new Error('文件超过 10 MB，请拆分导入');
       const isXlsx=file.name.toLowerCase().endsWith('.xlsx'),migration=isXlsx?Importer.migrate(await Importer.readXLSX(await file.arrayBuffer(),file.name),state):null,text=isXlsx?'':await file.text(),parsed=migration?migration.incoming:file.name.toLowerCase().endsWith('.csv')?parseCSV(text):JSON.parse(text),archives=parsed?.storeVersion!==undefined?Store.validate(parsed):null;
-      const incoming=archives?(archives.active||M.blank()):M.validateState(parsed),preview=M.merge(state,incoming),isEmpty=!Store.hasData(state);
+      const incoming=archives?(archives.active||M.blank()):M.validateState(parsed),isEmpty=!Store.hasData(state);
+      let preview,mergeError='';try{preview=M.merge(state,incoming);}catch(e){mergeError=e.message;}
       previewImport={incoming,name:file.name,archives};
-      modal('导入预览 · '+esc(file.name),`${migration?`<p class="panel-sub mb">识别 ${migration.counts.roles} 个角色、${migration.incoming.progress.length} 条周期状态、${migration.counts.balances} 条总级余额；${migration.counts.archivedSheets} 张原表完整归档。已有 Excel 角色档案保持当前值；任务收益、工资、耗时没有从完成标记推断。</p><details class="mb"><summary>待确认 / 未映射 ${migration.issues.length} 项（保留原文）</summary><div class="pad">${migration.issues.map(x=>`<p>${esc(x)}</p>`).join('')||'无'}</div></details>`:''}<p class="muted mb">已验证版本、ID、账号归属与计算参数。源文件保持原样。</p><div class="list-detail"><div><span>将新增记录（合并）</span><b class="success">${preview.stats.added}</b></div><div><span>将更新记录（合并）</span><b>${preview.stats.updated}</b></div><div><span>重复 / 不可覆盖旧记录</span><b>${preview.stats.skipped+preview.stats.old}</b></div><div><span>来源数据性质</span><b>${incoming.dataKind==='simulated'?'示例 / 模拟':'手工 / 导入'}</b></div><div><span>账号 / 角色 / 任务</span><b>${incoming.accounts.length} / ${incoming.roles.length} / ${incoming.tasks.length}</b></div>${archives?`<div><span>包含日期档案</span><b>${archives.snapshots.length} 份</b></div>`:''}</div><div class="mt">${select('importMode','导入方式',[['merge','合并到当前工作空间'],['replace','替换当前工作空间（完整恢复文件）']],'merge')}</div><label class="mt"><input type="checkbox" name="applyConfig" ${isEmpty?'checked':''}> 合并时同时应用文件中的全局参数</label><div class="form-preview mt">替换会完整恢复文件参数和数据，保留其他日期档案。合并时，同 ID 金融事件不改写；没有更新时点的配置保留当前值。<br>日期档案会一并导入；相同档案 ID 只接纳较新的快照。确认后可立即撤销。</div>`,fd=>{
+      modal('导入预览 · '+esc(file.name),`${migration?`<p class="panel-sub mb">识别 ${migration.counts.roles} 个角色、${migration.incoming.progress.length} 条周期状态、${migration.counts.balances} 条总级余额；${migration.counts.archivedSheets} 张原表完整归档。已有 Excel 角色档案保持当前值；任务收益、工资、耗时没有从完成标记推断。</p><details class="mb"><summary>待确认 / 未映射 ${migration.issues.length} 项（保留原文）</summary><div class="pad">${migration.issues.map(x=>`<p>${esc(x)}</p>`).join('')||'无'}</div></details>`:''}<p class="muted mb">已验证版本、ID、账号归属与计算参数。源文件保持原样。</p><div class="list-detail">${preview?`<div><span>将新增记录（合并）</span><b class="success">${preview.stats.added}</b></div><div><span>将更新记录（合并）</span><b>${preview.stats.updated}</b></div><div><span>重复 / 不可覆盖旧记录</span><b>${preview.stats.skipped+preview.stats.old}</b></div>`:''}<div><span>来源数据性质</span><b>${incoming.dataKind==='simulated'?'示例 / 模拟':'手工 / 导入'}</b></div><div><span>账号 / 角色 / 任务</span><b>${incoming.accounts.length} / ${incoming.roles.length} / ${incoming.tasks.length}</b></div>${archives?`<div><span>包含日期档案</span><b>${archives.snapshots.length} 份</b></div>`:''}</div><div class="mt">${mergeError?`<div class="form-preview import-conflict" role="status"><b>文件已校验，合并需要处理冲突</b><p>${esc(mergeError)}</p><p>可以选择完整替换来恢复这份备份，或取消后保留当前工作空间。</p></div>`:''}${select('importMode','导入方式',mergeError?[['','请选择导入方式'],['replace','替换当前工作空间（完整恢复文件）']]:[['merge','合并到当前工作空间'],['replace','替换当前工作空间（完整恢复文件）']],mergeError?'':'merge')}</div><label class="mt"><input type="checkbox" name="applyConfig" ${isEmpty?'checked':''}> 合并时同时应用文件中的全局参数</label><div class="form-preview mt">替换会完整恢复文件参数和数据，保留其他日期档案。合并时，同 ID 金融事件不改写；没有更新时点的配置保留当前值。<br>日期档案会一并导入；相同档案 ID 只接纳较新的快照。确认后可立即撤销。</div>`,fd=>{
         const item=previewImport,wasSetup=ui.setup;
         commit(()=>{
-          const existingRoleIds=new Set(state.roles.map(r=>r.id)),replace=fd.get('importMode')==='replace',merged=M.merge(state,item.incoming),empty=!Store.hasData(state);
+          const mode=fd.get('importMode');if(!['merge','replace'].includes(mode))throw new Error('请选择导入方式；完整替换会恢复文件中的全部数据');
+          const existingRoleIds=new Set(state.roles.map(r=>r.id)),replace=mode==='replace',merged=replace?null:M.merge(state,item.incoming),empty=!Store.hasData(state);
           state=M.freezeHistory(M.upgradeState(replace?structuredClone(item.incoming):merged.next));
           if(replace||empty||fd.get('applyConfig'))state.config={...item.incoming.config};
           if(replace||empty)state.dataKind=item.incoming.dataKind;else if(item.incoming.dataKind==='simulated'&&merged.stats.added)state.dataKind='simulated';
@@ -967,7 +966,7 @@
     'task-date-step':b=>{ui.taskDate=M.addDays(ui.taskDate,Number(b.dataset.offset)*(ui.queueRange==='week'&&ui.workView==='queue'?7:1));ui.generated=null;ui.progressSelection=[];render();},
     'task-layout':b=>{ui.taskLayout=b.dataset.value;render();},
     'progress-layout':b=>{ui.roleDisplayMode=b.dataset.value;render();},
-    'focus-batch':b=>{ui.focusBatchKey=b.dataset.key;render();const card=$('#tc-v2-focus');if(card)card.scrollIntoView({block:'start',behavior:'instant'});},
+    'focus-batch':b=>{ui.focusBatchKey=b.dataset.key;render();const card=$('#tc-v2-focus');if(card&&window.innerWidth<1100)card.scrollIntoView({block:'start',behavior:'instant'});const heading=card?.querySelector('h2');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}},
     'queue-status-button':b=>{ui.queueStatus=b.dataset.value;if(b.dataset.value==='overdue')ui.queueRange='all';ui.focusBatchKey='';render();},
     'quick-batch':b=>quickExecutionForm(state.plans.find(p=>p.id===b.dataset.plan),b.dataset.task,Number(b.dataset.index)),
     'edit-execution':b=>editExecutionForm(b.dataset.plan,b.dataset.task,Number(b.dataset.index)),

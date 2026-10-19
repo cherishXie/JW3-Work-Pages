@@ -700,27 +700,56 @@
     for(const e of s.equipment){if(!s.roles.some(r=>r.id===e.roleId))throw new Error('装备角色不存在');number(e.score,'装备评分');}
     for(const p of s.plans){if(!s.tasks.some(t=>t.id===p.taskId)||!Array.isArray(p.batches)||p.batches.some(b=>!Array.isArray(b)||b.some(id=>!s.roles.some(r=>r.id===id))))throw new Error('排程任务或成员引用无效');if(p.companionAssignments!==undefined){if(!Array.isArray(p.companionAssignments)||p.companionAssignments.some((a,i)=>!Array.isArray(a)||a.some(c=>!p.batches[i]?.includes(c.ownerRoleId)||!Catalog.companions.some(x=>x.id===c.companionId)||!['tank','heal','dps'].includes(c.duty))))throw new Error('排程侠客引用、归属或职责无效');}if(p.teamConfigs!==undefined){if(!Array.isArray(p.teamConfigs)||p.teamConfigs.length!==p.batches.length)throw new Error('排程逐队配置与成员批次不一致');for(const c of p.teamConfigs)if(c)validateTeamConfig(c);}}
     for(const sc of s.scenarios)validateConfig({...s.config,...sc.config});
+    for(const entry of s.notes.filter(n=>n.kind==='task-recycle'))validateRecycleEntry(entry);
     return s;
+  }
+  function validateRecycleEntry(entry){
+    if(!Array.isArray(entry.changes))throw new Error('任务回收记录缺少变更明细');
+    const seen=new Set();
+    for(const c of entry.changes){
+      if(!c||!['plans','records','progress','wageClaims','wageReceipts','materials','materialSales','ledger'].includes(c.key)||typeof c.id!=='string'||!/^[-_a-zA-Z0-9]+$/.test(c.id)||[c.before,c.after].some(row=>row!==null&&(!row||typeof row!=='object'||Array.isArray(row)||row.id!==c.id))||seen.has(c.key+'|'+c.id))throw new Error('任务回收记录引用无效');
+      seen.add(c.key+'|'+c.id);
+    }
+  }
+  function sameHistoryRow(context,key,a,b){
+    const canonical=value=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+    const snapshot=(key,row)=>{
+      if(!row)return null;
+      const copy=JSON.parse(JSON.stringify(row));
+      if(['records','ledger','wageReceipts','materialSales'].includes(key))freezeHistory({...context,records:key==='records'?[copy]:context.records,ledger:key==='ledger'?[copy]:[],wageReceipts:key==='wageReceipts'?[copy]:[],materialSales:key==='materialSales'?[copy]:[]});
+      return copy;
+    };
+    return canonical(snapshot(key,a))===canonical(snapshot(key,b));
   }
   function merge(current,incoming) {
     validateState(incoming);incoming=freezeHistory(JSON.parse(JSON.stringify(incoming)));const next=freezeHistory(JSON.parse(JSON.stringify(current))),stats={added:0,updated:0,skipped:0,old:0};
+    // Backups contain the final workspace plus an audit journal, not a sequence
+    // to replay against an arbitrary (possibly empty) installation.
+    const same=(key,a,b)=>sameHistoryRow(incoming,key,a,b);
     const recycle=new Map((current.notes||[]).filter(n=>n.kind==='task-recycle').map(n=>[n.id,n]));
+    const histories=new Map(),changed=new Set(),handled=new Set();
     for(const entry of incoming.notes.filter(n=>n.kind==='task-recycle')){
-      const old=recycle.get(entry.id);if(old&&(!entry.updatedAt||entry.updatedAt<=old.updatedAt))continue;
-      if(!entry.restoredAt||old&&!old.restoredAt){
-        if(!Array.isArray(entry.changes))throw new Error('任务回收记录缺少变更明细');
-        for(const c of entry.changes){
-          if(!['plans','records','progress','wageClaims','wageReceipts','materials','materialSales','ledger'].includes(c.key)||!/^[-_a-zA-Z0-9]+$/.test(c.id)||c.before?.id!==c.id&&c.before!==null||c.after?.id!==c.id&&c.after!==null)throw new Error('任务回收记录引用无效');
-          const row=(next[c.key]||[]).find(x=>x.id===c.id)||null;
-          if(JSON.stringify(row)!==JSON.stringify(c.before)&&JSON.stringify(row)!==JSON.stringify(c.after))throw new Error('任务删除 / 恢复与当前数据冲突，请核对后使用完整备份替换或手工处理');
-        }
-        for(const c of entry.changes){next[c.key]=(next[c.key]||[]).filter(x=>x.id!==c.id);const row=entry.restoredAt?c.before:c.after;if(row)next[c.key].push(JSON.parse(JSON.stringify(row)));}
+      const old=recycle.get(entry.id),fresh=!old||!!entry.updatedAt&&(!old.updatedAt||entry.updatedAt>old.updatedAt);
+      for(const c of entry.changes){
+        const key=c.key+'|'+c.id;if(!histories.has(key))histories.set(key,[]);histories.get(key).push({entry,...c});if(fresh)changed.add(key);
       }
-      recycle.set(entry.id,entry);
+      if(fresh)recycle.set(entry.id,entry);
+    }
+    for(const key of changed){
+      const history=histories.get(key),{key:collection,id}=history[0],row=(next[collection]||[]).find(x=>x.id===id)||null,target=(incoming[collection]||[]).find(x=>x.id===id)||null;
+      const time=n=>n.updatedAt||n.createdAt||'',latest=history.reduce((at,c)=>time(c.entry)>at?time(c.entry):at,'');
+      const newerLocal=(current.notes||[]).some(n=>n.kind==='task-recycle'&&time(n)>latest&&n.changes?.some(c=>c.key===collection&&c.id===id));
+      handled.add(key);
+      if(newerLocal){stats.old++;continue;}
+      if(same(collection,row,target)){stats.skipped++;continue;}
+      if(row&&!history.some(c=>same(collection,row,c.before)||same(collection,row,c.after)))throw new Error('任务删除 / 恢复与当前数据冲突（'+collection+' / '+id+'），可选择完整备份替换；合并不会覆盖后续修改');
+      next[collection]=(next[collection]||[]).filter(x=>x.id!==id);if(target)next[collection].push(target);
+      if(row)stats.updated++;else if(target)stats.added++;
     }
     const deleted=new Set([...recycle.values()].filter(n=>!n.restoredAt).flatMap(n=>(n.changes||[]).filter(c=>c.after===null).map(c=>c.key+'|'+c.id)));
     for(const key of ['accounts','roles','tasks','progress','records','ledger','cash','equipment','plans','scenarios','notes','wageClaims','wageReceipts','materials','materialSales','sourceArchives','priceQuotes','energyRecipes','roiComparisons'])for(const item of incoming[key]||[]){
-      if(deleted.has(key+'|'+item.id)){stats.old++;continue;}
+      if(handled.has(key+'|'+item.id))continue;
+      if(deleted.has(key+'|'+item.id)&&!next[key]?.some(x=>x.id===item.id)){stats.old++;continue;}
       next[key]??=[];const existing=next[key].find(x=>x.id===item.id);
       if(!existing){next[key].push(item);stats.added++;continue;}
       if(JSON.stringify(existing)===JSON.stringify(item)){stats.skipped++;continue;}
@@ -736,5 +765,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

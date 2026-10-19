@@ -178,7 +178,7 @@
  }
  function restoreDeleted(s,id){
   const copy=JSON.parse(JSON.stringify(s)),entry=copy.notes.find(n=>n.id===id&&n.kind==='task-recycle'&&!n.restoredAt);if(!entry)throw new Error('回收记录不存在或已经恢复');
-  for(const c of entry.changes){const current=(copy[c.key]||[]).find(x=>x.id===c.id);if(JSON.stringify(current||null)!==JSON.stringify(c.after))throw new Error('相关排程或记录已有后续修改，请先撤销后续调整，避免覆盖新数据');}
+  for(const c of entry.changes){const current=(copy[c.key]||[]).find(x=>x.id===c.id);if(!M.sameHistoryRow(copy,c.key,current||null,c.after))throw new Error('相关排程或记录已有后续修改，请先撤销后续调整，避免覆盖新数据');}
   for(const c of entry.changes){copy[c.key]=(copy[c.key]||[]).filter(x=>x.id!==c.id);if(c.before)copy[c.key].push(JSON.parse(JSON.stringify(c.before)));}
   // Refuse recovery if roles have since been arranged or completed elsewhere.
   const restoredPlans=new Set(entry.changes.filter(c=>c.key==='plans'&&c.before).map(c=>c.id));
