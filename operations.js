@@ -31,7 +31,8 @@
    if(t.partyRule==='raid10'){const patch=Object.fromEntries(allowed.filter(k=>options[k]!==undefined).map(k=>[k,options[k]]));if(options.raidTeams===undefined&&(options.runs!==undefined||options.raidPlayerSeats!==undefined))patch.raidTeams=[];t=M.withPartyRule({...t,...patch},'raid10');}
    if(options.enabled!==undefined)t.enabled=options.enabled;M.validateTask(t,s);return t;
   });
-  for(const t of updates){Object.assign(s.tasks.find(x=>x.id===t.id),t);for(const p of s.plans.filter(p=>!p.executed&&!p.executedTaskIds?.includes(t.id)&&(p.routeTaskIds||[p.taskId]).includes(t.id)))p.requiresReview=true;}
+  M.capturePlanForecasts(s);
+  for(const t of updates){Object.assign(s.tasks.find(x=>x.id===t.id),t);}
  }
  function syncRole(s,r){if(r.creationStatus==='planned')return;for(const t of s.tasks.filter(t=>t.autoIncludeRoles))if(!t.roleIds.includes(r.id))t.roleIds.push(r.id);}
  function toggle(s,t){t.enabled=!t.enabled;if(t.enabled&&t.presetKey==='mineral_trade')for(const v of s.tasks.filter(v=>['camp','trade'].includes(v.presetKey)))v.enabled=false;if(t.enabled&&['camp','trade'].includes(t.presetKey))for(const v of s.tasks.filter(v=>v.presetKey==='mineral_trade'))v.enabled=false;}

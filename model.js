@@ -88,9 +88,10 @@
   function partyTask(task,config){return config?withPartyRule({...task,raidPlayerSeats:config.playerSeats,tankMode:config.tankMode},task.partyRule):withPartyRule(task);}
   function upgradeState(s){
     s.config.levelCap??=130;
+    for(const p of s.plans||[])delete p.requiresReview;
     if(s.partyRulesVersion===3)return s;
     for(const t of s.tasks){let rule=t.partyRule;if(!rule){if(t.name==='大战日常')rule='daily5';else if(t.name==='10 人副本'||t.name==='10人本')rule='raid10';}
-      if(rule){t.previousPartyConfig={teamSize:t.teamSize,maxParallel:t.maxParallel,tank:t.tank,heal:t.heal,externalSeats:t.externalSeats};Object.assign(t,withPartyRule(t,rule));for(const p of s.plans.filter(p=>p.taskId===t.id&&!p.executed))p.requiresReview=true;}
+      if(rule){t.previousPartyConfig={teamSize:t.teamSize,maxParallel:t.maxParallel,tank:t.tank,heal:t.heal,externalSeats:t.externalSeats};Object.assign(t,withPartyRule(t,rule));}
     }
     s.partyRulesVersion=3;return s;
   }
@@ -591,33 +592,64 @@
   function inScope(s,r,scope={}){return !!scopedRecord(s,r,scope);}
   function planStart(s,p,taskId=p.taskId){
     let at=instant(p.startedAt||p.date);
-    for(const id of p.routeTaskIds||[p.taskId]){if(id===taskId)break;const t=s.tasks.find(t=>t.id===id),records=s.records.filter(r=>r.planId===p.id&&r.taskId===id),done=new Set(records.flatMap(r=>r.planBatchIndices||p.batches.map((_,i)=>i))),pending=p.batches.filter((_,i)=>!done.has(i)&&!p.closedBatches?.[id]?.includes(i));if(t){const predicted=calculateBatches({...t,prepare:done.size?0:t.prepare,otherCost:0},pending.map(b=>b.map(id=>s.roles.find(r=>r.id===id))),s.config).minutes;at=Math.max(at+records.reduce((n,r)=>n+r.minutes,0)*60000,...records.map(r=>instant(r.startedAt||new Date(at))+r.minutes*60000))+predicted*60000;}}
+    for(const id of p.routeTaskIds||[p.taskId]){if(id===taskId)break;const t=p.taskSnapshots?.[id]||s.tasks.find(t=>t.id===id),records=s.records.filter(r=>r.planId===p.id&&r.taskId===id),done=new Set(records.flatMap(r=>r.planBatchIndices||p.batches.map((_,i)=>i))),pending=p.batches.filter((_,i)=>!done.has(i)&&!p.closedBatches?.[id]?.includes(i));if(t){const predicted=calculateBatches({...t,prepare:done.size?0:t.prepare,otherCost:0},pending.map(b=>b.map(id=>s.roles.find(r=>r.id===id))),s.config).minutes;at=Math.max(at+records.reduce((n,r)=>n+r.minutes,0)*60000,...records.map(r=>instant(r.startedAt||new Date(at))+r.minutes*60000))+predicted*60000;}}
     return new Date(at).toISOString();
   }
-  function confirmedForecast(s,start,end,scope={}){
-    const usage=new Map(),warnings=[],rows=new Map(s.tasks.filter(t=>t.enabled).map(t=>[t.id,[]]));
-    for(const p of [...s.plans].filter(p=>!p.cancelled&&p.date<=end).sort((a,b)=>instant(a.startedAt||a.date)-instant(b.startedAt||b.date)||(a.createdAt||'').localeCompare(b.createdAt||''))){
-      if(p.requiresReview){warnings.push((p.taskName||p.taskId)+'：方案待复核，未计入预测');continue;}
-      let when=instant(p.startedAt||p.date);
-      for(const taskId of p.routeTaskIds||[p.taskId]){when=instant(planStart(s,p,taskId));const taskWhen=new Date(when).toISOString(),taskDate=dateKey(new Date(when));const original=s.tasks.find(t=>t.id===taskId);if(!original)continue;const t=taskForVersion(s,original),batches=[],fullBatches=[],full=eligible(s,t),selected=new Set(eligible(s,t,scope).map(r=>r.id)),wasExecuted=p.executed||p.executedTaskIds?.includes(taskId);
-        for(const [i,ids]of p.batches.entries()){
-          if(p.closedBatches?.[taskId]?.includes(i))continue;
-          const key=id=>[id,cdKey(t),cycle(t,taskWhen)].join('|'),allowed=ids.map(id=>full.find(r=>r.id===id)).filter(r=>{if(!r)return false;const progress=getProgress(s,t,r,taskWhen),record=cdRecord(s,t,r.id,taskWhen);const batchExecuted=s.records.some(x=>x.planId===p.id&&x.taskId===taskId&&(!x.planBatchIndices||x.planBatchIndices.includes(i)));return progress?.status!=='skipped'&&(usage.get(key(r.id))||0)<(progress?.target??t.target)&&(!record||record.planId===p.id)&& (wasExecuted||batchExecuted||(progress?.completed||0)<(progress?.target??t.target));});
-          try{
-            if(t.type==='team'||t.partyRule==='daily5'){if(allowed.length!==ids.length)throw new Error('成员资格、跳过状态或 CD 已变化');if(t.partyRule==='raid10'||t.partyRule==='daily5')validateParty(partyTask(t,p.teamConfigs?.[i]),allowed,p.companionAssignments?.[i]||[],s.config.concurrency);else if(!teamCandidates({...t,runs:1},allowed,[],s.config.concurrency).teams.length)throw new Error('队伍已失效');}
-            if(!allowed.length)continue;
-            if(new Set(allowed.map(r=>r.accountId)).size!==allowed.length||allowed.length>Math.min(s.config.concurrency,t.maxParallel))throw new Error('账号互斥或并行容量已变化');
-            if(!t.enabled)continue;
-            // Reserve CD before filtering; filtering cannot create a new team or duplicate shared income.
-            for(const r of allowed)usage.set(key(r.id),(usage.get(key(r.id))||0)+1);
-            fullBatches.push(allowed);if(allowed.every(r=>selected.has(r.id)))batches.push(allowed);
-            else warnings.push(t.name+'：筛选未包含完整确认批次，未分摊共享收益');
-          }catch(e){warnings.push(t.name+'：'+e.message+'，该批次未计入预测');}
-        }
-        const scopedTask={...t,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0},result=pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);if(taskDate>=start&&taskDate<=end&&rows.has(taskId))rows.get(taskId).push(result);when+=calculateBatches(t,fullBatches,s.config).minutes*60000;
+  // Keep the confirmed template for historical plan/actual comparisons. Archives
+  // are read only; no completion, income, pricing or recycle evidence is edited.
+  function capturePlanForecasts(s,archives=[]){
+    let changed=s.workflowVersion!==2;s.workflowVersion=2;
+    const sources=[...archives].sort((a,b)=>(a.savedAt||'').localeCompare(b.savedAt||''));
+    for(const p of s.plans){
+      if(p.requiresReview!==undefined){delete p.requiresReview;changed=true;}
+      for(const id of p.routeTaskIds||[p.taskId]){
+        if(p.taskSnapshots?.[id])continue;
+        const archive=sources.find(row=>row.data?.plans?.some(old=>old.id===p.id)&&row.data.tasks?.some(t=>t.id===id));
+        const task=(archive?.data||s).tasks.find(t=>t.id===id);if(!task)continue;
+        p.taskSnapshots??={};p.taskSnapshots[id]={...JSON.parse(JSON.stringify(task)),roleIds:[...new Set(p.batches?.flat()||task.roleIds)]};changed=true;
       }
     }
-    const tasks=s.tasks.filter(t=>t.enabled).map(task=>({task,...sum(rows.get(task.id)||[],s.config),hasData:true}));
+    return changed;
+  }
+  function confirmedForecast(s,start,end,scope={}){
+    const usage=new Map(),warnings=[],rows=new Map(s.tasks.map(t=>[t.id,[]]));
+    for(const p of [...s.plans].filter(p=>!p.cancelled&&p.date<=end).sort((a,b)=>instant(a.startedAt||a.date)-instant(b.startedAt||b.date)||(a.createdAt||'').localeCompare(b.createdAt||''))){
+      for(const taskId of p.routeTaskIds||[p.taskId]){
+        const when=instant(planStart(s,p,taskId)),taskWhen=new Date(when).toISOString(),taskDate=dateKey(new Date(when)),current=s.tasks.find(t=>t.id===taskId);if(!current)continue;
+        const t=taskForVersion(s,p.taskSnapshots?.[taskId]||current),validationTask=taskForVersion(s,{...current,...p.taskSnapshots?.[taskId],enabled:current.enabled}),batches=[],fullBatches=[],done=new Set(recordedBatchIndices(s,p,taskId)),full=eligible(s,validationTask),selected=new Set(eligible(s,validationTask,scope).map(r=>r.id));
+        for(const [i,ids]of p.batches.entries()){
+          if(p.closedBatches?.[taskId]?.includes(i))continue;
+          const completed=done.has(i),event=executionRecords(s).find(r=>r.planId===p.id&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(i)));
+          const key=id=>[id,cdKey(t),event?.cycle||cycle(t,taskWhen)].join('|');
+          // Completed batches are evidence. Current membership, caps, manual
+          // progress and duty edits must never erase their confirmed baseline.
+          const allowed=completed?ids.map(id=>{const r=s.roles.find(r=>r.id===id);return r&&{...r,accountId:event?.roleAccounts?.[id]||r.accountId};}).filter(Boolean):ids.map(id=>full.find(r=>r.id===id)).filter(r=>{
+            if(!r)return false;const progress=getProgress(s,validationTask,r,taskWhen),record=cdRecord(s,validationTask,r.id,taskWhen);
+            return progress?.status!=='skipped'&&(usage.get(key(r.id))||0)<(progress?.target??validationTask.target)&&(!record||record.planId===p.id);
+          });
+          try{
+            if(!completed){
+              if(!validationTask.enabled)continue;
+              if(validationTask.type==='team'||validationTask.partyRule==='daily5'){
+                if(allowed.length!==ids.length)throw new Error('成员资格、跳过状态或 CD 已变化');
+                if(['raid10','daily5'].includes(validationTask.partyRule))validateParty(partyTask(savedPartyTask(validationTask,p),p.teamConfigs?.[i]),allowed,p.companionAssignments?.[i]||[],s.config.concurrency);
+                else if(!teamCandidates({...validationTask,runs:1},allowed,[],s.config.concurrency).teams.length)throw new Error('队伍已失效');
+              }
+              if(new Set(allowed.map(r=>r.accountId)).size!==allowed.length||allowed.length>Math.min(s.config.concurrency,validationTask.maxParallel))throw new Error('账号互斥或并行容量已变化');
+            }
+            if(!allowed.length)continue;
+            for(const r of allowed)usage.set(key(r.id),(usage.get(key(r.id))||0)+1);
+            fullBatches.push(allowed);
+            const scoped=completed?new Set(selectedRecordRoles(s,event||{roleIds:ids},scope)):selected;
+            if(allowed.every(r=>scoped.has(r.id)))batches.push(allowed);else warnings.push(t.name+'：筛选未包含完整确认批次，未分摊共享收益');
+          }catch(e){if(taskDate>=start&&taskDate<=end)warnings.push(t.name+'：'+e.message+'，该批次未计入预测');}
+        }
+        const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
+        const result=pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);
+        if(taskDate>=start&&taskDate<=end)rows.get(taskId).push(result);
+      }
+    }
+    const tasks=s.tasks.filter(t=>t.enabled||rows.get(t.id)?.length).map(task=>({task,...sum(rows.get(task.id)||[],s.config),hasData:true}));
     const seen=new Set();let unassignedTargets=0;for(const d of dates(start,end))for(const t of s.tasks.filter(t=>t.enabled&&t.days.includes(weekday(d))))for(const r of eligible(s,t,scope)){const key=[r.id,cdKey(t),cycle(t,d)].join('|');if(seen.has(key))continue;seen.add(key);const p=getProgress(s,t,r,d);if(p?.status==='skipped')continue;unassignedTargets+=Math.max(0,(p?.target??t.target)-Math.max(p?.completed||0,usage.get(key)||0));}
     return {...sum(tasks,s.config),tasks,hasData:true,unassignedTargets,forecastWarnings:[...new Set(warnings)],start,end};
   }
@@ -664,6 +696,7 @@
       if(r.billableAccountMinutes){for(const [id,m]of Object.entries(r.billableAccountMinutes)){if(!s.accounts.some(a=>a.id===id))throw new Error('计费分钟账号不存在');number(m,'计费分钟');number(r.coveredAccountMinutes?.[id]??0,'月卡覆盖分钟');if(Math.abs(m+(r.coveredAccountMinutes?.[id]||0)-(r.accountMinutes?.[id]||0))>1e-6)throw new Error('计费分钟与账号出勤不一致');}}
       if(new Set(r.roleIds).size!==r.roleIds.length)throw new Error('实测成员重复');
       if(r.startedAt!==undefined&&r.startedAt!==null&&(!Number.isFinite(new Date(r.startedAt).getTime())||dateKey(new Date(r.startedAt))!==r.date))throw new Error('实测开始时刻与日期不一致');
+      if(r.endedAt!=null&&(!r.startedAt||!Number.isFinite(Date.parse(r.endedAt))||Date.parse(r.endedAt)<Date.parse(r.startedAt)))throw new Error('实测结束时间无效或早于开始时间');
       if(r.dungeonId&&(typeof r.dungeonId!=='string'||!/^[-_a-zA-Z0-9]+$/.test(r.dungeonId)||!validDate(r.cycle)))throw new Error('实测副本 CD 标识无效');
       if(r.cdSnapshot){if(r.cdSnapshot.period!=='weekly'||!Array.isArray(r.cdSnapshot.resetDays)||!r.cdSnapshot.resetDays.length||r.cdSnapshot.resetDays.some(d=>!Number.isInteger(d)||d<0||d>6))throw new Error('历史 CD 刷新规则无效');number(r.cdSnapshot.resetHour,'历史刷新小时',{min:0,max:23,integer:true});if(r.cycle!==cycle(r.cdSnapshot,r.startedAt||r.date))throw new Error('实测 CD 与开始时刻或历史刷新规则不一致');}
       if(r.roleAccounts){if(Object.keys(r.roleAccounts).length!==r.roleIds.length||r.roleIds.some(id=>!s.accounts.some(a=>a.id===r.roleAccounts[id])))throw new Error('历史角色账号快照无效');}if(r.roleGroups&&r.roleIds.some(id=>typeof r.roleGroups[id]!=='string'))throw new Error('历史分组快照无效');
@@ -672,6 +705,14 @@
       if(r.roleAllocations){
         if(Object.keys(r.roleAllocations).length!==r.roleIds.length||r.roleIds.some(id=>!r.roleAllocations[id]))throw new Error('实测分摊必须覆盖全部出勤成员');
         for(const key of ['gold','minutes','onlineMinutes','otherCost']){let total=0;for(const [id,a]of Object.entries(r.roleAllocations)){if(!r.roleIds.includes(id))throw new Error('分摊成员不在实测范围');total+=number(a[key]??0,'分摊 '+key);}if(Math.abs(total-(r[key]||0))>1e-6)throw new Error('分摊 '+key+' 与整条记录不一致');}
+      }
+    }
+    for(const p of s.plans){
+      if(p.taskSnapshots!=null){if(typeof p.taskSnapshots!=='object'||Array.isArray(p.taskSnapshots))throw new Error('排程模板快照格式无效');for(const [id,t]of Object.entries(p.taskSnapshots)){if(!t||t.id!==id||!s.tasks.some(x=>x.id===id))throw new Error('排程模板快照引用无效');validateTask(t,s);}}
+      for(const f of p.completionFacts||[])if(f.endedAt!=null&&(!f.startedAt||!Number.isFinite(Date.parse(f.endedAt))||Date.parse(f.endedAt)<Date.parse(f.startedAt)))throw new Error('完成登记结束时间无效');
+      if(p.executionDrafts!==undefined){
+        if(!Array.isArray(p.executionDrafts))throw new Error('执行草稿必须为数组');
+        const keys=new Set();for(const d of p.executionDrafts){const key=d.taskId+'|'+d.index;if(!(p.routeTaskIds||[p.taskId]).includes(d.taskId)||!Number.isInteger(d.index)||!p.batches[d.index]||keys.has(key)||!d.values||typeof d.values!=='object'||Array.isArray(d.values)||!Array.isArray(d.roleIds))throw new Error('执行草稿引用无效');keys.add(key);for(const k of ['gold','minutes','onlineMinutes','otherCost'])if(d.values[k]!==''&&d.values[k]!=null)number(d.values[k],k);}
       }
     }
     const factIds=new Set();for(const p of s.plans){if(p.completionFacts!==undefined&&!Array.isArray(p.completionFacts))throw new Error('完成登记必须为数组');const keys=new Set();for(const f of p.completionFacts||[]){const i=f.planBatchIndices?.[0],t=s.tasks.find(t=>t.id===f.taskId),key=f.taskId+'|'+i;if(!f.id||!/^[-_a-zA-Z0-9]+$/.test(f.id)||factIds.has(f.id)||keys.has(key)||f.planId!==p.id||!f.completionOnly||!t||!(p.routeTaskIds||[p.taskId]).includes(t.id)||!Array.isArray(f.planBatchIndices)||f.planBatchIndices.length!==1||!Number.isInteger(i)||!p.batches?.[i]||f.batches!==1)throw new Error('完成登记引用无效或重复');factIds.add(f.id);keys.add(key);if(!validDate(f.date)||f.date!==p.date||f.startedAt&&(!Number.isFinite(Date.parse(f.startedAt))||dateKey(new Date(f.startedAt))!==f.date)||f.cycle!==cycle(f.cycleSnapshot||f.cdSnapshot||t,f.startedAt||f.date))throw new Error('完成登记日期或周期无效');if(!Array.isArray(f.roleIds)||new Set(f.roleIds).size!==f.roleIds.length||f.roleIds.length!==p.batches[i].length||f.roleIds.some(id=>!p.batches[i].includes(id)||!s.accounts.some(a=>a.id===f.roleAccounts?.[id])||typeof f.roleGroups?.[id]!=='string'))throw new Error('完成登记成员或账号快照无效');validateConfig(f.snapshot);if(!Array.isArray(f.billingAccounts)||new Set(f.billingAccounts.map(a=>a.id)).size!==f.billingAccounts.length||f.roleIds.some(id=>!f.billingAccounts.some(a=>a.id===f.roleAccounts[id]))||f.billingAccounts.some(a=>!s.accounts.some(x=>x.id===a.id)||a.monthlyExpiresAt&&!Number.isFinite(Date.parse(a.monthlyExpiresAt))||a.billingType&&!['point','monthly'].includes(a.billingType)))throw new Error('完成登记计费账号快照无效');if(f.cycleSnapshot){if(!['daily','weekly'].includes(f.cycleSnapshot.period)||!Array.isArray(f.cycleSnapshot.resetDays)||!f.cycleSnapshot.resetDays.length||f.cycleSnapshot.resetDays.some(d=>!Number.isInteger(d)||d<0||d>6))throw new Error('完成登记刷新规则无效');number(f.cycleSnapshot.resetHour,'完成刷新小时',{min:0,max:23,integer:true});}}}
@@ -716,6 +757,7 @@
     const snapshot=(key,row)=>{
       if(!row)return null;
       const copy=JSON.parse(JSON.stringify(row));
+      if(key==='plans'){delete copy.taskSnapshots;delete copy.requiresReview;}
       if(['records','ledger','wageReceipts','materialSales'].includes(key))freezeHistory({...context,records:key==='records'?[copy]:context.records,ledger:key==='ledger'?[copy]:[],wageReceipts:key==='wageReceipts'?[copy]:[],materialSales:key==='materialSales'?[copy]:[]});
       return copy;
     };
@@ -765,5 +807,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
