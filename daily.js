@@ -4,6 +4,14 @@
  function doneIndices(s,p,taskId){return M.recordedBatchIndices(s,p,taskId);}
  function remaining(s,p,taskId=p.taskId){return M.pendingBatchIndices(s,p,taskId);}
  function reconcile(s,p){p.executedTaskIds=(p.routeTaskIds||[p.taskId]).filter(id=>doneIndices(s,p,id).length===p.batches.length);p.executed=p.executedTaskIds.length===(p.routeTaskIds||[p.taskId]).length;p.ended=(p.routeTaskIds||[p.taskId]).every(id=>!remaining(s,p,id).length);}
+ // Original completion facts keep backfills and note edits from changing order.
+ function completedTime(s,p,taskId=null,index=null){
+  const facts=p.completionFacts||[],records=s.records.filter(r=>r.planId===p.id);
+  const matches=r=>(taskId===null||r.taskId===taskId)&&(index===null||!r.planBatchIndices||r.planBatchIndices.includes(index));
+  const entries=[...facts.filter(matches),...records.filter(matches).filter(r=>!(index===null?(r.planBatchIndices||p.batches.map((_,i)=>i)):[index]).every(i=>facts.some(f=>f.taskId===r.taskId&&f.planBatchIndices.includes(i))))];
+  const timestamp=r=>{for(const value of [r.endedAt,r.createdAt,r.startedAt,r.date]){const n=Date.parse(value);if(Number.isFinite(n))return n;}return 0;};
+  return Math.max(0,...entries.map(timestamp))||timestamp({date:p.date});
+ }
  function hasExecution(s,p){return M.executionRecords(s).some(r=>r.planId===p.id);}
  function canRegisterPlannedRole(s,t,id,when){const r=s.roles.find(r=>r.id===id);if(!r||M.cdRecord(s,t,id,when))return false;const progress=M.effectiveProgress(s,t,r,when);return progress.manualStatus!=='skipped'&&progress.actualCompleted<progress.target;}
  function checkBatch(s,p,taskId,index,when){
@@ -243,5 +251,5 @@
   for(const p of copy.plans.filter(p=>restoredPlans.has(p.id))){if(!p.cancelled)M.validatePlanCapacity(copy,p);for(const e of M.executionRecords(copy).filter(e=>e.planId===p.id)){const t=copy.tasks.find(t=>t.id===e.taskId),when=e.startedAt||e.date;for(const id of e.roleIds){const other=M.executionRecords(copy).filter(x=>x.planId!==p.id&&x.roleIds.includes(id)&&(x.dungeonId?M.cdKey(x)===M.cdKey(t):x.taskId===t.id)&&(x.cycle||M.cycle(t,x.startedAt||x.date))===(e.cycle||M.cycle(t,when)));if(t.dungeonId&&other.length)throw new Error('该副本 CD 已被其他执行占用，无法恢复');const r=copy.roles.find(r=>r.id===id),progress=M.effectiveProgress(copy,t,r,when);if(progress.completed+M.reservedCount(copy,t,id,when)>progress.target)throw new Error(r.name+' 的目标已被其他排程或执行占用，无法恢复');}}}
   entry.restoredAt=new Date(Math.max(Date.now(),Date.parse(entry.updatedAt)+1)).toISOString();entry.updatedAt=entry.restoredAt;M.validateState(copy);Object.assign(s,copy);return entry;
  }
- return {canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });
