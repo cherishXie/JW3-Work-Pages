@@ -44,12 +44,23 @@
  function saveExecutionDraft(s,planId,taskId,index,input={}){
   const p=s.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
   const fact=(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices.includes(index));
-  const timing=executionTiming(p.date,input);
-  if(!fact)checkBatch(s,p,taskId,index,timing.startedAt||p.date);
+  executionTiming(input.date||fact?.date||p.date,input);
+  if(!fact)checkBatch(s,p,taskId,index,M.planStart(s,p,taskId));
   if(s.records.some(r=>r.planId===planId&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(index))))throw new Error('本批已有实测，请使用调整完成记录');
   for(const key of ['gold','minutes','onlineMinutes','otherCost'])if(input[key]!==''&&input[key]!=null)M.number(input[key],key);
   const draft={taskId,index,roleIds:[...p.batches[index]],values:JSON.parse(JSON.stringify(input)),updatedAt:new Date().toISOString()};
   p.executionDrafts=(p.executionDrafts||[]).filter(d=>d.taskId!==taskId||d.index!==index);p.executionDrafts.push(draft);p.updatedAt=draft.updatedAt;return draft;
+ }
+ // Opening a pending batch persists its clock even when the dialog is cancelled.
+ function openExecutionDraft(s,planId,taskId,index,defaults={},now=new Date()){
+  const p=s.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
+  const fact=(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices[0]===index);
+  const draft=p.executionDrafts?.find(d=>d.taskId===taskId&&d.index===index&&JSON.stringify(d.roleIds)===JSON.stringify(p.batches[index]))?.values||{};
+  const values={...defaults,...draft},day=M.dateKey(now),time=new Date(now.getTime()+8*3600000).toISOString().slice(11,19);
+  if(fact?.startedAt){values.date=fact.date;values.startTime=new Date(Date.parse(fact.startedAt)+8*3600000).toISOString().slice(11,19);values.startedAt=fact.startedAt;}
+  if(values.startTime||values.startedAt){values.date=values.date||fact?.date||p.date;values.endDate=day;values.endTime=time;delete values.endedAt;}
+  else{values.date=day;values.startTime=time;values.endDate=day;values.endTime='';delete values.endedAt;}
+  return saveExecutionDraft(s,planId,taskId,index,values);
  }
  // Return an entirely validated candidate. No state is written on a failed swap.
  function replaceBatchRole(s,p,index,fromRoleId,toRoleId){
@@ -77,15 +88,16 @@
  }
  function registerBatch(s,planId,taskId,index,input={}){
   const copy=JSON.parse(JSON.stringify(s)),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
-  const timing=executionTiming(p.date,input,new Set((p.batches[index]||[]).map(id=>copy.roles.find(r=>r.id===id)?.accountId)).size);
+  const date=input.date||(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices[0]===index)?.date||p.date;
+  const timing=executionTiming(date,input,new Set((p.batches[index]||[]).map(id=>copy.roles.find(r=>r.id===id)?.accountId)).size);
   let fact=(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices[0]===index);
   if(copy.records.some(r=>r.planId===planId&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(index))))throw new Error('本批已有实测，请勿重复登记');
   const values=['gold','minutes','onlineMinutes'].map(k=>input[k]!==undefined&&input[k]!==''&&input[k]!==null),measured=values.every(Boolean);
   if(values.some(Boolean)&&!measured)throw new Error('请补齐实收、操作分钟和在线分钟，或全部留空仅登记完成');
   if(fact&&!measured)throw new Error('已登记完成，请填写实测值后补录');
   if(!fact){
-   const when=timing.startedAt||p.date,t=checkBatch(copy,p,taskId,index,when),ids=[...p.batches[index]],accounts=new Set(ids.map(id=>copy.roles.find(r=>r.id===id).accountId));
-   fact={id:M.id('completion'),completionOnly:true,planId,taskId,taskName:t.name,date:p.date,startedAt:timing.startedAt,cycle:M.cycle(t,when),roleIds:ids,batches:1,planBatchIndices:[index],source:'完成登记',createdAt:new Date().toISOString(),note:input.note||'',snapshot:M.pricingConfig(copy,when),billingAccounts:copy.accounts.filter(a=>accounts.has(a.id)).map(a=>({...a})),...(t.dungeonId?{dungeonId:t.dungeonId,dungeonName:t.dungeonName,difficulty:t.difficulty,cdSnapshot:{period:t.period,resetDays:t.resetDays||[t.resetDay],resetDay:t.resetDay,resetHour:t.resetHour}}:{})};
+   const when=timing.startedAt||date,t=checkBatch(copy,p,taskId,index,when),ids=[...p.batches[index]],accounts=new Set(ids.map(id=>copy.roles.find(r=>r.id===id).accountId));
+   fact={id:M.id('completion'),completionOnly:true,planId,taskId,taskName:t.name,date,startedAt:timing.startedAt,cycle:M.cycle(t,when),roleIds:ids,batches:1,planBatchIndices:[index],source:'完成登记',createdAt:new Date().toISOString(),note:input.note||'',snapshot:M.pricingConfig(copy,when),billingAccounts:copy.accounts.filter(a=>accounts.has(a.id)).map(a=>({...a})),...(t.dungeonId?{dungeonId:t.dungeonId,dungeonName:t.dungeonName,difficulty:t.difficulty,cdSnapshot:{period:t.period,resetDays:t.resetDays||[t.resetDay],resetDay:t.resetDay,resetHour:t.resetHour}}:{})};
    fact.cycleSnapshot={period:t.period,resetDays:t.resetDays||[t.resetDay],resetDay:t.resetDay,resetHour:t.resetHour};M.freezeRecord(copy,fact);p.completionFacts??=[];p.completionFacts.push(fact);
   }
   if(timing.startedAt&&fact.startedAt&&fact.startedAt!==timing.startedAt)throw new Error('补录须沿用完成登记的开始时刻；需要改期请先撤销完成');
@@ -231,5 +243,5 @@
   for(const p of copy.plans.filter(p=>restoredPlans.has(p.id))){if(!p.cancelled)M.validatePlanCapacity(copy,p);for(const e of M.executionRecords(copy).filter(e=>e.planId===p.id)){const t=copy.tasks.find(t=>t.id===e.taskId),when=e.startedAt||e.date;for(const id of e.roleIds){const other=M.executionRecords(copy).filter(x=>x.planId!==p.id&&x.roleIds.includes(id)&&(x.dungeonId?M.cdKey(x)===M.cdKey(t):x.taskId===t.id)&&(x.cycle||M.cycle(t,x.startedAt||x.date))===(e.cycle||M.cycle(t,when)));if(t.dungeonId&&other.length)throw new Error('该副本 CD 已被其他执行占用，无法恢复');const r=copy.roles.find(r=>r.id===id),progress=M.effectiveProgress(copy,t,r,when);if(progress.completed+M.reservedCount(copy,t,id,when)>progress.target)throw new Error(r.name+' 的目标已被其他排程或执行占用，无法恢复');}}}
   entry.restoredAt=new Date(Math.max(Date.now(),Date.parse(entry.updatedAt)+1)).toISOString();entry.updatedAt=entry.restoredAt;M.validateState(copy);Object.assign(s,copy);return entry;
  }
- return {canRegisterPlannedRole,executionTiming,saveExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });
