@@ -306,7 +306,7 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 .tc-v2-measured span{font-size:10px;color:var(--wb-text-secondary);flex:1;min-width:86px}
 .tc-v2-measured b{display:block;font-size:14px;color:var(--wb-text);font-variant-numeric:tabular-nums}
 
-/* Keep account positions stable across batches, including absent accounts. */
+/* Keep active accounts aligned across adjacent batches without empty slots. */
 :root{--tc-login:#fb923c;--tc-login-bg:#f9731614;--tc-switch:#60a5fa;--tc-switch-bg:#2563eb1a}
 :root[data-color-mode="light"]{--tc-login:#9a3412;--tc-login-bg:#fff7ed;--tc-switch:#1d4ed8;--tc-switch-bg:#eff6ff}
 .tc-account-legend{display:flex;flex-wrap:wrap;gap:5px 15px;color:var(--wb-text-secondary);font-size:11px;margin:0 0 12px}
@@ -321,7 +321,5 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 .tc-account-slot.is-login .tc-account-action{color:var(--tc-login)}
 .tc-account-slot.is-switch{background:var(--tc-switch-bg);border-color:var(--tc-switch);border-left:3px solid var(--tc-switch)}
 .tc-account-slot.is-switch .tc-account-action{color:var(--tc-switch)}
-.tc-account-slot.is-absent{background:transparent;border-style:dashed}
-.tc-account-slot.is-absent strong,.tc-account-slot.is-absent .tc-v2-person-account{color:var(--wb-text-muted)}
 .tc-quick-context>.tc-account-grid{width:100%}
 .tc-account-grid .tc-account-slot .combat-tag{align-self:flex-start}
