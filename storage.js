@@ -29,13 +29,54 @@
   }
   function read(storage){
     const raw=storage.getItem(KEY);
-    if(raw!==null)return {store:validate(JSON.parse(raw)),migrated:false};
+    if(raw!==null)return {store:validate(unpack(JSON.parse(raw))),migrated:false};
     const legacy=storage.getItem(LEGACY_KEY);
     if(legacy===null)return {store:empty(),migrated:false};
     const state=M.validateState(JSON.parse(legacy)),time=new Date(state.updatedAt);
     return {store:withState(empty(),state,Number.isFinite(time.getTime())?time:new Date()),migrated:true};
   }
-  function write(storage,store){storage.setItem(KEY,JSON.stringify(validate(store)));}
+  // Snapshots and recycle entries share most of their content. Intern equal JSON
+  // subtrees only when the ordinary representation exceeds the browser quota.
+  // Array references are unambiguous: every original array/object lives in nodes.
+  function pack(value){
+    const nodes=[],known=new Map();
+    function encode(value){
+      if(value===null||typeof value!=='object')return value;
+      const node=Array.isArray(value)?value.map(encode):Object.fromEntries(Object.entries(value).map(([k,v])=>[k,encode(v)]));
+      const key=JSON.stringify(node);
+      if(known.has(key))return [known.get(key)];
+      const id=nodes.length;nodes.push(node);known.set(key,id);return [id];
+    }
+    const root=encode(value);return {storageEncoding:'shared-json-v1',root,nodes};
+  }
+  function unpack(value){
+    if(value?.storageEncoding!=='shared-json-v1')return value;
+    const {nodes,root}=value;
+    if(!Array.isArray(nodes))throw new Error('本地去重数据格式无效');
+    const decoded=[];
+    function decode(value,limit){
+      if(value===null||typeof value!=='object')return value;
+      if(!Array.isArray(value)||value.length!==1||!Number.isInteger(value[0])||value[0]<0||value[0]>=limit)throw new Error('本地去重数据引用无效');
+      // Each occurrence must be independent, as in an ordinary JSON round trip.
+      return copy(decoded[value[0]]);
+    }
+    for(const node of nodes){
+      if(!node||typeof node!=='object')throw new Error('本地去重数据节点无效');
+      decoded.push(Array.isArray(node)?node.map(v=>decode(v,decoded.length)):Object.fromEntries(Object.entries(node).map(([k,v])=>[k,decode(v,decoded.length)])));
+    }
+    return decode(root,decoded.length);
+  }
+  function quotaError(e){return e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22||e?.code===1014;}
+  function write(storage,store){
+    const raw=JSON.stringify(validate(store));
+    try{storage.setItem(KEY,raw);return;}catch(e){if(!quotaError(e))throw e;}
+    const compact=JSON.stringify(pack(JSON.parse(raw)));
+    if(compact.length<raw.length){
+      try{storage.setItem(KEY,compact);return;}catch(e){if(!quotaError(e))throw e;}
+    }
+    // setItem is atomic. Never remove the previous value or discard archives.
+    throw new Error('浏览器本地存储空间不足，无损去重后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
+  }
   function restore(store,id){const row=store.snapshots.find(x=>x.id===id);if(!row)throw new Error('日期档案不存在');const next=copy(store);next.active=copy(row.data);return validate(next);}
   function mergeArchives(current,incoming){
     validate(incoming);const next=copy(current);

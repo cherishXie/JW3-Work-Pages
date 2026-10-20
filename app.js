@@ -1,8 +1,8 @@
-/* No network or game access: all records are browser-local and explicitly sourced. */
+/* Browser-local records. Device launch preparation is isolated in execution.js. */
 (() => {
   'use strict';
   const Theme=WorkbenchThemes, Catalog=JX3Catalog, Raids=JX3Raids, Activity=WorkbenchActivity, Ops=WorkbenchOperations;
-  const ROI=WorkbenchROI, Daily=WorkbenchDaily, Importer=WorkbenchImporter;
+  const ROI=WorkbenchROI, Daily=WorkbenchDaily, Importer=WorkbenchImporter, Execution=WorkbenchExecution;
   const M=Workbench, Store=WorkbenchStorage, KEY=Store.KEY, $=s=>document.querySelector(s);
   const icons={overview:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',task:'M9 5h11 M9 12h11 M9 19h11 M3 5l1 1 2-2 M3 12l1 1 2-2 M3 19l1 1 2-2',roi:'M4 20V4 M4 20h17 M8 16v-5 M13 16V7 M18 16v-9',plan:'M4 4h16v17H4z M8 2v4 M16 2v4 M4 9h16 M8 13h2 M14 13h2 M8 17h2',history:'M3 11a9 9 0 1 1 2 7 M3 4v7h7 M12 7v6l4 2',roles:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8 M17 4a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-4',assets:'M3 7h18v13H3z M3 7V4h15v3 M16 12h5v4h-5z',settings:'M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2',data:'M4 5c0-4 16-4 16 0s-16 4-16 0 M4 5v14c0 4 16 4 16 0V5 M4 12c0 4 16 4 16 0',plus:'M12 4v16 M4 12h16',arrow:'M5 12h14 M13 6l6 6-6 6',share:'M7 12l10-6 M7 12l10 6 M3 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0 M17 5a2 2 0 1 0 4 0 2 2 0 1 0-4 0 M17 19a2 2 0 1 0 4 0 2 2 0 1 0-4 0',download:'M12 3v12 M7 10l5 5 5-5 M4 16v5h16v-5',info:'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20 M12 10v7 M12 6v1',check:'M5 12l4 4L20 5',close:'M6 6l12 12 M6 18L18 6',search:'M10 3a7 7 0 1 0 0 14 7 7 0 1 0 0-14 M15 15l6 6',menu:'M3 5h18 M3 12h18 M3 19h18',bolt:'M13 2L5 14h7l-1 8 8-13h-7z',shield:'M12 2l8 3v7c0 5-8 10-8 10S4 17 4 12V5z',chevron:'M9 5l7 7-7 7',edit:'M4 20l4-1L20 7l-4-4L4 15z M14 5l4 4'};
   const icon=(name)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[name]||icons.task}"/></svg>`;
@@ -191,7 +191,7 @@
   }
   function todoList(limit=4){const rows=state.tasks.filter(t=>t.enabled&&t.days.includes(M.weekday(today))).map(t=>({task:t,...M.plan(state,t,today,scope(),true)})).filter(t=>t.executions>0).sort((a,b)=>(b.hourly??0)-(a.hourly??0));if(!rows.length)return empty('今天的任务已清空','可以选择其他日期，或为角色安排新任务。',button('查看任务矩阵','nav','','data-page="task"'));return `<div class="todo-list">${rows.slice(0,limit).map(r=>`<div class="todo-row"><span class="task-icon">${icon(r.task.type==='team'?'shield':'bolt')}</span><div class="todo-name"><strong>${esc(r.task.name)}</strong><small>${r.executions} ${r.task.type==='team'?'队通关':'角色次'}待做 · ${r.batches.length} 批 · ${num(r.minutes)} 分钟</small></div><div class="todo-value"><b class="cyan">${amount(r.net,r.netGold)}</b><small>预计净收益</small></div>${button(icon('chevron'),'task-detail','ghost small',`data-id="${r.task.id}" aria-label="查看${esc(r.task.name)}"`)}</div>`).join('')}</div>`;}
   function taskPage(){
-    return `<div class="task-center"><div class="tc-heading"><div><h1>任务中心</h1><span class="muted">按批次执行，按角色查漏</span></div><div class="flex wrap">${button('回收站'+(state.notes.filter(n=>n.kind==='task-recycle'&&!n.restoredAt).length?' ('+state.notes.filter(n=>n.kind==='task-recycle'&&!n.restoredAt).length+')':''),'task-recycle','small')}${button('管理与分配任务','nav','small','data-page="settings"')}</div></div><div class="tc-bar">${tabs([['queue','排程与执行'],['progress','角色查漏'],['planning','安排任务']],ui.workView,'work-view')}<div class="tc-date flex wrap">${button('‹','task-date-step','small','data-offset="-1" aria-label="上一日期"')}<label><span class="sr-only">任务日期</span><input id="task-date" aria-label="任务日期" type="date" value="${ui.taskDate}"></label>${button('›','task-date-step','small','data-offset="1" aria-label="下一日期"')}${button('今天','task-today','small')}${ui.workView==='queue'?`<select id="queue-range" aria-label="排程范围">${[['day','当天'],['week','本周'],['all','全部日期']].map(([v,l])=>`<option value="${v}" ${ui.queueRange===v?'selected':''}>${l}</option>`).join('')}</select>`:''}</div></div>${ui.workView!=='planning'?`<div class="tc-filters"><input id="task-search" type="search" placeholder="搜索任务、角色、账号" aria-label="搜索任务、角色、账号" value="${esc(ui.search)}">${ui.workView==='queue'?`<select id="queue-status" aria-label="执行状态">${[['pending','未完成'],['review','需复核'],['overdue','已逾期'],['unmeasured','待补实测'],['all','全部状态']].map(([v,l])=>`<option value="${v}" ${ui.queueStatus===v?'selected':''}>${l}</option>`).join('')}</select>`:''}${ui.taskFilter?button('清除任务筛选','clear-task-filter','ghost small'):''}<span class="tc-scope muted">${ui.group?esc(ui.group):'全部账号'}${ui.role?' · '+esc(state.roles.find(r=>r.id===ui.role)?.name):''}${ui.workView==='progress'?' · 各任务按所选日期所在刷新周期':''}</span></div>`:''}${ui.workView==='planning'?planPage():ui.workView==='progress'?progressPanel():executionQueue()}</div>`;
+    return `<div class="task-center"><div class="tc-heading"><div><h1>任务中心</h1><span class="muted">按批次执行，按角色查漏</span></div><div class="flex wrap">${button('MuMu 设置','mumu-settings','small')}${button('回收站'+(state.notes.filter(n=>n.kind==='task-recycle'&&!n.restoredAt).length?' ('+state.notes.filter(n=>n.kind==='task-recycle'&&!n.restoredAt).length+')':''),'task-recycle','small')}${button('管理与分配任务','nav','small','data-page="settings"')}</div></div><div class="tc-bar">${tabs([['queue','排程与执行'],['progress','角色查漏'],['planning','安排任务']],ui.workView,'work-view')}<div class="tc-date flex wrap">${button('‹','task-date-step','small','data-offset="-1" aria-label="上一日期"')}<label><span class="sr-only">任务日期</span><input id="task-date" aria-label="任务日期" type="date" value="${ui.taskDate}"></label>${button('›','task-date-step','small','data-offset="1" aria-label="下一日期"')}${button('今天','task-today','small')}${ui.workView==='queue'?`<select id="queue-range" aria-label="排程范围">${[['day','当天'],['week','本周'],['all','全部日期']].map(([v,l])=>`<option value="${v}" ${ui.queueRange===v?'selected':''}>${l}</option>`).join('')}</select>`:''}</div></div>${ui.workView!=='planning'?`<div class="tc-filters"><input id="task-search" type="search" placeholder="搜索任务、角色、账号" aria-label="搜索任务、角色、账号" value="${esc(ui.search)}">${ui.workView==='queue'?`<select id="queue-status" aria-label="执行状态">${[['pending','未完成'],['review','需复核'],['overdue','已逾期'],['unmeasured','待补实测'],['all','全部状态']].map(([v,l])=>`<option value="${v}" ${ui.queueStatus===v?'selected':''}>${l}</option>`).join('')}</select>`:''}${ui.taskFilter?button('清除任务筛选','clear-task-filter','ghost small'):''}<span class="tc-scope muted">${ui.group?esc(ui.group):'全部账号'}${ui.role?' · '+esc(state.roles.find(r=>r.id===ui.role)?.name):''}${ui.workView==='progress'?' · 各任务按所选日期所在刷新周期':''}</span></div>`:''}${ui.workView==='planning'?planPage():ui.workView==='progress'?progressPanel():executionQueue()}</div>`;
   }
   function planFinished(p){return (p.routeTaskIds||[p.taskId]).every(id=>!Daily.remaining(state,p,id).length);}
   function planFacts(p){return M.completionRecords(state).filter(r=>r.planId===p.id);}
@@ -259,6 +259,7 @@
       worldPartyNote(t,x.members.length)+
       '<div class="tc-v2-switch">'+icon('arrow')+'<div><strong>换号建议</strong>'+savedBatchSwitchNote(x)+'</div></div>'+
       '<div class="tc-v2-focus-actions">'+taskV2Action(x)+
+      (x.pending?button('MuMu 启动准备','mumu-prepare','small',attrs):'')+
       button('复制本批名单','copy-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'"')+
       '<details class="tc-v2-more"><summary>更多操作</summary><div class="tc-v2-more-body">'+
       (x.pending?button('改期 / 调整','adjust-batch','small',attrs+(locked?' disabled title="请先解锁队伍"':''))+button('删除本批','delete-batch','ghost small',attrs+(locked?' disabled title="请先解锁队伍"':'')):(!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',attrs)+button('撤销完成','reopen-execution','ghost small',attrs):''))+
@@ -728,6 +729,41 @@
     const ids=ui.progressSelection.filter(id=>activeRoles().some(r=>r.id===id)),tasks=Ops.assignedTasks(state,scope()).filter(t=>!ui.taskFilter||t.id===ui.taskFilter);if(!ids.length||!tasks.length)throw new Error('请先选择角色和适用任务');
     modal('批量跳过 / 恢复',`<p class="tc-quick-note">已选 ${ids.length} 个角色；只修改以下任务的当前周期。完成事实与已确认排程中的成员不会被删除。</p><div class="form-grid">${select('bulkTask','处理任务',tasks.map(t=>[t.id,t.name]),tasks[0].id)}${select('bulkStatus','处理方式',[['skipped','跳过本周期剩余目标'],['planned','恢复本周期目标']],'skipped')}</div>`,fd=>commit(()=>{const t=state.tasks.find(t=>t.id===fd.get('bulkTask'));for(const id of ids){const r=M.eligible(state,t).find(r=>r.id===id);if(!r)continue;if(M.reservedCount(state,t,id,ui.taskDate)>0)throw new Error(r.name+' 已在排程中，请先从批次调整中终止，再跳过目标');const p=M.effectiveProgress(state,t,r,ui.taskDate),skip=fd.get('bulkStatus')==='skipped',target=skip?p.completed:Math.max(t.target,p.completed);updateProgress(t,r,ui.taskDate,skip&&p.completed===0?'skipped':'planned',M.getProgress(state,t,r,ui.taskDate)?.completed||0,target);}ui.progressSelection=[];ui.generated=null;},'所选角色周期目标已更新，可撤销'),'更新所选角色');
   }
+  function mumuSettings(){
+    let config;
+    try{config=Execution.read(localStorage);}catch(e){
+      modal('MuMu 本机配置读取失败','<p>'+esc(e.message)+'</p><p>原配置保留，可清除本机绑定后重新设置。</p>'+button('清除 MuMu 本机绑定','mumu-clear','small','type="button"'));return;
+    }
+    const accounts=state.accounts.filter(a=>a.enabled!==false);
+    modal('MuMu 本机设置 · Windows','<p class="panel-sub">为账号绑定 MuMu 实例索引和实际游戏包名。配置仅保存在此浏览器，不随业务备份迁移。目前提供启动准备，尚未连接模拟器。</p>'+table(['账号','实例索引','游戏包名','操作'],accounts.map(a=>{
+      const b=config.bindings.find(b=>b.accountId===a.id);
+      return '<tr><td>'+esc(a.name)+'</td><td data-label="实例索引">'+esc(b?.instanceId??'未绑定')+'</td><td data-label="游戏包名">'+esc(b?.packageName||'待配置')+'</td><td>'+button(b?'修改绑定':'绑定实例','mumu-bind','small','data-account="'+esc(a.id)+'" type="button"')+(b?button('解除','mumu-unbind','ghost small','data-account="'+esc(a.id)+'" type="button"'):'')+'</td></tr>';
+    }))+'<p class="panel-sub">允许不同批次复用实例；同一批次的不同账号必须使用不同实例。绑定表示目标映射，实际登录账号仍需在连接时核验。</p>');
+  }
+  function mumuBind(accountId){
+    const a=state.accounts.find(a=>a.id===accountId&&a.enabled!==false);
+    if(!a)throw new Error('账号已删除或停用');
+    const config=Execution.read(localStorage),b=config.bindings.find(b=>b.accountId===accountId);
+    modal('绑定 MuMu · '+esc(a.name),'<div class="form-grid">'+
+      field('instanceId','MuMu 实例索引',b?.instanceId??'','text','填写 MuMu 多开管理器中的实际索引，0 为有效值。','required inputmode="numeric" pattern="(0|[1-9][0-9]{0,5})"')+
+      field('packageName','Android 游戏包名',b?.packageName||'','text','填写实际安装包的标识，例如 com.example.game；不同渠道可能不同。','required')+
+      '</div><p class="panel-sub">账号：'+esc(a.name)+'。此处不保存密码；登录和选角将在后续本地连接服务中核验。</p>',fd=>{
+        if(!state.accounts.some(a=>a.id===accountId&&a.enabled!==false))throw new Error('账号已删除或停用');
+        Execution.write(localStorage,Execution.bind(Execution.read(localStorage),accountId,fd.get('instanceId'),fd.get('packageName')));
+        toast('MuMu 绑定已保存到本机');
+      });
+  }
+  function mumuPreparation(ref){
+    let config;try{config=Execution.read(localStorage);}catch{return mumuSettings();}
+    const request=Execution.prepare(state,config,ref);
+    const labels={prepared:'配置检查通过 · 待连接核验',blocked:'请先处理以下问题'};
+    modal('MuMu 批次启动准备','<p><b>'+labels[request.status]+'</b></p><p class="panel-sub">Windows · 第 '+(ref.batchIndex+1)+' 批。尚未连接模拟器，以下仅为目标角色与实例配置。</p>'+
+      table(['角色 / 区服','账号','MuMu 实例'],request.targets.map(t=>'<tr><td>'+esc(t.roleName)+'<small>'+esc(t.server||'区服待补')+'</small></td><td data-label="账号">'+esc(t.accountName)+'</td><td data-label="MuMu 实例">'+esc(t.instanceId??'未绑定')+'</td></tr>'))+
+      (request.issues.length?'<ul>'+request.issues.map(i=>'<li>'+esc(i.message)+'</li>').join('')+'</ul>':'<p>实例和成员配置已齐全；实际账号登录与角色状态仍需由本地服务核验。</p>')+
+      '<div class="flex wrap">'+button('MuMu 本机设置','mumu-settings','small','type="button"')+
+      button('导出启动准备 JSON','mumu-export','small','type="button" data-plan="'+esc(ref.planId)+'" data-task="'+esc(ref.taskId)+'" data-index="'+ref.batchIndex+'"'+(request.issues.length?' disabled':''))+'</div>'+
+      '<p class="panel-sub">启动准备不会登记任务完成、扣除 CD 或生成收益。修改批次或绑定后，请重新检查。</p>');
+  }
   async function copyBatch(p,index){
     const text=p.batches[index].map(id=>{const r=state.roles.find(r=>r.id===id);return r.name+'（'+state.accounts.find(a=>a.id===r.accountId)?.name+'）';}).join('、');
     try{if(!navigator.clipboard?.writeText)throw new Error();await navigator.clipboard.writeText(text);toast('名单已复制');}catch{modal('复制本批名单',`<textarea class="tc-copy" rows="4" readonly aria-label="本批名单">${esc(text)}</textarea>`);$('#dialog textarea').select();}
@@ -978,6 +1014,16 @@
     'edit-batch-roles':b=>batchRolesForm(b.dataset.draft?generatedPlan():state.plans.find(p=>p.id===b.dataset.plan),Number(b.dataset.index),!!b.dataset.draft),
     'lock-batch':b=>{const draft=!!b.dataset.draft,p=draft?generatedPlan():state.plans.find(p=>p.id===b.dataset.plan),i=Number(b.dataset.index),locked=!p.lockedBatches?.includes(i);if(draft){Daily.setBatchLocked(state,p,i,locked);ui.generated.lockedBatches=p.lockedBatches;render();}else commit(()=>Daily.setBatchLocked(state,p,i,locked),locked?'队伍已锁定，可继续登记执行':'队伍已解锁，可以修改角色');},
     'adjust-batch':b=>remainingForm(state.plans.find(p=>p.id===b.dataset.plan),b.dataset.task,[Number(b.dataset.index)]),
+    'mumu-settings':()=>mumuSettings(),
+    'mumu-bind':b=>mumuBind(b.dataset.account),
+    'mumu-unbind':b=>{Execution.write(localStorage,Execution.unbind(Execution.read(localStorage),b.dataset.account));mumuSettings();},
+    'mumu-clear':()=>{Execution.write(localStorage,Execution.empty());mumuSettings();},
+    'mumu-prepare':b=>mumuPreparation({planId:b.dataset.plan,taskId:b.dataset.task,batchIndex:Number(b.dataset.index)}),
+    'mumu-export':b=>{
+      const request=Execution.prepare(state,Execution.read(localStorage),{planId:b.dataset.plan,taskId:b.dataset.task,batchIndex:Number(b.dataset.index)});
+      if(request.issues.length)throw new Error('批次或绑定已变化，请重新检查启动准备');
+      download('JX3_MuMu_启动准备.json',new Blob([JSON.stringify(request,null,2)],{type:'application/json'}));toast('启动准备已导出，尚未执行模拟器操作');
+    },
     'copy-batch':b=>copyBatch(state.plans.find(p=>p.id===b.dataset.plan),Number(b.dataset.index)).catch(e=>toast(e.message)),
     'reuse-plan':b=>reusePlanForm(state.plans.find(p=>p.id===b.dataset.id)),
     'reuse-selected':()=>reusePlanForm(state.plans.find(p=>p.id===$('#reuse-source').value)),
@@ -1015,7 +1061,7 @@
     search:()=>{modal('搜索任务或角色',`<input id="global-search" type="search" placeholder="输入名称…" style="width:100%" aria-label="搜索任务或角色"><div id="search-results" class="mt"></div>`);$('#global-search').addEventListener('input',e=>{const q=e.target.value;$('#search-results').innerHTML=q?`<div class="stack">${state.tasks.filter(t=>t.name.includes(q)).slice(0,8).map(t=>button('任务 · '+esc(t.name),'task-detail','',`data-id="${t.id}" type="button"`)).join('')}${state.roles.filter(r=>r.name.includes(q)).slice(0,8).map(r=>button('角色 · '+esc(r.name),'role-detail','',`data-id="${r.id}" type="button"`)).join('')}</div>`:'';});}
   };
   document.addEventListener('toggle',e=>{const el=e.target;if(el.matches?.('.analysis-task-picker'))ui.analysisPicker=el.open;if(el.matches?.('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}},true);
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;try{actions[b.dataset.action]?.(b);}catch(err){if($('#dialog').open&&$('#form-error'))$('#form-error').textContent=err.message;else toast(err.message);}});
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;try{actions[b.dataset.action]?.(b);}catch(err){if($('#dialog').open&&$('#form-error')){$('#form-error').textContent=err.message;$('#form-error').hidden=false;}else toast(err.message);}});
   document.addEventListener('keydown',e=>{const b=e.target.closest('[data-action][role="button"]');if(b&&(e.key==='Enter'||e.key===' ')){e.preventDefault();b.dispatchEvent(new MouseEvent('click',{bubbles:true}));}});
   document.addEventListener('change',e=>{
     const el=e.target;try{
