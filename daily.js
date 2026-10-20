@@ -12,13 +12,19 @@
   const timestamp=r=>{for(const value of [r.endedAt,r.createdAt,r.startedAt,r.date]){const n=Date.parse(value);if(Number.isFinite(n))return n;}return 0;};
   return Math.max(0,...entries.map(timestamp))||timestamp({date:p.date});
  }
- // Display slots are independent of party order and never rewrite saved batches.
+ // Retained accounts keep their relative slots; newcomers take vacated slots.
+ // Compact smaller batches without adding absent accounts or mutating party order.
  function batchAccountSlots(s,p,index,taskId=p.taskId){
-  const roles=ids=>ids.map(id=>s.roles.find(r=>r.id===id)).filter(Boolean),players=roles(p.batches[index]||[]);
-  const previous=roles((p.routeTaskIds||[p.taskId]).indexOf(taskId)>0?p.batches[index]||[]:p.batches[index-1]||[]);
-  const change=M.batchTransition(previous,players),used=new Set(roles(p.batches.flat()).map(r=>r.accountId));
-  const accounts=[...s.accounts.filter(a=>used.has(a.id)).map(a=>a.id),...[...used].filter(id=>!s.accounts.some(a=>a.id===id))];
-  return accounts.map(accountId=>{const role=players.find(r=>r.accountId===accountId);return {accountId,role:role||null,action:!role?'absent':change.login.some(r=>r.id===role.id)?'login':change.switchRole.some(x=>x.to.id===role.id)?'switch':'stay'};});
+  const roles=ids=>ids.map(id=>s.roles.find(r=>r.id===id)).filter(Boolean);
+  let order=[];
+  for(let i=0;i<=index;i++){
+   const current=roles(p.batches[i]||[]),accounts=current.map(r=>r.accountId),active=new Set(accounts),newcomers=accounts.filter(id=>!order.includes(id));
+   const next=[];
+   for(const account of order){if(active.has(account))next.push(account);else if(newcomers.length)next.push(newcomers.shift());}
+   order=[...next,...newcomers];
+  }
+  const players=roles(p.batches[index]||[]),previous=roles((p.routeTaskIds||[p.taskId]).indexOf(taskId)>0?p.batches[index]||[]:p.batches[index-1]||[]),change=M.batchTransition(previous,players);
+  return order.map(accountId=>{const role=players.find(r=>r.accountId===accountId);return {accountId,role,action:change.login.some(r=>r.id===role.id)?'login':change.switchRole.some(x=>x.to.id===role.id)?'switch':'stay'};});
  }
  function hasExecution(s,p){return M.executionRecords(s).some(r=>r.planId===p.id);}
  function canRegisterPlannedRole(s,t,id,when){const r=s.roles.find(r=>r.id===id);if(!r||M.cdRecord(s,t,id,when))return false;const progress=M.effectiveProgress(s,t,r,when);return progress.manualStatus!=='skipped'&&progress.actualCompleted<progress.target;}
