@@ -12,6 +12,14 @@
   const timestamp=r=>{for(const value of [r.endedAt,r.createdAt,r.startedAt,r.date]){const n=Date.parse(value);if(Number.isFinite(n))return n;}return 0;};
   return Math.max(0,...entries.map(timestamp))||timestamp({date:p.date});
  }
+ // Display slots are independent of party order and never rewrite saved batches.
+ function batchAccountSlots(s,p,index,taskId=p.taskId){
+  const roles=ids=>ids.map(id=>s.roles.find(r=>r.id===id)).filter(Boolean),players=roles(p.batches[index]||[]);
+  const previous=roles((p.routeTaskIds||[p.taskId]).indexOf(taskId)>0?p.batches[index]||[]:p.batches[index-1]||[]);
+  const change=M.batchTransition(previous,players),used=new Set(roles(p.batches.flat()).map(r=>r.accountId));
+  const accounts=[...s.accounts.filter(a=>used.has(a.id)).map(a=>a.id),...[...used].filter(id=>!s.accounts.some(a=>a.id===id))];
+  return accounts.map(accountId=>{const role=players.find(r=>r.accountId===accountId);return {accountId,role:role||null,action:!role?'absent':change.login.some(r=>r.id===role.id)?'login':change.switchRole.some(x=>x.to.id===role.id)?'switch':'stay'};});
+ }
  function hasExecution(s,p){return M.executionRecords(s).some(r=>r.planId===p.id);}
  function canRegisterPlannedRole(s,t,id,when){const r=s.roles.find(r=>r.id===id);if(!r||M.cdRecord(s,t,id,when))return false;const progress=M.effectiveProgress(s,t,r,when);return progress.manualStatus!=='skipped'&&progress.actualCompleted<progress.target;}
  function checkBatch(s,p,taskId,index,when){
@@ -251,5 +259,5 @@
   for(const p of copy.plans.filter(p=>restoredPlans.has(p.id))){if(!p.cancelled)M.validatePlanCapacity(copy,p);for(const e of M.executionRecords(copy).filter(e=>e.planId===p.id)){const t=copy.tasks.find(t=>t.id===e.taskId),when=e.startedAt||e.date;for(const id of e.roleIds){const other=M.executionRecords(copy).filter(x=>x.planId!==p.id&&x.roleIds.includes(id)&&(x.dungeonId?M.cdKey(x)===M.cdKey(t):x.taskId===t.id)&&(x.cycle||M.cycle(t,x.startedAt||x.date))===(e.cycle||M.cycle(t,when)));if(t.dungeonId&&other.length)throw new Error('该副本 CD 已被其他执行占用，无法恢复');const r=copy.roles.find(r=>r.id===id),progress=M.effectiveProgress(copy,t,r,when);if(progress.completed+M.reservedCount(copy,t,id,when)>progress.target)throw new Error(r.name+' 的目标已被其他排程或执行占用，无法恢复');}}}
   entry.restoredAt=new Date(Math.max(Date.now(),Date.parse(entry.updatedAt)+1)).toISOString();entry.updatedAt=entry.restoredAt;M.validateState(copy);Object.assign(s,copy);return entry;
  }
- return {completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });
