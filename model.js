@@ -23,7 +23,15 @@
     const delta=Math.min(...resetDays.map(day=>(weekday(d)-day+7)%7));
     return addDays(d,-delta);
   }
-  function blank() { return {version:VERSION, dataKind:'actual', updatedAt:new Date().toISOString(), config:{levelCap:130,goldUnit:10000,goldPrice:8.5,fee:0.02,saleRate:1,concurrency:3,cardPrice:30,cardMinutes:4000,discount:1,hourlyValue:20},accounts:[],roles:[],tasks:[],progress:[],records:[],ledger:[],cash:[],equipment:[],plans:[],imports:[],scenarios:[],notes:[],wageClaims:[],wageReceipts:[],materials:[],materialSales:[],sourceArchives:[],priceQuotes:[],energyRecipes:[],roiComparisons:[]}; }
+  const dungeonRewardDefaults={dailyBossEquipment:1,dailyEquipmentGold:25,dailyBossGold:10,raidBossEquipment:2,raidEquipmentGold:100,raidBossGold:100,gongzhanExtraEquipment:1,raidClearBoxes:2,raidWeeklyBoxes:1,raidBoxEquipmentGold:100};
+  function dungeonRewards(t,players,c={}){
+    if(!['daily5','raid10'].includes(t.partyRule)||t.dungeonRewardMode!=='auto')return null;
+    const r={...dungeonRewardDefaults,...c},raid=t.partyRule==='raid10',bosses=t.bossCount??(raid?1:3),extra=players.some(p=>p.gongzhanBuff===true)?r.gongzhanExtraEquipment:0;
+    return {direct:raid?(r.raidClearBoxes+(t.raidWeekly? r.raidWeeklyBoxes:0))*r.raidBoxEquipmentGold:t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,
+      shared:bosses*((raid?r.raidBossEquipment:r.dailyBossEquipment)+extra)*(raid?r.raidEquipmentGold:r.dailyEquipmentGold)+bosses*(raid?r.raidBossGold:r.dailyBossGold)};
+  }
+  function dungeonGold(t,batches,c){return batches.reduce((sum,players)=>{const r=dungeonRewards(t,players,c);return sum+(r?players.length*r.direct+r.shared:0);},0);}
+  function blank() { return {version:VERSION, dataKind:'actual', updatedAt:new Date().toISOString(), config:{...dungeonRewardDefaults,levelCap:130,goldUnit:10000,goldPrice:8.5,fee:0.02,saleRate:1,concurrency:3,cardPrice:30,cardMinutes:4000,discount:1,hourlyValue:20},accounts:[],roles:[],tasks:[],progress:[],records:[],ledger:[],cash:[],equipment:[],plans:[],imports:[],scenarios:[],notes:[],wageClaims:[],wageReceipts:[],materials:[],materialSales:[],sourceArchives:[],priceQuotes:[],energyRecipes:[],roiComparisons:[]}; }
   function demo(today=dateKey()) {
     const s=blank();s.dataKind='simulated';s.config.concurrency=8;
     s.accounts=Array.from({length:8},(_,i)=>({id:'a'+(i+1),name:'账号 '+String(i+1).padStart(2,'0'),group:i<4?'主力组':'日常组',balance:i%3===0?800:1600,balanceExpiry:null,enabled:true}));
@@ -51,12 +59,12 @@
     return s;
   }
   function number(value,name,{min=0,max=Infinity,integer=false}={}) {if(value===''||value===null||!Number.isFinite(Number(value))||Number(value)<min||Number(value)>max||(integer&&!Number.isInteger(Number(value))))throw new Error(name+' 必须为'+(integer?'整数':'数字')+'，范围 '+min+'–'+(max===Infinity?'无上限':max));return Number(value);}
-  function validateConfig(c) {if(c.levelCap!==undefined)number(c.levelCap,'当前版本满级',{min:1,integer:true});if(c.accountBillingRates)for(const [id,v]of Object.entries(c.accountBillingRates)){if(!/^[-_a-zA-Z0-9]+$/.test(id))throw new Error('账号计价快照 ID 无效');number(v,'账号在线单价');}number(c.goldUnit,'金币换算单位',{min:1});number(c.goldPrice,'人民币价格');number(c.concurrency,'最大并行账号数',{min:1,integer:true});number(c.cardMinutes,'点卡分钟数',{min:1});number(c.cardPrice,'点卡价格');number(c.discount,'点卡折扣',{min:0,max:1});number(c.fee,'手续费',{max:1});number(c.saleRate,'出售率',{max:1});number(c.hourlyValue,'人工时薪');if(c.goldPriceObservedAt&&(!/T/.test(c.goldPriceObservedAt)||!Number.isFinite(Date.parse(c.goldPriceObservedAt))))throw new Error('金币价格采集时点无效');return c;}
+  function validateConfig(c) {for(const k of Object.keys(dungeonRewardDefaults))if(c[k]!==undefined)number(c[k],k,{integer:!k.endsWith("Gold")});if(c.levelCap!==undefined)number(c.levelCap,'当前版本满级',{min:1,integer:true});if(c.accountBillingRates)for(const [id,v]of Object.entries(c.accountBillingRates)){if(!/^[-_a-zA-Z0-9]+$/.test(id))throw new Error('账号计价快照 ID 无效');number(v,'账号在线单价');}number(c.goldUnit,'金币换算单位',{min:1});number(c.goldPrice,'人民币价格');number(c.concurrency,'最大并行账号数',{min:1,integer:true});number(c.cardMinutes,'点卡分钟数',{min:1});number(c.cardPrice,'点卡价格');number(c.discount,'点卡折扣',{min:0,max:1});number(c.fee,'手续费',{max:1});number(c.saleRate,'出售率',{max:1});number(c.hourlyValue,'人工时薪');if(c.goldPriceObservedAt&&(!/T/.test(c.goldPriceObservedAt)||!Number.isFinite(Date.parse(c.goldPriceObservedAt))))throw new Error('金币价格采集时点无效');return c;}
   function validateTask(t,s) {
     if(!t.name?.trim())throw new Error('请填写任务名称');
     if(!['role','team'].includes(t.type)||!['daily','weekly'].includes(t.period))throw new Error('不支持的任务类型或周期');
     for(const key of ['gold','shared','minutes','prepare','onlineExtra','otherCost','minScore','minLevel'])number(t[key]??0,key);
-    if(t.bossCount!=null)number(t.bossCount,'首领数量',{min:1,integer:true});if(t.partyRule==='raid10'&&t.presetKey&&!t.gameVersion?.trim())throw new Error('默认十人本必须绑定资料片版本');
+    if(t.dungeonRewardMode!==undefined&&!['auto','manual'].includes(t.dungeonRewardMode))throw new Error('副本收益模式无效');if(t.raidWeekly!==undefined&&typeof t.raidWeekly!=='boolean')throw new Error('周常任务选项无效');if(t.bossCount!=null)number(t.bossCount,'首领数量',{min:1,integer:true});if(t.partyRule==='raid10'&&t.presetKey&&!t.gameVersion?.trim())throw new Error('默认十人本必须绑定资料片版本');
     for(const key of ['target','runs'])number(t[key]??1,key,{integer:true});
     number(t.maxParallel,'任务并行上限',{min:1,integer:true});number(t.efficiency,'并行效率',{min:.01,max:1});number(t.resetHour,'刷新小时',{max:23,integer:true});number(t.resetDay,'刷新星期',{max:6,integer:true});
     number(t.teamSize,'自有角色席位',{min:1,integer:true});number(t.tank,'坦克要求',{integer:true});number(t.heal,'治疗要求',{integer:true});number(t.externalSeats??0,'外部占位',{integer:true});
@@ -88,6 +96,7 @@
   function partyTask(task,config){return config?withPartyRule({...task,raidPlayerSeats:config.playerSeats,tankMode:config.tankMode},task.partyRule):withPartyRule(task);}
   function upgradeState(s){
     s.config.levelCap??=130;
+    if(s.dungeonRewardsVersion!==1){for(const t of s.tasks)if(['daily5','raid10'].includes(t.partyRule)&&t.dungeonRewardMode===undefined){t.dungeonRewardMode='auto';if(t.partyRule==='daily5')t.bossCount??=3;}s.dungeonRewardsVersion=1;}
     for(const p of s.plans||[])delete p.requiresReview;
     if(s.partyRulesVersion===3)return s;
     for(const t of s.tasks){let rule=t.partyRule;if(!rule){if(t.name==='大战日常')rule='daily5';else if(t.name==='10 人副本'||t.name==='10人本')rule='raid10';}
@@ -426,7 +435,7 @@
       const generated=t.enabled===false||!roles.length||!rounds?{teams:[],parties:[],reasons:[],unassigned:[]}:partyCandidates(t,roles,[],c.concurrency,true),batches=generated.teams,covered=batches.flat(),duration=t.minutes/t.efficiency,accountMinutes={};
       for(const r of covered)accountMinutes[r.accountId]=(accountMinutes[r.accountId]||0)+rounds*(duration+t.onlineExtra);
       const perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,shared=t.sharedMode==='person'?covered.length*rounds*t.shared:batches.length*rounds*t.shared;
-      return {...costs(covered.length*rounds*perGold+shared,batches.length*rounds*duration+(batches.length?t.prepare:0),covered.length*rounds*(duration+t.onlineExtra),c,batches.length?t.otherCost:0,accountMinutes),batches,parties:generated.parties,accountMinutes,reasons:generated.reasons,unassigned:generated.unassigned,executions:covered.length*rounds};
+      return {...costs((dungeonRewards(t,[],c)?dungeonGold(t,batches,c)*rounds:covered.length*rounds*perGold+shared),batches.length*rounds*duration+(batches.length?t.prepare:0),covered.length*rounds*(duration+t.onlineExtra),c,batches.length?t.otherCost:0,accountMinutes),batches,parties:generated.parties,accountMinutes,reasons:generated.reasons,unassigned:generated.unassigned,executions:covered.length*rounds};
     }
     const batches=t.enabled===false||!roles.length||!rounds?[]:splitBatches(roles,Math.min(c.concurrency,t.maxParallel));
     const duration=t.minutes/t.efficiency;
@@ -465,7 +474,7 @@
     const accountMinutes={};for(const r of players)accountMinutes[r.accountId]=(accountMinutes[r.accountId]||0)+duration+t.onlineExtra;
     const perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold;
     const shared=(t.sharedMode==='person'?players.length:k)*(t.shared||0);
-    return {...costs((t.rewardPerRole?players.length:k)*perGold+shared,k*duration+(k?t.prepare:0),Object.values(accountMinutes).reduce((a,b)=>a+b,0),c,k?t.otherCost:0,accountMinutes),batches:active,accountMinutes,executions:k};
+    return {...costs(dungeonRewards(t,[],c)?dungeonGold(t,active,c):(t.rewardPerRole?players.length:k)*perGold+shared,k*duration+(k?t.prepare:0),Object.values(accountMinutes).reduce((a,b)=>a+b,0),c,k?t.otherCost:0,accountMinutes),batches:active,accountMinutes,executions:k};
   }
   function calculateBatches(t,batches,c){
     if(t.enabled===false)batches=[];
@@ -473,7 +482,7 @@
     const duration=t.minutes/t.efficiency,accountMinutes={},players=batches.flat(),perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold;
     for(const r of players)accountMinutes[r.accountId]=(accountMinutes[r.accountId]||0)+duration+t.onlineExtra;
     const shared=t.sharedMode==='person'?players.length*t.shared:batches.length*t.shared;
-    return {...costs(players.length*perGold+shared,batches.length*duration+(batches.length?t.prepare:0),players.length*(duration+t.onlineExtra),c,batches.length?t.otherCost:0,accountMinutes),batches,accountMinutes,executions:players.length};
+    return {...costs(dungeonRewards(t,[],c)?dungeonGold(t,batches,c):players.length*perGold+shared,batches.length*duration+(batches.length?t.prepare:0),players.length*(duration+t.onlineExtra),c,batches.length?t.otherCost:0,accountMinutes),batches,accountMinutes,executions:players.length};
   }
   function levelCap(s){return s.config.levelCap??130;}
   function isMaxLevel(s,r){return r.creationStatus!=='planned'&&r.level===levelCap(s);}
@@ -807,5 +816,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
