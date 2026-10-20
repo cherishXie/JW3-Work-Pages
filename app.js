@@ -234,10 +234,10 @@
     return '';
   }
   function batchAccountRoster(p,index,taskId,detail=false){
-    const labels={login:index===0?'首次登录':'需重新登录',switch:'只需切换角色',stay:'原角色继续',absent:'本批未参与'};
+    const labels={login:index===0?'首次登录':'需切换账号',switch:'只需切换角色',stay:'原角色继续'};
     return Daily.batchAccountSlots(state,p,index,taskId).map(({accountId,role,action})=>{
       const account=state.accounts.find(a=>a.id===accountId);
-      return '<span class="tc-account-slot '+(detail?'tc-v2-person':'tc-member')+' is-'+action+'" data-account-id="'+esc(accountId)+'" data-role-id="'+esc(role?.id||'')+'" data-transition="'+action+'"><span class="tc-v2-person-account">'+esc(account?.name||'未知账号')+'</span><strong>'+esc(role?.name||(action==='absent'?'—':'未知角色'))+'</strong>'+(detail&&role?'<small>'+esc(role.stance||duty(Catalog.profile(role).duty))+'</small>'+gongzhanTag(role):'')+'<span class="tc-account-action">'+labels[action]+'</span></span>';
+      return '<span class="tc-account-slot '+(detail?'tc-v2-person':'tc-member')+' is-'+action+'" data-account-id="'+esc(accountId)+'" data-role-id="'+esc(role?.id||'')+'" data-transition="'+action+'"><span class="tc-v2-person-account">'+esc(account?.name||'未知账号')+'</span><strong>'+esc(role?.name||'未知角色')+'</strong>'+(detail&&role?'<small>'+esc(role.stance||duty(Catalog.profile(role).duty))+'</small>'+gongzhanTag(role):'')+'<span class="tc-account-action">'+labels[action]+'</span></span>';
     }).join('');
   }
   function taskV2FocusCard(x,navigation=[]){
@@ -315,7 +315,7 @@
     const range=ui.queueRange==='all'?'全部日期':ui.queueRange==='day'?ui.taskDate:M.weekStart(ui.taskDate)+' — '+M.addDays(M.weekStart(ui.taskDate),6);
     const archive=closed.length||ui.queueStatus==='all'&&archived.length?'<details class="tc-v2-archive" '+(['all','unmeasured'].includes(ui.queueStatus)||closed.some(p=>p.id===focus?.p.id)?'open':'')+'><summary>已完成 / 已结束排程（'+(closed.length+(ui.queueStatus==='all'?archived.length:0))+'）</summary><div class="tc-v2-plan-grid">'+[...closed,...(ui.queueStatus==='all'?archived:[])].map(p=>savedPlanCard(p,focus?.key)).join('')+'</div></details>':'';
     return '<div class="tc-v2">'+
-      '<div class="tc-account-legend"><span class="login">橙色 · 需登录账号</span><span class="switch">蓝色 · 只需切换角色</span><span>同一排程按账号固定位置，与上一批对比；空位表示本批未参与。</span></div>'+
+      '<div class="tc-account-legend"><span class="login">橙色 · 登录 / 切换账号</span><span class="switch">蓝色 · 只需切换角色</span><span>仅显示本批角色；沿用账号保持相对位置，新账号接替退出账号的位置。</span></div>'+
       '<div class="tc-v2-summary">'+
       [['待执行批次',allPending.length,'pending'],['预计剩余',minutes?num(minutes,1)+' 分钟':allPending.length?'待补':'0 分钟',''],['已完成批次',live.flatMap(p=>planBatchRows(p)).filter(x=>!x.pending&&!x.closed).length,''],['待补实测',pendingFacts.length,'unmeasured']].map(([label,value,status])=>status?button('<small>'+label+'</small><strong>'+value+'</strong>','queue-status-button','tc-v2-stat '+(status===ui.queueStatus?'is-active':''),'data-value="'+status+'" aria-pressed="'+(status===ui.queueStatus)+'"'):'<div class="tc-v2-stat"><small>'+label+'</small><strong>'+value+'</strong></div>').join('')+'</div>'+
       '<div class="tc-v2-actions"><span class="muted">'+esc(range)+' · 已确认排程'+(overdue?' · '+button('逾期 '+overdue+' 批','show-overdue','ghost small'):'')+'</span><div class="flex wrap">'+button('卡片视图','task-layout',ui.taskLayout==='cards'?'active small':'small','data-value="cards" aria-pressed="'+(ui.taskLayout==='cards')+'"')+button('紧凑列表','task-layout',ui.taskLayout==='list'?'active small':'small','data-value="list" aria-pressed="'+(ui.taskLayout==='list')+'"')+button('安排新任务','work-view','primary small','data-value="planning"')+'</div></div>'+
