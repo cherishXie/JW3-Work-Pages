@@ -305,3 +305,23 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 .tc-v2-measured>div{display:flex;gap:12px;flex-wrap:wrap;margin-top:7px}
 .tc-v2-measured span{font-size:10px;color:var(--wb-text-secondary);flex:1;min-width:86px}
 .tc-v2-measured b{display:block;font-size:14px;color:var(--wb-text);font-variant-numeric:tabular-nums}
+
+/* Keep account positions stable across batches, including absent accounts. */
+:root{--tc-login:#fb923c;--tc-login-bg:#f9731614;--tc-switch:#60a5fa;--tc-switch-bg:#2563eb1a}
+:root[data-color-mode="light"]{--tc-login:#9a3412;--tc-login-bg:#fff7ed;--tc-switch:#1d4ed8;--tc-switch-bg:#eff6ff}
+.tc-account-legend{display:flex;flex-wrap:wrap;gap:5px 15px;color:var(--wb-text-secondary);font-size:11px;margin:0 0 12px}
+.tc-account-legend .login{color:var(--tc-login)}
+.tc-account-legend .switch{color:var(--tc-switch)}
+.tc-account-grid,.tc-v2-inspector .tc-v2-person-grid.tc-account-grid,.tc-v2-workspace.is-list .tc-v2-person-grid.tc-account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-width:0}
+.tc-account-slot.tc-member,.tc-account-slot.tc-v2-person{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;min-width:0;gap:2px;padding:6px 7px;border-radius:7px;line-height:1.5;overflow-wrap:anywhere;text-align:left}
+.tc-account-slot strong{font-size:12px;color:var(--wb-text);font-weight:600}
+.tc-account-slot .tc-v2-person-account{font-size:10px;color:var(--wb-text-secondary)}
+.tc-account-slot .tc-account-action{font-size:10px;line-height:1.5;color:var(--wb-text-muted)}
+.tc-account-slot.is-login{background:var(--tc-login-bg);border-color:var(--tc-login);border-left:3px solid var(--tc-login)}
+.tc-account-slot.is-login .tc-account-action{color:var(--tc-login)}
+.tc-account-slot.is-switch{background:var(--tc-switch-bg);border-color:var(--tc-switch);border-left:3px solid var(--tc-switch)}
+.tc-account-slot.is-switch .tc-account-action{color:var(--tc-switch)}
+.tc-account-slot.is-absent{background:transparent;border-style:dashed}
+.tc-account-slot.is-absent strong,.tc-account-slot.is-absent .tc-v2-person-account{color:var(--wb-text-muted)}
+.tc-quick-context>.tc-account-grid{width:100%}
+.tc-account-grid .tc-account-slot .combat-tag{align-self:flex-start}
