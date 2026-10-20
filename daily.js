@@ -108,6 +108,26 @@
   }
   M.validatePlanCapacity(s,next);next.updatedAt=new Date().toISOString();return next;
  }
+ function removeBatchRole(s,p,index,roleId){
+  assertBatchEditable(s,p,index);
+  if(!p.batches[index].includes(roleId))throw new Error('角色不在本队');
+  if(p.batches[index].length<=1)throw new Error('不能移除最后一名角色，请删除批次或整个任务');
+  const next=JSON.parse(JSON.stringify(p));next.batches[index]=next.batches[index].filter(id=>id!==roleId);
+  const members=next.batches[index].map(id=>s.roles.find(r=>r.id===id)),base=M.savedPartyTask(M.taskForVersion(s,s.tasks.find(t=>t.id===p.taskId)),p);
+  if(base.partyRule==='raid10'){
+   next.teamConfigs=next.batches.map((batch,i)=>i===index?{...(p.teamConfigs?.[i]||{name:'第 '+(i+1)+' 队',tankMode:base.tankMode||'auto'}),playerSeats:batch.length}:p.teamConfigs?.[i]||null);
+  }
+  const task=M.partyTask(base,next.teamConfigs?.[index]);M.validateDailyGongzhan(task,members);
+  next.companionAssignments=next.batches.map((_,i)=>p.companionAssignments?.[i]||[]);
+  if(['daily5','raid10'].includes(task.partyRule)){
+   const companions=M.companionAssignments(task,members,task.partyRule==='daily5'?5:10);
+   if(!companions)throw new Error('移除后职责或已有侠客不足，请先调整队伍');next.companionAssignments[index]=companions;
+  }
+  for(const taskId of next.routeTaskIds||[next.taskId])checkBatch(s,next,taskId,index,M.planStart(s,next,taskId));
+  M.validatePlanCapacity(s,next);
+  if(next.executionDrafts)next.executionDrafts=next.executionDrafts.filter(d=>d.index!==index);
+  next.updatedAt=new Date().toISOString();return next;
+ }
  function registerBatch(s,planId,taskId,index,input={}){
   const copy=JSON.parse(JSON.stringify(s)),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
   const date=input.date||(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices[0]===index)?.date||p.date;
@@ -265,5 +285,5 @@
   for(const p of copy.plans.filter(p=>restoredPlans.has(p.id))){if(!p.cancelled)M.validatePlanCapacity(copy,p);for(const e of M.executionRecords(copy).filter(e=>e.planId===p.id)){const t=copy.tasks.find(t=>t.id===e.taskId),when=e.startedAt||e.date;for(const id of e.roleIds){const other=M.executionRecords(copy).filter(x=>x.planId!==p.id&&x.roleIds.includes(id)&&(x.dungeonId?M.cdKey(x)===M.cdKey(t):x.taskId===t.id)&&(x.cycle||M.cycle(t,x.startedAt||x.date))===(e.cycle||M.cycle(t,when)));if(t.dungeonId&&other.length)throw new Error('该副本 CD 已被其他执行占用，无法恢复');const r=copy.roles.find(r=>r.id===id),progress=M.effectiveProgress(copy,t,r,when);if(progress.completed+M.reservedCount(copy,t,id,when)>progress.target)throw new Error(r.name+' 的目标已被其他排程或执行占用，无法恢复');}}}
   entry.restoredAt=new Date(Math.max(Date.now(),Date.parse(entry.updatedAt)+1)).toISOString();entry.updatedAt=entry.restoredAt;M.validateState(copy);Object.assign(s,copy);return entry;
  }
- return {batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });
