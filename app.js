@@ -1059,16 +1059,41 @@
   }
   function sourceArchivePanel(){return `<section class="card mt">${head('导入来源档案','保留原工作表、单元格地址、公式与未映射状态；不执行公式')}${(state.sourceArchives||[]).length?table(['来源','原表','待确认','操作'],state.sourceArchives.map(x=>`<tr><td>${esc(x.name)}<small>${x.date}</small></td><td>${x.files?.length?x.files.length+' 个文件':x.book?x.book.sheets.length+' 张':(x.counts?.roles||0)+' 个角色'}</td><td>${x.issues?.length||0} 项</td><td>${button('查看待确认','source-issues','small',`data-id="${x.id}"`)}${button('导出原始归档','source-export','small',`data-id="${x.id}"`)}</td></tr>`)):empty('暂无来源归档')}</section>`;}
 
-  let screenshotDraft=null,screenshotBusy=false;
+
+  let screenshotDraft=null,screenshotBusy=false,screenshotQueue=[];
+  const clearScreenshotQueue=()=>{
+    for(const entry of screenshotQueue)URL.revokeObjectURL(entry.url);
+    screenshotQueue=[];
+  };
+  function renderScreenshotQueue(){
+    const host=$('#screenshot-queue');if(!host)return;
+    host.innerHTML=screenshotQueue.length?`<div class="screenshot-queue-summary">${screenshotQueue.length} 张图片 · ${(screenshotQueue.reduce((total,item)=>total+item.file.size,0)/1024/1024).toFixed(1)} MB <span>可以再次选择图片继续添加</span></div><div class="screenshot-file-list">${screenshotQueue.map((item,i)=>`<div class="screenshot-file-item"><img alt="" src="${item.url}"><div><strong>${esc(item.file.name)}</strong><small>${(item.file.size/1024/1024).toFixed(2)} MB</small></div>${button('删除','screenshot-remove','ghost small',`data-index="${i}" type="button"`)}</div>`).join('')}</div>`:'<div class="screenshot-queue-empty">暂无图片。可分多次选择并添加。</div>';
+  }
+  function screenshotQueueAdd(event){
+    if(screenshotBusy)return;
+    const files=Array.from(event.target.files||[]);event.target.value='';
+    const status=$('#screenshot-status');let skipped=0;
+    for(const file of files){
+      if(screenshotQueue.some(item=>item.file.name===file.name&&item.file.size===file.size&&item.file.lastModified===file.lastModified)){skipped++;continue;}
+      if(!/^image\/(png|jpeg|webp)$/.test(file.type)||!file.size||file.size>12*1024*1024){skipped++;continue;}
+      if(screenshotQueue.length>=12||screenshotQueue.reduce((n,item)=>n+item.file.size,0)+file.size>60*1024*1024){if(status)status.textContent='最多 12 张、合计 60 MB，请删除部分图片或分批处理';break;}
+      screenshotQueue.push({file,url:URL.createObjectURL(file)});
+    }
+    renderScreenshotQueue();
+    if(skipped&&status&&!status.textContent)status.textContent='跳过 '+skipped+' 张重复或不支持的图片';
+  }
+
   const shotDigest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
   function screenshotDialog(){
-    screenshotDraft=null;
+    clearScreenshotQueue();screenshotDraft=null;
     modal('批量上传角色统计截图',`<p>支持一次选择多张茗伊「角色统计」截图，自动合并重复角色，并补齐空白字段。包含名字、门派、金钱、通宝、等级、资历、宠物、侠行、侠行周等列。</p>
       <p class="panel-sub mt">图片只在浏览器内识别，不上传。相同角色的冲突数值会标明来源，需要人工确认；最后统一勾选更新，可以撤销。</p>
-      <label class="field mt">角色数据截图（可多选）<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+      <label class="field mt">添加图片（可分多次选择）<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="screenshot-queue" class="mt" aria-live="polite"></div>
       <div class="form-grid mt"><label class="field">表格数据顶部（图片高度 %）<input id="screenshot-top" type="number" value="23" min="0" max="90"></label><label class="field">表格数据底部（图片高度 %）<input id="screenshot-bottom" type="number" value="92" min="10" max="100"></label></div>
-      <p class="panel-sub">使用同一组裁剪比例逐张识别。最多 12 张，每张不超过 12 MB，总计不超过 60 MB；已导入或内容相同的截图自动跳过。</p>
+      <p class="panel-sub">使用同一组裁剪比例逐张识别。最多 12 张，每张不超过 12 MB，总计不超过 60 MB；本批相同截图自动去重；已导入截图仍可重新识别并核对。</p>
       ${button('开始本地识别','screenshot-recognize','primary mt')}<p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
+    $('#screenshot-file').addEventListener('change',screenshotQueueAdd);
+    renderScreenshotQueue();
   }
   async function screenshotRecognize(b){
     if(screenshotBusy)return;
