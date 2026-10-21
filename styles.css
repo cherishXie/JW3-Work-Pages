@@ -551,3 +551,20 @@ html[data-theme="deep-ocean"] .footer{border-top-color:#35353a}
 @media(max-width:1200px){.overview-command-layout{grid-template-columns:1fr}.overview-command-side{position:static}.revenue-map-layout{grid-template-columns:minmax(0,1.3fr) minmax(200px,1fr)}}
 @media(max-width:900px){.revenue-map-layout{grid-template-columns:1fr}.revenue-map{height:300px}.revenue-map-list{max-height:180px}}
 @media(max-width:767px){.task-center .tc-v2-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.revenue-map-layout{padding:12px}.revenue-map{height:250px}.revenue-map-tile{padding:4px}.revenue-map-tile small{display:none}.overview-command-main .overview-links{grid-template-columns:1fr}.task-center .tc-bar{flex-wrap:wrap}.task-center .tc-filters input{max-width:none}.overview-snapshot-count strong{font-size:32px}}
+
+/* Dense trend and analytics workspace inspired by context-trend reference. */
+.analysis-context .chart-container svg{min-height:260px;max-height:390px}
+.analysis-context .chart-container{padding:16px 19px 10px;overflow-x:auto}
+.analysis-context .chart-container svg .chart-grid{stroke-dasharray:3 5;stroke-width:.8}
+.analysis-context .chart-foot{background:var(--wb-surface-2);padding:12px 18px;gap:14px;align-items:center}
+.analysis-context .analysis-focus,.analysis-context .dashboard-grid{gap:14px}
+.analysis-context .analysis-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+.analysis-context .analysis-kpis .kpi{min-height:128px}
+.analysis-context .tabs,.task-center .tabs{display:inline-flex;flex-wrap:wrap;gap:5px;padding:4px;background:var(--wb-surface-2);border:1px solid var(--wb-border);border-radius:9px}
+.analysis-context .tabs button,.task-center .tabs button{border-radius:6px}
+.analysis-context .tabs button.active,.task-center .tabs button.active{background:var(--wb-surface);border-color:var(--wb-border);box-shadow:0 1px 4px var(--wb-shadow)}
+.analysis-context .raw-data{border:1px solid var(--wb-border);border-radius:9px;margin-top:14px;overflow:hidden}
+.analysis-context .raw-data>summary{padding:13px 16px;cursor:pointer;background:var(--wb-surface-2);font-size:12px}
+.analysis-context .raw-data[open]>summary{border-bottom:1px solid var(--wb-border)}
+@media(max-width:900px){.analysis-context .analysis-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.analysis-context .analysis-kpis{grid-template-columns:1fr}}
