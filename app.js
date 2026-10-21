@@ -1136,7 +1136,7 @@
       const notes=[skipped.length?'跳过重复截图：'+skipped.join('、'):'',failed.length?'识别失败（未纳入本批）：'+failed.join('；'):'',repeated.length?'已识别 '+repeated.length+' 张历史导入过的截图：'+repeated.map(image=>image.name).join('、'):''].filter(Boolean);
       modal('核对截图识别结果',`<p class="panel-sub">成功识别 <b>${images.length}</b> 张，原始 <b>${merged.rawRows}</b> 行，合并重复 <b>${merged.duplicates}</b> 行，共 <b>${merged.rows.length}</b> 个角色；其中 <b>${merged.conflicts}</b> 个有数据冲突。</p>
         ${notes.map(note=>`<p class="warning mt">${esc(note)}</p>`).join('')}
-        <p class="warning mt">仅合并完全相同的角色名（含 @ 后缀）；不同 @ 后缀不自动合并。冲突默认保留第一张非空值，请核对原图、修改数值并勾选“已核对冲突”。只有选中的角色会更新，其他数据保持不变。</p>
+        <p class="warning mt">优先使用工作台已有的角色名称：截图名称只用于匹配，不会修改已存角色名。跨图片可合并唯一确认的 OCR 错字，已知不同服务器不会自动误合并。数值冲突默认保留第一张非空值，请人工核对。只有选中的角色会更新。</p>
         <details class="mt"><summary>查看本批原图（${originals.length} 张）</summary>${originals.map((image,i)=>`<div class="mt"><small>${i+1}. ${esc(image.name)}</small><img class="screenshot-preview-original" src="${image.url}" style="display:block;max-width:100%;height:auto" alt="角色统计截图 ${i+1}"></div>`).join('')}</details>
         ${repeated.length?`<label class="screenshot-confirm-review"><input type="checkbox" name="shot-allow-reimport"> 确认复核已导入截图：保存新的更正记录，保留原始导入档案；不会产生收益记录</label>`:''}
         ${field('screenshot-time','确认本批采集时间（北京时间）',beijingLocal(),'datetime-local','同批所有角色使用同一采集时间；不同日期建议分批导入。','required')}
@@ -1144,7 +1144,7 @@
         <div class="table-wrap mt"><table><thead><tr><th>更新 / 来源</th><th>匹配已有角色</th>${WorkbenchScreenshot.labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>
         ${merged.rows.map((r,i)=>{
           const suggested=WorkbenchScreenshot.suggestRoles(state.roles,r.name,r.school),roleId=r.roleId||suggested.roleId,conflicts=Object.entries(r.conflicts);
-          return `<tr><td><label><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"> 更新</label><small>${r.occurrences} 行 · ${esc(r.sourceNames.join('、'))}</small>${conflicts.length?`<small class="negative">${conflicts.length} 项数据冲突</small><label class="mt"><input type="checkbox" name="shot-confirm-${i}" aria-label="已核对第 ${i+1} 行冲突"> 已核对冲突</label>`:''}</td>
+          return `<tr><td><label><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"> 更新</label><small>${r.occurrences} 行 · ${esc(r.sourceNames.join('、'))}</small>${r.ocrNames?.some(n=>n!==r.name)?`<small class="screenshot-ocr-source">截图识别原文：${esc(r.ocrNames.join(' / '))}</small>`:''}${conflicts.length?`<small class="negative">${conflicts.length} 项数据冲突</small><label class="mt"><input type="checkbox" name="shot-confirm-${i}" aria-label="已核对第 ${i+1} 行冲突"> 已核对冲突</label>`:''}</td>
             <td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${[...suggested.suggestions.map(x=>x.roleId),...state.roles.map(x=>x.id)].filter((id,pos,all)=>all.indexOf(id)===pos).map(id=>{const role=state.roles.find(item=>item.id===id);return `<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`;}).join('')}</select><small id="shot-match-hint-${i}">${roleId?suggested.exact?'姓名准确匹配':'候选匹配，请核对账号和门派':suggested.suggestions.length?'建议优先选择：'+esc(suggested.suggestions.slice(0,3).map(x=>x.name).join('、')):'未匹配，请手动选择'}</small></td>
             ${WorkbenchScreenshot.fields.map(k=>{
               const options=r.conflicts[k];
@@ -1154,7 +1154,7 @@
         <p class="panel-sub mt">金币请核实单位；空白字段保留原值。选中角色一次提交，可立即撤销。</p>`,fd=>{
           const draft=screenshotDraft,rows=draft.rows.map((r,i)=>({
             ...Object.fromEntries(WorkbenchScreenshot.fields.map(k=>[k,String(fd.get('shot-'+i+'-'+k)||'').trim()])),
-            conflicts:r.conflicts,sourceNames:r.sourceNames,conflictsConfirmed:fd.has('shot-confirm-'+i),
+            conflicts:r.conflicts,sourceNames:r.sourceNames,ocrNames:r.ocrNames,conflictsConfirmed:fd.has('shot-confirm-'+i),
             selected:fd.has('shot-pick-'+i),roleId:fd.get('shot-role-'+i)
           }));
           const capturedAt=new Date(fd.get('screenshot-time')+':00+08:00').toISOString();
