@@ -34,8 +34,14 @@
         compatibleSchool,schoolKnown,suffixStatus,suffixConflict:suffixStatus==='conflict',
         score,eligible:distance<=threshold};
     }).filter(x=>x.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
+    // A full existing character name outranks an identical short base name on
+    // another server. This occurs in the two real screenshots (same 3-character
+    // name, but different school and @ suffix).
+    const fullMatches=suggestions.filter(x=>x.fullExact);
+    if(fullMatches.length===1)return {roleId:fullMatches[0].roleId,exact:true,auto:true,suggestions};
     const exactMatches=suggestions.filter(x=>x.exact&&!x.suffixConflict);
-    const validExact=exactMatches.length===1?exactMatches[0]:null;
+    const schoolMatches=exactMatches.filter(x=>x.schoolKnown&&x.compatibleSchool);
+    const validExact=exactMatches.length===1?exactMatches[0]:schoolMatches.length===1?schoolMatches[0]:null;
     const exactAuto=!!validExact&&(validExact.suffixStatus==='exact'||validExact.schoolKnown&&validExact.compatibleSchool);
     if(exactAuto)return {roleId:validExact.roleId,exact:true,auto:true,suggestions};
     // A one-character OCR error needs corroborating school AND one unique safe candidate.
