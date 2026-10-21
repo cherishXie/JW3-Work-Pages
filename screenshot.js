@@ -236,7 +236,7 @@
         await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'',preserve_interword_spaces:'0'});
         for(let i=0;i<parsed.length;i++){
           const original=parsed[i].name;
-          if(suggestRoles(roles,original,parsed[i].school).exact)continue;
+          if(suggestRoles(roles,original,parsed[i].school).auto)continue;
           progress('正在复核角色名称（'+(i+1)+'/'+parsed.length+'）…');
           const a=anchors[i],cropHeight=Math.max(20,Math.round(Math.min(spacing*.86,h*.13)));
           const cropY=Math.max(0,Math.min(h-cropHeight,Math.round(a.y-cropHeight/2)));
