@@ -7,7 +7,7 @@
   const KEY='jx3-workbench-data-v2',LEGACY_KEY='jx3-workbench-v1';
   const copy=value=>JSON.parse(JSON.stringify(value));
   const empty=()=>({storeVersion:1,active:null,snapshots:[]});
-  const hasData=s=>!!s&&(['accounts','roles','progress','records','ledger','cash','equipment','plans','imports','scenarios','notes','balanceSnapshots','wageClaims','wageReceipts','materials','materialSales','sourceArchives','priceQuotes','energyRecipes','roiComparisons'].some(k=>s[k]?.length)||s.tasks?.some(t=>!t.presetKey||t.updatedAt)||s.configurationConfirmed===true);
+  const hasData=s=>!!s&&(['accounts','roles','progress','records','ledger','cash','equipment','plans','imports','scenarios','notes','balanceSnapshots','wageClaims','wageReceipts','materials','materialSales','sourceArchives','priceQuotes','energyRecipes','roiComparisons'].some(k=>s[k]?.length)||s.tasks?.some(t=>!t.presetKey||t.updatedAt)||s.configurationConfirmed===true||Object.keys(s.raidGuides||{}).length>0);
   function validDate(date){return typeof date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(new Date(date+'T12:00:00+08:00').getTime())&&M.dateKey(new Date(date+'T12:00:00+08:00'))===date;}
   function validate(store){
     if(!store||store.storeVersion!==1||!Array.isArray(store.snapshots))throw new Error('不支持的日期数据档案');

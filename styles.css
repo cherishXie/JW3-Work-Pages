@@ -608,3 +608,5 @@ html[data-theme="deep-ocean"] .footer{border-top-color:#35353a}
 
 /* Keep measured duration visible outside the task inspector. */
 .flow-task{max-height:none}.flow-task-duration{font-size:11px;line-height:1.5;color:var(--wb-cyan);white-space:normal}
+
+.raid-guide-panel{margin:16px 0;padding:16px;border:1px solid var(--wb-border);border-radius:12px;min-width:0}.raid-guide-panel>summary{font-weight:700;cursor:pointer}.raid-guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;margin:12px 0}.raid-guide-card{padding:14px;border:1px solid var(--wb-border);border-radius:10px;min-width:0}.raid-guide-card h4{margin:0 0 10px}.raid-guide-card h4 span{font-size:12px;color:var(--wb-text-muted);font-weight:400}.raid-guide-card p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;margin:0}.raid-guide-card textarea{width:100%;box-sizing:border-box}

@@ -699,6 +699,7 @@
   function balance(s,r) {const events=s.ledger.filter(e=>e.roleId===r.id&&(!r.openingGoldDate||e.date>=r.openingGoldDate)),delta=events.reduce((n,e)=>n+(e.direction==='in'?e.gold:-e.gold),0),expected=r.openingGold==null?null:r.openingGold+delta;return {expected,observed:r.observedGold,unexplained:expected===null||r.observedGold==null?null:r.observedGold-expected};}
   function ledgerIncome(s) {return s.ledger.filter(e=>e.category!=='transfer'&&e.category!=='adjustment').reduce((n,e)=>n+(e.direction==='in'?e.gold:-e.gold),0);}
   function validateState(s) {
+    if(s.raidGuides!==undefined){if(!s.raidGuides||typeof s.raidGuides!=='object'||Array.isArray(s.raidGuides))throw new Error('副本攻略格式无效');for(const [id,rows]of Object.entries(s.raidGuides)){if(!/^[-_a-zA-Z0-9]+$/.test(id)||!Array.isArray(rows)||!rows.length||rows.length>100||rows.some(b=>!b||['name','mode','note'].some(k=>typeof b[k]!=='string'||b[k].length>10000)))throw new Error('首领攻略格式无效');}}
     if(s.version!==VERSION)throw new Error('不支持的数据版本 '+s.version+'；当前支持 version: 1');
     validateConfig(s.config);if(s.recordingPreferences&&(!['none','attendance'].includes(s.recordingPreferences.financialAllocation)||!['none','attendance'].includes(s.recordingPreferences.timeAllocation)))throw new Error('执行分摊偏好无效');
     for(const key of ['accounts','roles','tasks','progress','records','ledger','cash','equipment','plans','imports','scenarios','notes']){if(!Array.isArray(s[key]))throw new Error('缺少数组字段 '+key);const ids=s[key].map(x=>x.id);if(ids.some(x=>typeof x!=='string'||!x||!/^[-_a-zA-Z0-9]+$/.test(x))||new Set(ids).size!==ids.length)throw new Error(key+' 包含缺失、非法或重复 ID（仅字母、数字、下划线与连字符）');}
@@ -785,6 +786,7 @@
     validateState(incoming);incoming=freezeHistory(JSON.parse(JSON.stringify(incoming)));const next=freezeHistory(JSON.parse(JSON.stringify(current))),stats={added:0,updated:0,skipped:0,old:0};
     // Backups contain the final workspace plus an audit journal, not a sequence
     // to replay against an arbitrary (possibly empty) installation.
+    next.raidGuides={...incoming.raidGuides,...current.raidGuides};
     const same=(key,a,b)=>sameHistoryRow(incoming,key,a,b);
     const recycle=new Map((current.notes||[]).filter(n=>n.kind==='task-recycle').map(n=>[n.id,n]));
     const histories=new Map(),changed=new Set(),handled=new Set();
