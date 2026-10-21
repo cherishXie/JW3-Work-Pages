@@ -1058,29 +1058,94 @@
     return M.validateState(s);
   }
   function sourceArchivePanel(){return `<section class="card mt">${head('导入来源档案','保留原工作表、单元格地址、公式与未映射状态；不执行公式')}${(state.sourceArchives||[]).length?table(['来源','原表','待确认','操作'],state.sourceArchives.map(x=>`<tr><td>${esc(x.name)}<small>${x.date}</small></td><td>${x.files?.length?x.files.length+' 个文件':x.book?x.book.sheets.length+' 张':(x.counts?.roles||0)+' 个角色'}</td><td>${x.issues?.length||0} 项</td><td>${button('查看待确认','source-issues','small',`data-id="${x.id}"`)}${button('导出原始归档','source-export','small',`data-id="${x.id}"`)}</td></tr>`)):empty('暂无来源归档')}</section>`;}
+
   let screenshotDraft=null,screenshotBusy=false;
+  const shotDigest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
   function screenshotDialog(){
-    modal('上传角色统计截图',`<p>适用于茗伊「角色统计」完整表格，列顺序须为：名字、门派、金钱、通宝、等级、资历、宠物、侠行、侠行周。保持全部列，建议分屏截图，避免截断角色行。</p><p class="panel-sub mt">图片仅在当前浏览器处理。识别后逐行核对、勾选并确认，才会更新已有角色；可立即撤销。</p><label class="field mt">角色数据截图<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp"></label><div class="form-grid mt"><label class="field">表格数据顶部（图片高度 %）<input id="screenshot-top" type="number" value="23" min="0" max="90"></label><label class="field">表格数据底部（图片高度 %）<input id="screenshot-bottom" type="number" value="92" min="10" max="100"></label></div><p class="panel-sub">默认适配所示完整游戏窗口。边界应只包含角色数据行，排除表头、底部总计和截断行；左右保持原表格布局。</p>${button('开始本地识别','screenshot-recognize','primary mt')}<p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
+    screenshotDraft=null;
+    modal('批量上传角色统计截图',`<p>支持一次选择多张茗伊「角色统计」截图，自动合并重复角色，并补齐空白字段。包含名字、门派、金钱、通宝、等级、资历、宠物、侠行、侠行周等列。</p>
+      <p class="panel-sub mt">图片只在浏览器内识别，不上传。相同角色的冲突数值会标明来源，需要人工确认；最后统一勾选更新，可以撤销。</p>
+      <label class="field mt">角色数据截图（可多选）<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+      <div class="form-grid mt"><label class="field">表格数据顶部（图片高度 %）<input id="screenshot-top" type="number" value="23" min="0" max="90"></label><label class="field">表格数据底部（图片高度 %）<input id="screenshot-bottom" type="number" value="92" min="10" max="100"></label></div>
+      <p class="panel-sub">使用同一组裁剪比例逐张识别。最多 12 张，每张不超过 12 MB，总计不超过 60 MB；已导入或内容相同的截图自动跳过。</p>
+      ${button('开始本地识别','screenshot-recognize','primary mt')}<p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
   }
   async function screenshotRecognize(b){
     if(screenshotBusy)return;
-    const file=$('#screenshot-file')?.files[0],status=$('#screenshot-status'),host=$('#screenshot-result');if(!file){status.textContent='请先选择截图';return;}
-    const top=Number($('#screenshot-top').value),bottom=Number($('#screenshot-bottom').value);screenshotBusy=true;b.disabled=true;status.textContent='正在准备识别…';host.innerHTML='';
+    const files=Array.from($('#screenshot-file')?.files||[]),status=$('#screenshot-status'),host=$('#screenshot-result');
+    if(!files.length){status.textContent='请至少选择一张截图';return;}
+    if(files.length>12){status.textContent='每批最多 12 张截图，请分批导入';return;}
+    if(files.reduce((n,f)=>n+f.size,0)>60*1024*1024){status.textContent='截图总大小不可超过 60 MB，请分批导入';return;}
+    const top=Number($('#screenshot-top').value),bottom=Number($('#screenshot-bottom').value);
+    screenshotBusy=true;b.disabled=true;status.textContent='正在准备批量识别…';host.innerHTML='';
+    let worker;
     try{
-      const bytes=await file.arrayBuffer(),digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
-      const rows=await WorkbenchScreenshot.recognize(file,{top,bottom,progress:t=>{status.textContent=t;}});
+      const imported=WorkbenchScreenshot.importedDigests(state),seen=new Set(),images=[],skipped=[],failed=[];
+      for(const [i,file] of files.entries()){
+        if(!host.isConnected||!$('#dialog').open)return;
+        status.textContent='正在识别第 '+(i+1)+' / '+files.length+' 张：'+file.name;
+        try{
+          if(!/^image\/(png|jpeg|webp)$/.test(file.type)||!file.size||file.size>12*1024*1024)throw new Error('请选择不超过 12 MB 的 PNG / JPG / WebP 图片');
+          const digest=await shotDigest(await file.arrayBuffer());
+          if(seen.has(digest)||imported.has(digest)){skipped.push(file.name+(imported.has(digest)?'（已导入）':'（本批重复）'));continue;}
+          seen.add(digest);
+          if(!worker)worker=await WorkbenchScreenshot.createWorker(t=>{if(host.isConnected)status.textContent='正在加载识别引擎：'+t;});
+          const rows=await WorkbenchScreenshot.recognize(file,{top,bottom,worker,progress:t=>{if(host.isConnected)status.textContent='第 '+(i+1)+' / '+files.length+' 张：'+t;}});
+          if(!rows.length)throw new Error('没有识别到角色行');
+          images.push({file,name:file.name,digest,rows});
+        }catch(e){
+          const detail=e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():'识别引擎未返回具体原因';
+          failed.push(file.name+'：'+detail);
+          console.error('[OCR] 截图识别失败',file.name,e);
+        }
+      }
       if(!host.isConnected||!$('#dialog').open)return;
-      screenshotDraft={rows,digest,name:file.name};
-      const picture=URL.createObjectURL(file);
-      modal('核对截图识别结果',`<p class="warning">识别 ${rows.length} 行。请对照原图修改，逐行勾选。角色名忽略 @ 及其后文字后匹配；账号、角色名、期初余额、任务与收益不变。金币图标可能被识别为数字，必须核对金额；空白字段保留旧值。</p><details class="mt"><summary>查看原图</summary><img id="screenshot-original" src="${picture}" style="max-width:100%;height:auto" alt="待核对的角色统计截图"></details>${field('screenshot-time','确认采集时间（北京时间）',beijingLocal(),'datetime-local','截图中每行快照计时可能不同；此时间为你确认的本批采集时间，不自动推算。','required')}<div class="table-wrap mt"><table><thead><tr><th>更新</th><th>匹配已有角色</th>${WorkbenchScreenshot.labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>{const roleId=WorkbenchScreenshot.match(state.roles,r.name);return `<tr><td><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"></td><td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${state.roles.map(role=>`<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`).join('')}</select><small>${roleId?'已忽略 @ 后缀匹配，请核对门派和账号':'未唯一匹配，请手动选择'}</small></td>${WorkbenchScreenshot.fields.map(k=>`<td><input name="shot-${i}-${k}" aria-label="第 ${i+1} 行${esc(WorkbenchScreenshot.labels[WorkbenchScreenshot.fields.indexOf(k)])}" value="${esc(r[k]||'')}" style="min-width:85px;width:110px" ${k==='name'?'readonly':''}></td>`).join('')}</tr>`;}).join('')}</tbody></table></div><p class="panel-sub mt">通宝、宠物、侠行周分别存为独立字段；不将通宝当精力或金钱，不将侠行当威名。门派可修正或清空以保留原值。未显示的属性不会推测。</p>`,fd=>{
-        const draft=screenshotDraft,rows=draft.rows.map((r,i)=>({...Object.fromEntries(WorkbenchScreenshot.fields.map(k=>[k,String(fd.get('shot-'+i+'-'+k)||'').trim()])),selected:fd.has('shot-pick-'+i),roleId:fd.get('shot-role-'+i)}));
-        const capturedAt=new Date(fd.get('screenshot-time')+':00+08:00').toISOString();
-        commit(()=>{state=WorkbenchScreenshot.apply(state,rows,{...draft,capturedAt});},'截图数据已更新，可立即撤销');screenshotDraft=null;
-      },'确认更新勾选角色');
+      if(!images.length)throw new Error('没有成功识别的截图。'+[...skipped,...failed].join('；'));
+      const merged=WorkbenchScreenshot.mergeScreenshots(images);
+      const fileRecords=images.map(image=>({name:image.name,sha256:image.digest}));
+      const digest=images.length===1?images[0].digest:await shotDigest(new TextEncoder().encode(images.map(i=>i.digest).sort().join('|')));
+      const name=images.length===1?images[0].name:'角色截图批次（'+images.length+' 张）';
+      screenshotDraft={rows:merged.rows,digest,name,files:fileRecords,rawRows:merged.rawRows,duplicates:merged.duplicates};
+      const originals=images.map(image=>({name:image.name,url:URL.createObjectURL(image.file)}));
+      const notes=[skipped.length?'跳过重复截图：'+skipped.join('、'):'',failed.length?'识别失败（未纳入本批）：'+failed.join('；'):''].filter(Boolean);
+      modal('核对截图识别结果',`<p class="panel-sub">成功识别 <b>${images.length}</b> 张，原始 <b>${merged.rawRows}</b> 行，合并重复 <b>${merged.duplicates}</b> 行，共 <b>${merged.rows.length}</b> 个角色；其中 <b>${merged.conflicts}</b> 个有数据冲突。</p>
+        ${notes.map(note=>`<p class="warning mt">${esc(note)}</p>`).join('')}
+        <p class="warning mt">仅合并完全相同的角色名（含 @ 后缀）；不同 @ 后缀不自动合并。冲突默认保留第一张非空值，请核对原图、修改数值并勾选“已核对冲突”。只有选中的角色会更新，其他数据保持不变。</p>
+        <details class="mt"><summary>查看本批原图（${originals.length} 张）</summary>${originals.map((image,i)=>`<div class="mt"><small>${i+1}. ${esc(image.name)}</small><img class="screenshot-preview-original" src="${image.url}" style="display:block;max-width:100%;height:auto" alt="角色统计截图 ${i+1}"></div>`).join('')}</details>
+        ${field('screenshot-time','确认本批采集时间（北京时间）',beijingLocal(),'datetime-local','同批所有角色使用同一采集时间；不同日期建议分批导入。','required')}
+        <div class="table-wrap mt"><table><thead><tr><th>更新 / 来源</th><th>匹配已有角色</th>${WorkbenchScreenshot.labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>
+        ${merged.rows.map((r,i)=>{
+          const roleId=WorkbenchScreenshot.match(state.roles,r.name),conflicts=Object.entries(r.conflicts);
+          return `<tr><td><label><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"> 更新</label><small>${r.occurrences} 行 · ${esc(r.sourceNames.join('、'))}</small>${conflicts.length?`<small class="negative">${conflicts.length} 项数据冲突</small><label class="mt"><input type="checkbox" name="shot-confirm-${i}" aria-label="已核对第 ${i+1} 行冲突"> 已核对冲突</label>`:''}</td>
+            <td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${state.roles.map(role=>`<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`).join('')}</select><small>${roleId?'已匹配，请核对账号和门派':'未唯一匹配，请手动选择'}</small></td>
+            ${WorkbenchScreenshot.fields.map(k=>{
+              const options=r.conflicts[k];
+              return `<td><input name="shot-${i}-${k}" aria-label="第 ${i+1} 行${esc(WorkbenchScreenshot.labels[WorkbenchScreenshot.fields.indexOf(k)])}" value="${esc(r[k]||'')}" style="min-width:85px;width:110px" ${k==='name'?'readonly':''}>${options?`<small class="negative">冲突：${options.map(o=>esc(o.value)+'（'+esc(o.files.join('、'))+'）').join(' / ')}</small>`:''}</td>`;
+            }).join('')}</tr>`;
+        }).join('')}</tbody></table></div>
+        <p class="panel-sub mt">金币请核实单位；空白字段保留原值。选中角色一次提交，可立即撤销。</p>`,fd=>{
+          const draft=screenshotDraft,rows=draft.rows.map((r,i)=>({
+            ...Object.fromEntries(WorkbenchScreenshot.fields.map(k=>[k,String(fd.get('shot-'+i+'-'+k)||'').trim()])),
+            conflicts:r.conflicts,sourceNames:r.sourceNames,conflictsConfirmed:fd.has('shot-confirm-'+i),
+            selected:fd.has('shot-pick-'+i),roleId:fd.get('shot-role-'+i)
+          }));
+          const capturedAt=new Date(fd.get('screenshot-time')+':00+08:00').toISOString();
+          commit(()=>{state=WorkbenchScreenshot.apply(state,rows,{...draft,capturedAt});},'截图数据已更新，可立即撤销');
+          screenshotDraft=null;
+        },'确认更新勾选角色');
       $('#dialog').classList.add('screenshot-wide');
-      $('#screenshot-original').onload=()=>URL.revokeObjectURL(picture);
-    }catch(e){const detail=e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():'浏览器没有返回具体错误信息';console.error('[OCR] 本地识别失败',e);status.textContent='识别失败：'+detail+'。已有数据未修改。';}
-    finally{screenshotBusy=false;b.disabled=false;}
+      for(const img of $('#dialog').querySelectorAll('.screenshot-preview-original')){
+        img.onload=()=>URL.revokeObjectURL(img.src);
+        img.onerror=()=>URL.revokeObjectURL(img.src);
+      }
+    }catch(e){
+      const detail=e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():'浏览器没有返回具体错误信息';
+      console.error('[OCR] 批量本地识别失败',e);
+      if(status.isConnected)status.textContent='识别失败：'+detail+'。已有数据未修改。';
+    }finally{
+      if(worker)try{await worker.terminate();}catch(e){console.warn('[OCR] 关闭识别引擎失败',e);}
+      screenshotBusy=false;b.disabled=false;
+    }
   }
   async function importFile(file){
     if(!file)return;
