@@ -323,3 +323,25 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 .tc-account-slot.is-switch .tc-account-action{color:var(--tc-switch)}
 .tc-quick-context>.tc-account-grid{width:100%}
 .tc-account-grid .tc-account-slot .combat-tag{align-self:flex-start}
+
+/* Compact account profiles and nested raid CD progress. */
+.account-layout{align-items:start}
+.account-tree{max-height:min(640px,70vh);overflow:auto}
+.account-content{display:grid;align-content:start;gap:12px;min-width:0}
+.account-hint{margin:0;color:var(--wb-text-muted);font-size:12px;line-height:1.6}
+.role-grid{align-items:start;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.role-card{padding:14px;min-width:0}
+.role-card h2{font-size:16px}
+.role-card .avatar{width:34px;height:34px;font-size:16px}
+.role-card .resource-mini{margin:10px 0;gap:6px 12px}
+.role-card .role-meta{margin:8px 0;gap:5px}
+.role-card .list-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+.role-card .list-detail>div{padding:7px 0;font-size:12px;gap:6px;flex-wrap:wrap;min-width:0}
+.role-card .list-detail>div:nth-last-child(2){grid-column:1/-1}
+.role-card .companion-tags{max-width:100%;justify-content:flex-start}
+.role-card .role-bottom{margin-top:8px;padding-top:8px;gap:6px;flex-wrap:wrap}
+.tc-raid-progress{border-top:1px solid var(--wb-border);margin-top:4px;padding-top:6px}
+.tc-raid-progress summary{cursor:pointer;padding:6px 0;font-size:12px;color:var(--wb-text-secondary)}
+.tc-raid-progress summary small{color:var(--wb-text-muted);margin-left:6px}
+.tc-raid-progress-items{padding-left:10px;border-left:2px solid var(--wb-border);display:grid;gap:3px}
+@media(max-width:767px){.role-grid{grid-template-columns:1fr}.account-tree{max-height:230px;overflow:auto}.role-card{padding:12px}}
