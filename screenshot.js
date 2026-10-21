@@ -47,6 +47,17 @@
   }
   function match(roles,name){const k=base(name);if(!k)return '';const matches=(roles||[]).filter(r=>base(r.name)===k);return matches.length===1?matches[0].id:'';}
 
+  function chooseRecognizedName(roles,variants,school=''){
+    const unique=[...new Set(variants.map(x=>clean(x).replace(/[|]/g,'').replace(/@{2,}/g,'@')).filter(Boolean))];
+    if(!unique.length)return {name:'',matched:false};
+    const scored=unique.map((name,index)=>{
+      const matchInfo=suggestRoles(roles,name,school);
+      const candidate=matchInfo.suggestions.find(x=>x.roleId===matchInfo.roleId);
+      const strength=matchInfo.roleId?(candidate?.fullExact?4:matchInfo.exact?3:matchInfo.auto?2:0):0;
+      return {name,matchInfo,strength,index};
+    }).sort((a,b)=>b.strength-a.strength||a.index-b.index);
+    return {name:scored[0].name,matched:scored[0].strength>0};
+  }
   function value(v,key){if(v===''||v==null)return null;const s=String(v).trim();if(!/^\d+(?:\.\d{1,4})?$/.test(s))throw new Error('数值格式不正确：'+key);const n=Number(s);if(!Number.isSafeInteger(Math.round(n*10000))||n<0||key!=='gold'&&!Number.isInteger(n)||key==='level'&&(n<1||n>200))throw new Error('数值超出范围：'+key);return n;}
   // Merge identical names (including any @server suffix) across screenshots.
   // Do not merge unnamed rows or different server suffixes: they may be different roles.
@@ -161,8 +172,26 @@
       const scale=3,h=Math.round(bitmap.height*(bottom-top)/100)*scale,w=bitmap.width*scale;
       const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,bitmap.height*top/100,bitmap.width,h/scale,0,0,w,h);
       // Dark game UI: turn light glyphs into dark glyphs for OCR, retaining geometry.
-      const pixels=ctx.getImageData(0,0,w,h);for(let i=0;i<pixels.data.length;i+=4){const light=Math.max(pixels.data[i],pixels.data[i+1],pixels.data[i+2]);const c=255-light;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=c;}ctx.putImageData(pixels,0,0);
       const cuts=[.014,.128,.178,.398,.491,.561,.628,.708,.792,.875],columns=[];
+      // Color-aware name image: all colored glyphs on this UI become black text,
+      // while the low-intensity blue/gray table background remains white.
+      const nameLeft=Math.round(cuts[0]*w),nameWidth=Math.round((cuts[1]-cuts[0])*w);
+      const bin=document.createElement('canvas');bin.width=nameWidth;bin.height=h;
+      const binCtx=bin.getContext('2d',{willReadFrequently:true});
+      const binData=ctx.getImageData(nameLeft,0,nameWidth,h);
+      const pixels=ctx.getImageData(0,0,w,h);
+      for(let y=0;y<h;y++)for(let x=0;x<nameWidth;x++){
+        const src=(y*w+nameLeft+x)*4,dst=(y*nameWidth+x)*4;
+        const r=pixels.data[src],g=pixels.data[src+1],b=pixels.data[src+2];
+        const light=Math.max(r,g,b),colorDiff=light-Math.min(r,g,b);
+        const v=light>=103||colorDiff>=55?0:255;
+        binData.data[dst]=binData.data[dst+1]=binData.data[dst+2]=v;
+        binData.data[dst+3]=255;
+      }
+      binCtx.putImageData(binData,0,0);
+      // The regular grayscale path is preserved for numeric OCR.
+      for(let i=0;i<pixels.data.length;i+=4){const light=Math.max(pixels.data[i],pixels.data[i+1],pixels.data[i+2]);const c=255-light;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=c;}
+      ctx.putImageData(pixels,0,0);
       for(let i=0;i<9;i++){
         progress('正在识别 '+labels[i]+'（'+(i+1)+'/9）…');
         await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:i===0?'':i===1?'霸刀七秀藏剑纯阳五毒长歌药宗衍天唐门蓬莱苍云明教天策万花少林丐帮凌雪刀宗万灵段氏无方相知北傲太玄':'0123456789',preserve_interword_spaces:'1'});
@@ -178,30 +207,51 @@
       const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
       const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
       const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
-      // Re-recognize uncertain character names as individual lines with PSM 7.
+      // A second whole-column OCR pass uses the color-aware binary image.
+      // Compare both passes with the WORKBENCH character names (never use a
+      // raw OCR guess to rename a stored role).
       if(roles.length){
+        progress('正在用角色档案校对彩色角色名…');
+        await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+        try{
+          const nameResult=await worker.recognize(bin,{}, {tsv:true});
+          const alternatives=lines(nameResult.data.tsv||'');
+          for(let i=0;i<parsed.length;i++){
+            const a=anchors[i],text=alternatives.filter(x=>Math.abs(x.y-a.y)<spacing*.42)
+              .sort((l,r)=>l.x-r.x).map(x=>x.text).join('');
+            const best=chooseRecognizedName(roles,[parsed[i].name,text],parsed[i].school);
+            if(best.matched&&best.name!==parsed[i].name){
+              parsed[i].name=best.name;parsed[i].nameCorrected=true;
+            }
+          }
+        }catch{ /* The original column OCR remains available. */ }
+        // Only difficult lines need the slower isolated-line scans.
         await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'',preserve_interword_spaces:'0'});
         for(let i=0;i<parsed.length;i++){
           const original=parsed[i].name;
           if(suggestRoles(roles,original,parsed[i].school).exact)continue;
           progress('正在复核角色名称（'+(i+1)+'/'+parsed.length+'）…');
-          const a=anchors[i],left=Math.round(cuts[0]*w),cropWidth=Math.round((cuts[1]-cuts[0])*w);
-          const cropHeight=Math.max(20,Math.round(Math.min(spacing*.86,h*.13)));
+          const a=anchors[i],cropHeight=Math.max(20,Math.round(Math.min(spacing*.86,h*.13)));
           const cropY=Math.max(0,Math.min(h-cropHeight,Math.round(a.y-cropHeight/2)));
-          const c=document.createElement('canvas');c.width=cropWidth;c.height=cropHeight;
-          c.getContext('2d').drawImage(canvas,left,cropY,cropWidth,cropHeight,0,0,cropWidth,cropHeight);
-          try{
-            const result=await worker.recognize(c,{}, {text:true});
-            const next=clean(result.data.text).replace(/[|]/g,'');
-            const current=suggestRoles(roles,original,parsed[i].school),candidate=suggestRoles(roles,next,parsed[i].school);
-            if(candidate.exact&&!current.exact||candidate.auto&&!current.auto){
-              parsed[i].name=next;parsed[i].nameCorrected=true;
-            }
-          }catch{ /* Preserve original OCR if the extra pass fails. */ }
+          const results=[original];
+          // Use both the old inverted gray image and the color-aware glyph mask.
+          for(const source of [canvas,bin]){
+            const c=document.createElement('canvas');c.width=nameWidth;c.height=cropHeight;
+            c.getContext('2d').drawImage(source,source===canvas?nameLeft:0,cropY,nameWidth,cropHeight,0,0,nameWidth,cropHeight);
+            try{
+              const response=await worker.recognize(c,{}, {text:true});
+              results.push(response.data.text);
+              if(chooseRecognizedName(roles,results,parsed[i].school).matched)break;
+            }catch{ /* Preserve earlier OCR on a failed isolated-line pass. */ }
+          }
+          const best=chooseRecognizedName(roles,results,parsed[i].school);
+          if(best.matched&&best.name!==original){
+            parsed[i].name=best.name;parsed[i].nameCorrected=true;
+          }
         }
       }
       return parsed;
     }finally{bitmap.close();if(!sharedWorker&&worker)await worker.terminate();}
   }
-  return {fields,labels,base,match,suggestRoles,editDistance,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
+  return {fields,labels,base,match,suggestRoles,chooseRecognizedName,editDistance,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
 });
