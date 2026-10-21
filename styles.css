@@ -394,3 +394,19 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 /* Screenshot reconciliation needs room for the source and all resource columns. */
 #dialog.screenshot-wide{width:min(1500px,96vw);max-width:96vw}
 #dialog.screenshot-wide table{min-width:1300px}
+
+
+/* Screenshot OCR: persistent file selection and explicit review. */
+.screenshot-queue-summary{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--wb-text-secondary);margin-bottom:9px}
+.screenshot-queue-summary span{color:var(--wb-text-muted)}
+.screenshot-file-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:9px;max-height:240px;overflow:auto}
+.screenshot-file-item{display:flex;align-items:center;gap:10px;padding:9px;border:1px solid var(--wb-border);background:var(--wb-surface-2);border-radius:9px;min-width:0}
+.screenshot-file-item>img{width:55px;height:44px;border-radius:6px;object-fit:cover;flex:none}
+.screenshot-file-item>div{min-width:0;flex:1}
+.screenshot-file-item strong,.screenshot-file-item small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.screenshot-file-item strong{font-size:12px;color:var(--wb-text)}
+.screenshot-file-item small{font-size:11px;color:var(--wb-text-muted)}
+.screenshot-queue-empty{padding:17px;border:1px dashed var(--wb-control-border);border-radius:8px;font-size:12px;text-align:center;color:var(--wb-text-muted)}
+.screenshot-confirm-review{display:flex;align-items:center;gap:9px;padding:13px;border:1px solid var(--wb-warning);border-radius:8px;margin:13px 0;font-size:13px;line-height:1.5}
+.screenshot-select-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:14px 0}
+.screenshot-select-tools small{color:var(--wb-text-muted);font-size:12px}
