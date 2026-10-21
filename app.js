@@ -1388,7 +1388,7 @@
     'show-overdue':()=>{ui.workView='queue';ui.queueRange='all';ui.queueStatus='overdue';render();},
     'task-today':()=>{ui.taskDate=today;syncTaskDate();ui.queueRange='day';ui.generated=null;ui.progressSelection=[];render();},
     'task-date-step':b=>{ui.taskDate=M.addDays(ui.taskDate,Number(b.dataset.offset)*(ui.queueRange==='week'&&ui.workView==='queue'?7:1));syncTaskDate();ui.generated=null;ui.progressSelection=[];render();},
-    'flow-lane':b=>{ui.queueLane=b.dataset.value;ui.focusPlanId='';ui.focusBatchKey='';render();},
+    'flow-lane':b=>{if(b.dataset.value==='done'&&ui.queueStatus==='pending')ui.queueStatus='all';ui.queueLane=b.dataset.value;ui.focusPlanId='';ui.focusBatchKey='';render();},
     'flow-plan':b=>{ui.focusPlanId=b.dataset.id;ui.focusBatchKey='';render();},
     'flow-scroll':b=>{const rail=document.querySelector('[data-flow-rail="'+b.dataset.target+'"]');if(rail)rail.scrollBy({left:Number(b.dataset.offset)*rail.clientWidth*.75,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},
     'task-layout':b=>{ui.taskLayout=b.dataset.value;render();},
