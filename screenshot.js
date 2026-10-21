@@ -16,24 +16,33 @@
     return prev[b.length];
   }
   function suggestRoles(roles,name,school=''){
-    const key=base(name),full=clean(name),schoolKey=clean(school);
+    const key=base(name),full=clean(name),schoolKey=clean(school),all=roles||[];
     if(!key)return {roleId:'',exact:false,auto:false,suggestions:[]};
-    const suggestions=(roles||[]).map(role=>{
-      const target=base(role.name),exact=target===key,fullExact=clean(role.name)===full;
-      const distance=editDistance(key,target),compatibleSchool=!schoolKey||!role.school||clean(role.school)===schoolKey;
-      // Explicitly different @server suffixes must never auto-match.
-      const suffixConflict=full.includes('@')&&clean(role.name).includes('@')&&full.split('@')[1]!==clean(role.name).split('@')[1];
+    const ocrServer=full.includes('@')?full.split('@').slice(1).join('@'):'';
+    const knownServers=new Set(all.map(r=>clean(r.name).split('@').slice(1).join('@')).filter(Boolean));
+    const suggestions=all.map(role=>{
+      const target=base(role.name),roleFull=clean(role.name),server=roleFull.includes('@')?roleFull.split('@').slice(1).join('@'):'';
+      const distance=editDistance(key,target),exact=distance===0,fullExact=roleFull===full;
+      const schoolKnown=!!schoolKey&&!!clean(role.school);
+      const compatibleSchool=!schoolKnown||clean(role.school)===schoolKey;
+      const suffixStatus=!ocrServer||!server||ocrServer===server?'exact':
+        knownServers.has(ocrServer)||editDistance(ocrServer,server)>1?'conflict':'ocr-typo';
       const threshold=key.length>=6?2:key.length>=3?1:0;
-      const score=distance-(fullExact?.5:0)-(compatibleSchool&&schoolKey?.15:0)+(suffixConflict?2:0);
-      return {roleId:role.id,name:role.name,school:role.school,distance,exact,fullExact,compatibleSchool,suffixConflict,score,eligible:distance<=threshold&&!suffixConflict};
-    }).filter(r=>r.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
-    const exact=suggestions.filter(x=>x.exact);
-    if(exact.length===1)return {roleId:exact[0].roleId,exact:true,auto:true,suggestions};
-    const corroborated=schoolKey?suggestions.filter(s=>s.compatibleSchool):[];
-    const best=corroborated[0],second=corroborated[1];
-    // Auto-select only when a unique 1-character variant has the same known school.
-    const auto=!!best&&best.distance===1&&key.length>=3&&!!schoolKey&&
-      (second===undefined||second.score-best.score>=1);
+      const score=distance+(suffixStatus==='conflict'?2:suffixStatus==='ocr-typo'?.2:0)
+        +(schoolKnown&&!compatibleSchool?2:0)-(fullExact?.5:0);
+      return {roleId:role.id,name:role.name,school:role.school,distance,exact,fullExact,
+        compatibleSchool,schoolKnown,suffixStatus,suffixConflict:suffixStatus==='conflict',
+        score,eligible:distance<=threshold};
+    }).filter(x=>x.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
+    const exactMatches=suggestions.filter(x=>x.exact&&x.compatibleSchool&&!x.suffixConflict);
+    const validExact=exactMatches.length===1?exactMatches[0]:null;
+    const exactAuto=!!validExact&&(validExact.suffixStatus==='exact'||validExact.schoolKnown);
+    if(exactAuto)return {roleId:validExact.roleId,exact:true,auto:true,suggestions};
+    // A one-character OCR error needs corroborating school AND one unique safe candidate.
+    const supported=suggestions.filter(x=>x.distance<=1&&x.schoolKnown&&x.compatibleSchool&&!x.suffixConflict);
+    const best=supported[0],second=supported[1];
+    const auto=!!best&&best.distance===1&&key.length>=3&&
+      (second===undefined||second.score-best.score>=1)&&!suggestions.some(x=>x.exact&&!x.suffixConflict);
     return {roleId:auto?best.roleId:'',exact:false,auto,suggestions};
   }
   function match(roles,name){const k=base(name);if(!k)return '';const matches=(roles||[]).filter(r=>base(r.name)===k);return matches.length===1?matches[0].id:'';}
