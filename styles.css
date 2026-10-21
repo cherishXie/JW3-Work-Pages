@@ -493,3 +493,61 @@ html[data-theme="deep-ocean"] .footer{border-top-color:#35353a}
  html[data-theme="deep-ocean"] .tc-summary{gap:8px 14px}
  html[data-theme="deep-ocean"] .tc-plan-head{flex-wrap:wrap}
 }
+
+
+/* V3.3 STRUCTURAL UI: distribution / dashboard / task fleet, not a recolor */
+.revenue-map-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(230px,.9fr);gap:14px;padding:18px 20px}
+.revenue-map{position:relative;min-width:0;height:320px;background:var(--wb-track);border-radius:9px;overflow:hidden}
+.revenue-map-tile{position:absolute;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;min-width:0;min-height:0;overflow:hidden;padding:clamp(3px,1vw,14px);border:2px solid var(--wb-surface);border-radius:5px;background:color-mix(in srgb,var(--tile-accent) 53%,var(--wb-surface));color:var(--wb-text);text-align:left;white-space:normal;gap:3px;transition:filter .16s,box-shadow .16s}
+.revenue-map-tile:hover,.revenue-map-tile:focus-visible{filter:brightness(1.28);z-index:2;box-shadow:inset 0 0 0 2px var(--wb-text)}
+.revenue-map-name{font-size:12px;line-height:1.4;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.revenue-map-tile strong{font-size:clamp(11px,1.5vw,23px);line-height:1.2;letter-spacing:-.5px}
+.revenue-map-tile small{font-size:11px;color:var(--wb-text-secondary);overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.revenue-map-tile[style*="width:0."] .revenue-map-name{font-size:10px}
+.revenue-map-detail{border:1px solid var(--wb-border);border-radius:9px;min-width:0;overflow:hidden;display:flex;flex-direction:column}
+.revenue-map-summary{padding:15px 17px;display:grid;gap:5px;background:var(--wb-surface-2);border-bottom:1px solid var(--wb-border)}
+.revenue-map-summary small{color:var(--wb-text-muted)}.revenue-map-summary strong{font-size:24px;line-height:1.4}
+.revenue-map-summary strong span{font-size:12px;font-weight:400;color:var(--wb-text-muted)}
+.revenue-map-list{overflow:auto;max-height:236px;padding:5px}
+.revenue-map-line{display:flex;width:100%;align-items:center;gap:9px;padding:9px 11px;text-align:left;background:transparent;border:0;border-radius:6px}
+.revenue-map-line i{width:10px;height:10px;border-radius:2px;flex:none}
+.revenue-map-line span{flex:1;overflow:hidden;text-overflow:ellipsis;text-align:left}.revenue-map-line b{font-variant-numeric:tabular-nums}
+.overview-command-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);gap:14px;margin-top:16px;align-items:start}
+.overview-command-main{min-width:0;display:grid;gap:14px}
+.overview-command-main>.card{margin-top:0!important}
+.overview-command-main .overview-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.overview-command-main .overview-link{min-width:0;white-space:normal;text-align:left;display:flex;align-items:flex-start;flex-direction:column}
+.overview-command-side{min-width:0;position:sticky;top:18px}
+.overview-snapshot .panel-head{padding-bottom:12px}
+.overview-snapshot-body{padding:8px 20px 22px}
+.overview-snapshot-count{display:flex;align-items:baseline;gap:12px}
+.overview-snapshot-count strong{font-size:38px;line-height:1.3;letter-spacing:-1px}
+.overview-snapshot-count span{color:var(--wb-text-muted)}
+.overview-snapshot-meter{height:9px;border-radius:10px;background:var(--wb-track);overflow:hidden;margin:12px 0 20px}
+.overview-snapshot-meter i{display:block;height:100%;border-radius:10px;background:var(--wb-cyan)}
+.overview-snapshot-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.overview-snapshot-stats>div{padding:13px;background:var(--wb-surface-2);border:1px solid var(--wb-border);border-radius:8px;display:grid;gap:5px}
+.overview-snapshot-stats small{color:var(--wb-text-muted)}
+.overview-snapshot-stats strong{font-size:22px;font-variant-numeric:tabular-nums}
+.task-center{display:grid;gap:12px}
+.task-center .tc-heading{margin-bottom:0}
+.task-center .tc-bar{padding:12px 15px;border:1px solid var(--wb-border);border-radius:10px;background:var(--wb-surface)}
+.task-center .tc-filters{margin:0;padding:10px 15px;background:var(--wb-surface);border:1px solid var(--wb-border);border-radius:9px;gap:12px}
+.task-center .tc-filters input{flex:1;min-width:170px;max-width:430px}
+.task-center .tc-v2{display:grid;gap:12px}
+.task-center .tc-v2-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.task-center .tc-v2-stat{background:var(--wb-surface);border:1px solid var(--wb-border);border-radius:9px;min-height:95px;padding:15px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;text-align:left}
+.task-center .tc-v2-stat strong{font-size:24px;font-variant-numeric:tabular-nums}
+.task-center .tc-v2-stat small{color:var(--wb-text-muted)}
+.task-center .tc-v2-stat.is-active{border-color:var(--wb-primary);box-shadow:inset 3px 0 var(--wb-primary)}
+.task-center .tc-v2-actions{padding:6px 0}
+.task-center .tc-v2-queue,.task-center .tc-v2-workspace>section{min-width:0}
+.task-center .tc-v2-plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,350px),1fr));gap:12px}
+.task-center .tc-v2-plan-grid>.card{margin:0}
+.task-center .tc-v2-workspace{gap:14px;align-items:start}
+.task-center .tc-v2-section-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.task-center .tc-v2-archive{padding:13px 16px;border-radius:9px;background:var(--wb-surface);border:1px solid var(--wb-border)}
+.task-center .tc-v2-archive>summary{cursor:pointer;font-weight:600}
+@media(max-width:1200px){.overview-command-layout{grid-template-columns:1fr}.overview-command-side{position:static}.revenue-map-layout{grid-template-columns:minmax(0,1.3fr) minmax(200px,1fr)}}
+@media(max-width:900px){.revenue-map-layout{grid-template-columns:1fr}.revenue-map{height:300px}.revenue-map-list{max-height:180px}}
+@media(max-width:767px){.task-center .tc-v2-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.revenue-map-layout{padding:12px}.revenue-map{height:250px}.revenue-map-tile{padding:4px}.revenue-map-tile small{display:none}.overview-command-main .overview-links{grid-template-columns:1fr}.task-center .tc-bar{flex-wrap:wrap}.task-center .tc-filters input{max-width:none}.overview-snapshot-count strong{font-size:32px}}
