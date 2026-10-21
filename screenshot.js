@@ -6,21 +6,69 @@
   const numeric=fields.slice(2),clean=s=>String(s||'').normalize('NFKC').replace(/\s/g,''),base=s=>clean(s).split('@')[0];
   function match(roles,name){const nameOnly=base(name);if(!nameOnly)return '';const matches=roles.filter(r=>base(r.name)===nameOnly);return matches.length===1?matches[0].id:'';}
   function value(v,key){if(v===''||v==null)return null;const s=String(v).trim();if(!/^\d+(?:\.\d{1,4})?$/.test(s))throw new Error('数值格式不正确：'+key);const n=Number(s);if(!Number.isSafeInteger(Math.round(n*10000))||n<0||key!=='gold'&&!Number.isInteger(n)||key==='level'&&(n<1||n>200))throw new Error('数值超出范围：'+key);return n;}
-  function apply(state,rows,{digest,name,capturedAt,now=new Date().toISOString()}){
+  // Merge identical names (including any @server suffix) across screenshots.
+  // Do not merge unnamed rows or different server suffixes: they may be different roles.
+  // Fields are filled from the first nonblank candidate; discrepancies need explicit review.
+  function mergeScreenshots(images){
+    const groups=new Map();let rawRows=0;
+    for(const [imageIndex,image] of images.entries()){
+      for(const [rowIndex,row] of (image.rows||[]).entries()){
+        rawRows++;
+        const name=clean(row.name),key=name?'role:'+name:'unknown:'+imageIndex+':'+rowIndex;
+        let group=groups.get(key);
+        if(!group){
+          group={name,sourceNames:[],candidates:{},sources:[]};
+          for(const field of fields.slice(1))group.candidates[field]=new Map();
+          groups.set(key,group);
+        }
+        const label=String(image.name||'截图 '+(imageIndex+1));
+        if(!group.sourceNames.includes(label))group.sourceNames.push(label);
+        group.sources.push({name:label,row:rowIndex+1});
+        for(const field of fields.slice(1)){
+          const candidate=String(row[field]??'').trim();
+          if(!candidate)continue;
+          const options=group.candidates[field],normalized=field==='school'?clean(candidate):candidate;
+          if(!options.has(normalized))options.set(normalized,{value:candidate,files:[]});
+          const item=options.get(normalized);
+          if(!item.files.includes(label))item.files.push(label);
+        }
+      }
+    }
+    const rows=[...groups.values()].map(group=>{
+      const row={name:group.name,sourceNames:group.sourceNames,sources:group.sources,occurrences:group.sources.length,conflicts:{}};
+      for(const field of fields.slice(1)){
+        const choices=[...group.candidates[field].values()];
+        row[field]=choices[0]?.value||'';
+        if(choices.length>1)row.conflicts[field]=choices;
+      }
+      return row;
+    });
+    return {rows,rawRows,duplicates:rawRows-rows.length,conflicts:rows.filter(r=>Object.keys(r.conflicts).length).length};
+  }
+  function importedDigests(state){
+    return new Set((state.sourceArchives||[]).flatMap(a=>(a.files||[]).map(f=>f.sha256).filter(Boolean)));
+  }
+  function apply(state,rows,{digest,name,files,capturedAt,now=new Date().toISOString(),rawRows,duplicates}){
     if(!/^[a-f0-9]{64}$/.test(digest)||!Number.isFinite(Date.parse(capturedAt))||Date.parse(capturedAt)>Date.parse(now)+60000)throw new Error('截图标识或采集时间无效（不能在未来）');
-    const id='screenshot_'+digest;if((state.sourceArchives||[]).some(x=>x.id===id))throw new Error('该截图已导入；如需重做，请先撤销上次导入');
+    const incoming=files||[{name,sha256:digest}];
+    if(!Array.isArray(incoming)||!incoming.length||incoming.some(f=>!f.name||!/^[a-f0-9]{64}$/.test(f.sha256))||new Set(incoming.map(f=>f.sha256)).size!==incoming.length)throw new Error('截图文件清单无效或存在重复文件');
+    const existing=importedDigests(state);
+    if(incoming.some(f=>existing.has(f.sha256)))throw new Error('该截图已导入；如需重做，请先撤销上次导入');
+    const id='screenshot_'+digest;
+    if((state.sourceArchives||[]).some(x=>x.id===id))throw new Error('该截图批次已导入；如需重做，请先撤销上次导入');
     const next=structuredClone(state),seen=new Set(),changes=[],date=new Date(Date.parse(capturedAt)+8*3600000).toISOString().slice(0,10);
     for(const row of rows.filter(x=>x.selected)){
+      if(Object.keys(row.conflicts||{}).length&&!row.conflictsConfirmed)throw new Error(row.name+' 存在截图数据冲突，请逐项核对并勾选冲突确认');
       const role=next.roles.find(r=>r.id===row.roleId);if(!role)throw new Error('请为选中行选择已有角色');if(seen.has(role.id))throw new Error('同一角色出现多次，请只保留一行');seen.add(role.id);
       if(role.resourceUpdatedAt&&Date.parse(role.resourceUpdatedAt)>Date.parse(capturedAt)||role.observedDate&&role.observedDate>date||role.screenshotCapturedAt&&Date.parse(role.screenshotCapturedAt)>Date.parse(capturedAt))throw new Error(role.name+' 已有更新的快照，请取消选择旧数据');
       const changed={};for(const key of numeric){const n=value(row[key],key);if(n==null)continue;const target=key==='gold'?'observedGold':key;changed[target]={before:role[target]??null,after:n};role[target]=n;}
       if(!Object.keys(changed).length)throw new Error(role.name+' 没有可更新的数值');
       if(row.school?.trim()){changed.school={before:role.school??'',after:row.school.trim()};role.school=row.school.trim();}
       if(changed.observedGold){role.observedDate=date;role.observedGoldSource='茗伊角色统计截图';next.balanceSnapshots??=[];next.balanceSnapshots.push({id:id+'_'+role.id,roleId:role.id,gold:role.observedGold,date,source:'茗伊角色统计截图',importedAt:now,capturedAt});}
-      role.screenshotCapturedAt=capturedAt;role.updatedAt=now;changes.push({roleId:role.id,sourceName:row.name,changes:changed});
+      role.screenshotCapturedAt=capturedAt;role.updatedAt=now;changes.push({roleId:role.id,sourceName:row.name,sources:row.sourceNames||[],changes:changed});
     }
     if(!changes.length)throw new Error('请至少选择一行有效角色');
-    next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:'mingyi-role-screenshot-v1',counts:{roles:changes.length},files:[{name,sha256:digest}],rows:changes,issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。'],updatedAt:now,capturedAt});
+    next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。'],updatedAt:now,capturedAt});
     next.imports.push({id,name:'角色截图 · '+name,date,stats:{added:0,updated:changes.length,skipped:rows.length-changes.length,old:0}});return next;
   }
   function lines(tsv){return tsv.split('\n').slice(1).map(l=>l.split('\t')).filter(a=>a[0]==='5'&&a[11]?.trim()).map(a=>({text:a.slice(11).join('\t').trim(),x:Number(a[6]),y:Number(a[7])+Number(a[9])/2,confidence:Number(a[10])}));}
@@ -51,14 +99,14 @@
       throw new Error('OCR 引擎无法启动；SIMD：'+simdError+'；兼容模式：'+readableError(e)+'。请检查 '+asset('tesseract-core-simd-lstm.wasm.js')+' 和 '+asset('tesseract-core-lstm.wasm.js')+' 是否可访问（HTTP 200），刷新后重试');
     }
   }
-  async function recognize(file,{top=23,bottom=92,progress=()=>{}}={}){
+  async function recognize(file,{top=23,bottom=92,progress=()=>{},worker:sharedWorker}={}){
     if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>12*1024*1024)throw new Error('请选择不超过 12 MB 的 PNG / JPG / WebP 图片');
     if(!(top>=0&&bottom<=100&&bottom-top>=10))throw new Error('表格上下边界必须在 0–100%，且间距至少 10%');
     if(location.protocol==='file:')throw new Error('截图识别请使用 Pages 站点或本地 HTTP 服务；单文件模式可继续使用 JSON / CSV 导入');
     const bitmap=await createImageBitmap(file);if(bitmap.width*bitmap.height>20000000){bitmap.close();throw new Error('图片分辨率过大，请裁剪后上传');}
-    let worker;
+    let worker=sharedWorker;
     try{
-      worker=await createOcrWorker(progress);
+      if(!worker)worker=await createOcrWorker(progress);
       const scale=3,h=Math.round(bitmap.height*(bottom-top)/100)*scale,w=bitmap.width*scale;
       const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,bitmap.height*top/100,bitmap.width,h/scale,0,0,w,h);
       // Dark game UI: turn light glyphs into dark glyphs for OCR, retaining geometry.
@@ -78,8 +126,8 @@
       }
       const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
       const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
-      return anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=base(row.name);return row;});
-    }finally{bitmap.close();if(worker)await worker.terminate();}
+      return anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+    }finally{bitmap.close();if(!sharedWorker&&worker)await worker.terminate();}
   }
-  return {fields,labels,base,match,value,apply,recognize};
+  return {fields,labels,base,match,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
 });
