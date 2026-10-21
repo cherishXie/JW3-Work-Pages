@@ -34,9 +34,9 @@
         compatibleSchool,schoolKnown,suffixStatus,suffixConflict:suffixStatus==='conflict',
         score,eligible:distance<=threshold};
     }).filter(x=>x.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
-    const exactMatches=suggestions.filter(x=>x.exact&&x.compatibleSchool&&!x.suffixConflict);
+    const exactMatches=suggestions.filter(x=>x.exact&&!x.suffixConflict);
     const validExact=exactMatches.length===1?exactMatches[0]:null;
-    const exactAuto=!!validExact&&(validExact.suffixStatus==='exact'||validExact.schoolKnown);
+    const exactAuto=!!validExact&&(validExact.suffixStatus==='exact'||validExact.schoolKnown&&validExact.compatibleSchool);
     if(exactAuto)return {roleId:validExact.roleId,exact:true,auto:true,suggestions};
     // A one-character OCR error needs corroborating school AND one unique safe candidate.
     const supported=suggestions.filter(x=>x.distance<=1&&x.schoolKnown&&x.compatibleSchool&&!x.suffixConflict);
@@ -47,6 +47,13 @@
   }
   function match(roles,name){const k=base(name);if(!k)return '';const matches=(roles||[]).filter(r=>base(r.name)===k);return matches.length===1?matches[0].id:'';}
 
+  const recognizedSchools=['霸刀','七秀','藏剑','纯阳','五毒','长歌','药宗','衍天','唐门','蓬莱','苍云','明教','天策','万花','少林','丐帮','凌雪','刀宗','万灵','段氏'];
+  function canonicalSchool(input){
+    const key=clean(input);
+    if(!key||recognizedSchools.includes(key))return key;
+    const options=recognizedSchools.filter(name=>editDistance(key,name)===1);
+    return options.length===1?options[0]:key;
+  }
   function chooseRecognizedName(roles,variants,school=''){
     const unique=[...new Set(variants.map(x=>clean(x).replace(/[|]/g,'').replace(/@{2,}/g,'@')).filter(Boolean))];
     if(!unique.length)return {name:'',matched:false};
@@ -68,9 +75,9 @@
       for(const [rowIndex,row] of (image.rows||[]).entries()){
         rawRows++;
         const name=clean(row.name),matchInfo=suggestRoles(roles,name,row.school);
-        const canonical=clean(roles.find(r=>r.id===matchInfo.roleId)?.name);
-        const sameSuffix=!name.includes('@')||!canonical.includes('@')||name.split('@')[1]===canonical.split('@')[1];
-        const matched=matchInfo.auto&&matchInfo.roleId&&sameSuffix;
+        // suggestRoles already rejects known conflicting servers; OCR typos in an
+        // unknown suffix may still refer to the same existing role.
+        const matched=matchInfo.auto&&!!matchInfo.roleId;
         const key=matched?'matched:'+matchInfo.roleId:name?'role:'+name:'unknown:'+imageIndex+':'+rowIndex;
         let group=groups.get(key);
         if(!group){
@@ -206,7 +213,7 @@
       }
       const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
       const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
-      const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+      const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=i===1?canonicalSchool(words.map(x=>x.text).join('')):words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
       // A second whole-column OCR pass uses the color-aware binary image.
       // Compare both passes with the WORKBENCH character names (never use a
       // raw OCR guess to rename a stored role).
@@ -253,5 +260,5 @@
       return parsed;
     }finally{bitmap.close();if(!sharedWorker&&worker)await worker.terminate();}
   }
-  return {fields,labels,base,match,suggestRoles,chooseRecognizedName,editDistance,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
+  return {fields,labels,base,match,suggestRoles,chooseRecognizedName,canonicalSchool,editDistance,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
 });
