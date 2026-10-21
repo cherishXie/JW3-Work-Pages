@@ -194,7 +194,12 @@
       notice(`${badge()} ${ui.mode==='estimated'?'<span>未安排目标 '+s.unassignedTargets+' 角色次；仅统计确认的日期和批次。</span>':''} <span style="margin-left:8px">${state.dataKind==='simulated'?'示例配置可自由修改。当前金币收益是币价估值，现金流单独核算。':'数据来自手工或文件导入；金币估值与实际兑现现金分别展示。'}</span>`,button('计算口径 '+icon('chevron'),'guide','ghost small'))+
       (s.forecastWarnings?.length?notice(s.forecastWarnings.map(esc).join('<br>')):'')+(s.billingWarnings?.length?notice(s.billingWarnings.map(esc).join('<br>')):'')+revenueHeadline(s,period+(ui.mode==='actual'?'实测收益':'预计收益'))+`<div class="kpi-grid analysis-kpis">${kpi(ui.mode==='actual'?'实测操作时间':'预计操作时间',s.hasData?num(s.minutes/60,1):'—','小时',`账号在线 ${num(s.onlineMinutes/60,1)} 小时`,'操作时间指玩家现实投入；在线分钟是各账号实际参与分钟之和，尾批按真实账号数计费。')}${kpi('每操作小时净收益',s.hasData&&s.hourly!==null?amount(s.hourly,s.hourlyGold):'—','/ 小时','总净收益 ÷ 总操作小时','总体净时薪使用总量相除，不平均各任务时薪。零操作时间显示不适用。')}${kpi('角色任务完成率',complete.rate===null?'—':num(complete.rate,1),'%',`${complete.done} / ${complete.total} 次目标已完成`,'按角色、任务及刷新周期去重，独立于收益记录；单纯勾选不生成收入。')} </div>`+
       `<div class="summary-strip"><span>参与账号<b>${new Set(roles.map(r=>r.accountId)).size}</b></span><span>启用任务<b>${state.tasks.filter(t=>t.enabled).length}</b></span><span>兑现现金净额<b>${cash.hasData?money(cash.net):'暂无记录'}${state.dataKind==='simulated'?'（示例）':''}</b></span><span>已录入现金成本<b>${cash.hasData?money(cash.expense):'暂无记录'}</b></span></div>`+
-      overviewActions(s);
+      '<div class="overview-command-layout"><div class="overview-command-main">'+overviewActions(s)+'</div><aside class="overview-command-side">'+overviewSnapshot(s,complete,roles)+'</aside></div>';
+  }
+  function overviewSnapshot(s,complete,roles){
+    const due=state.plans.filter(p=>!p.cancelled&&p.date>=ui.start&&p.date<=ui.end).flatMap(planBatchRows).filter(x=>x.pending&&!x.closed);
+    const total=Math.max(1,complete.total);
+    return `<section class="card overview-snapshot"><div class="panel-head"><div><h2>执行状态</h2><p class="panel-sub">当前统计期间</p></div>${button('进入任务中心','open-task-queue','small')}</div><div class="overview-snapshot-body"><div class="overview-snapshot-count"><strong>${num(complete.rate??0,1)}%</strong><span>角色目标完成率</span></div><div class="overview-snapshot-meter" role="progressbar" aria-valuenow="${Math.round(complete.rate||0)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.max(0,Math.min(100,complete.rate||0))}%"></i></div><div class="overview-snapshot-stats"><div><small>已完成</small><strong>${complete.done}</strong></div><div><small>计划目标</small><strong>${complete.total}</strong></div><div><small>待执行批次</small><strong>${due.length}</strong></div><div><small>参与角色</small><strong>${roles.length}</strong></div></div></div></section>`;
   }
   function overviewActions(s){
     if(!state.roles.length)return '<section class="card pad mt">'+empty('先建立你的账号与角色','完成账号角色配置，再选择常用任务并生成第一份排程。',button('开始配置','setup','primary'))+'</section>';
@@ -241,11 +246,29 @@
     return `<div class="analysis-focus"><section class="card revenue-panel">${head('收益构成','按任务看收入来源与贡献占比',badge())}${composition(s)}<div class="revenue-totals revenue-totals-equal"><div><small>毛收益</small><b class="number purple">${s.hasData?amount(s.gross,s.gold):'—'}</b></div><div><small>经济净收益</small><b class="number ${s.net<0?'negative':'cyan'}">${s.hasData?amount(s.net,s.netGold):'—'}</b></div><div><small>综合成本</small><b class="number">${s.hasData?money(s.cost):'—'}</b></div></div></section><section class="card efficiency-panel">${head('任务效率排行榜','比较每小时回报，同时查看收益与时间投入',selector)}<div class="efficiency-summary"><div><small>整体净时薪</small><b class="number ${s.hourly<0?'negative':'cyan'}">${s.hasData&&s.hourly!==null?amount(s.hourly,s.hourlyGold):'—'}<em> /h</em></b></div><span>${rows.length} 项任务可比较<small>净收益 ÷ 操作小时</small></span></div>${ranking(s)}${best?`<div class="efficiency-insight">${icon('bolt')}<span><b>${esc(best.task.name)}</b> 净时薪领先${s.hourly>0&&best.hourly>s.hourly?'，为整体的 '+num(best.hourly/s.hourly,1)+' 倍':''}。${ui.mode==='actual'?'基于当前期间实测。':'基于当前预测配置。'}</span></div>`:''}</section></div>`;
   }
   function secondaryPanels(){return `<div class="analysis-secondary mt"><section class="card trend-panel">${head('收益与投入趋势',ui.chartMetric==='net'?'收益走势与预期是否一致？':'真实操作时间与计划差多少？',`<div class="legend"><span><i></i>实测</span><span><i class="dashed"></i>预测</span></div>`)}${trendChart()}<div class="chart-foot"><span>${ui.chartMetric==='net'?'经济净收益 · '+chartCurrency():'操作时间（小时）'}</span>${chartControls()}</div></section><section class="card today-panel">${head('今天优先做什么',`${today} · 按剩余任务净时薪排序`,button('全部任务 '+icon('arrow'),'nav','ghost small','data-page="task"'))}${todoList(3)}</section></div>`;}
+  // Proportional treemap for revenue composition; existing task accounting is unchanged.
   function composition(s){
-    const value=r=>ui.currency==='gold'?r.gold:r.gross,rows=s.tasks.filter(x=>value(x)>0).sort((a,b)=>value(b)-value(a)),total=rows.reduce((n,r)=>n+value(r),0);
-    if(!total)return empty(s.hasData?'当前没有收益贡献':'暂无实测数据','收益构成只使用当前筛选范围中的正毛收益；可切换口径或记录实测。');
-    let start=0;const topShare=rows.slice(0,3).reduce((n,r)=>n+value(r),0)/total*100;
-    return `<div class="composition"><div class="composition-visual"><div class="donut"><svg viewBox="0 0 160 160" role="img" aria-label="按任务的正毛收益构成"><circle cx="80" cy="80" r="61" fill="none" stroke="var(--wb-track)" stroke-width="15"/>${rows.map((r,i)=>{const len=value(r)/total*383.27,arc=Math.max(0,len-Math.min(3,len*.15)),segment=`<circle cx="80" cy="80" r="61" fill="none" stroke="${colors[i%colors.length]}" stroke-width="15" stroke-dasharray="${arc} ${383.27-arc}" stroke-dashoffset="${-start}"><title>${esc(r.task.name)}：${amount(r.gross,r.gold)} / ${pct(value(r)/total*100)}</title></circle>`;start+=len;return segment;}).join('')}</svg><div class="donut-center"><small>收益来源</small><b class="number">${rows.length}<em> 项</em></b><small>${ui.currency==='gold'?'按金币收入':'按人民币估值'}</small></div></div><p class="composition-caption">前 ${Math.min(3,rows.length)} 项贡献 <b class="cyan number">${pct(topShare)}</b></p></div><div class="composition-list" tabindex="0" role="region" aria-label="任务收益贡献明细">${rows.map((r,i)=>`<div class="contribution-item"><div class="composition-row"><i class="swatch" style="background:${colors[i%colors.length]}"></i><span title="${esc(r.task.name)}">${esc(r.task.name)}</span><small class="number">${pct(value(r)/total*100)}</small></div><div class="contribution-value number">${amount(r.gross,r.gold)}</div><div class="contribution-track"><i style="width:${value(r)/total*100}%;background:${colors[i%colors.length]}"></i></div></div>`).join('')}</div></div><p class="composition-note">占比按正毛收益计算，成本在下方单列；负净收益任务保留在效率排行中。</p>`;
+    const value=r=>ui.currency==='gold'?r.gold:r.gross;
+    const rows=s.tasks.filter(x=>value(x)>0).sort((a,b)=>value(b)-value(a));
+    const total=rows.reduce((n,r)=>n+value(r),0);
+    if(!total)return empty(s.hasData?'当前没有收益贡献':'暂无实测数据','收益占比仅使用当前筛选中的正毛收益，缺失值不记为零。');
+    const largest=rows.slice(0,3).reduce((n,r)=>n+value(r),0)/total*100;
+    // Alternating binary proportional partitions, avoiding tiny unreadable labels.
+    function split(items,x,y,w,h,depth){
+      if(!items.length)return [];
+      if(items.length===1)return [{row:items[0],x,y,w,h}];
+      const sum=items.reduce((n,r)=>n+value(r),0);
+      let acc=0,i=0;
+      while(i<items.length-1&&(acc<sum*.46||!i)){acc+=value(items[i]);i++;}
+      const fraction=Math.max(.001,Math.min(.999,acc/sum));
+      if(depth%2===0)return [...split(items.slice(0,i),x,y,w*fraction,h,depth+1),...split(items.slice(i),x+w*fraction,y,w*(1-fraction),h,depth+1)];
+      return [...split(items.slice(0,i),x,y,w,h*fraction,depth+1),...split(items.slice(i),x,y+h*fraction,w,h*(1-fraction),depth+1)];
+    }
+    const blocks=split(rows,0,0,100,100,0);
+    return `<div class="revenue-map-layout"><div class="revenue-map" role="list" aria-label="按任务正毛收益的面积占比图">${blocks.map(({row:r,x,y,w,h},i)=>{
+      const share=value(r)/total*100;
+      return `<button type="button" role="listitem" class="revenue-map-tile" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:${colors[i%colors.length]}" title="${esc(r.task.name)}：${pct(share)} · ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong>${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
+    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}"><i style="background:${colors[i%colors.length]}"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">面积表示正毛收益占比；点击任意任务查看现有明细。成本、净收益与亏损仍按原有规则独立计算。</p>`;
   }
   function ranking(s){
     const metric=ui.rankMetric,rows=[...s.tasks].filter(t=>t.hasData&&chartNumber(t[metric])&&(metric!=='hourly'||t.minutes>0)).sort((a,b)=>(b[metric]??0)-(a[metric]??0)),max=Math.max(1,...rows.map(r=>Math.abs(r[metric]||0)));
