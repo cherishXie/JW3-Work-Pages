@@ -1140,14 +1140,15 @@
         <details class="mt"><summary>查看本批原图（${originals.length} 张）</summary>${originals.map((image,i)=>`<div class="mt"><small>${i+1}. ${esc(image.name)}</small><img class="screenshot-preview-original" src="${image.url}" style="display:block;max-width:100%;height:auto" alt="角色统计截图 ${i+1}"></div>`).join('')}</details>
         ${repeated.length?`<label class="screenshot-confirm-review"><input type="checkbox" name="shot-allow-reimport"> 确认复核已导入截图：保存新的更正记录，保留原始导入档案；不会产生收益记录</label>`:''}
         ${field('screenshot-time','确认本批采集时间（北京时间）',beijingLocal(),'datetime-local','同批所有角色使用同一采集时间；不同日期建议分批导入。','required')}
+        <div class="screenshot-select-tools">${button('勾选已准确匹配的角色','screenshot-auto-select','small','type="button"')}<small>自动匹配仍需核对金额和其他数值</small></div>
         <div class="table-wrap mt"><table><thead><tr><th>更新 / 来源</th><th>匹配已有角色</th>${WorkbenchScreenshot.labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>
         ${merged.rows.map((r,i)=>{
           const suggested=WorkbenchScreenshot.suggestRoles(state.roles,r.name,r.school),roleId=r.roleId||suggested.roleId,conflicts=Object.entries(r.conflicts);
           return `<tr><td><label><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"> 更新</label><small>${r.occurrences} 行 · ${esc(r.sourceNames.join('、'))}</small>${conflicts.length?`<small class="negative">${conflicts.length} 项数据冲突</small><label class="mt"><input type="checkbox" name="shot-confirm-${i}" aria-label="已核对第 ${i+1} 行冲突"> 已核对冲突</label>`:''}</td>
-            <td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${state.roles.map(role=>`<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`).join('')}</select><small>${roleId?'已匹配，请核对账号和门派':'未唯一匹配，请手动选择'}</small></td>
+            <td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${[...suggested.suggestions.map(x=>x.roleId),...state.roles.map(x=>x.id)].filter((id,pos,all)=>all.indexOf(id)===pos).map(id=>{const role=state.roles.find(item=>item.id===id);return `<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`;}).join('')}</select><small id="shot-match-hint-${i}">${roleId?suggested.exact?'姓名准确匹配':'候选匹配，请核对账号和门派':suggested.suggestions.length?'建议优先选择：'+esc(suggested.suggestions.slice(0,3).map(x=>x.name).join('、')):'未匹配，请手动选择'}</small></td>
             ${WorkbenchScreenshot.fields.map(k=>{
               const options=r.conflicts[k];
-              return `<td><input name="shot-${i}-${k}" aria-label="第 ${i+1} 行${esc(WorkbenchScreenshot.labels[WorkbenchScreenshot.fields.indexOf(k)])}" value="${esc(r[k]||'')}" style="min-width:85px;width:110px" ${''}>${options?`<small class="negative">冲突：${options.map(o=>esc(o.value)+'（'+esc(o.files.join('、'))+'）').join(' / ')}</small>`:''}</td>`;
+              return `<td><input name="shot-${i}-${k}" aria-label="第 ${i+1} 行${esc(WorkbenchScreenshot.labels[WorkbenchScreenshot.fields.indexOf(k)])}" value="${esc(r[k]||'')}" style="min-width:85px;width:110px">${options?`<small class="negative">冲突：${options.map(o=>esc(o.value)+'（'+esc(o.files.join('、'))+'）').join(' / ')}</small>`:''}</td>`;
             }).join('')}</tr>`;
         }).join('')}</tbody></table></div>
         <p class="panel-sub mt">金币请核实单位；空白字段保留原值。选中角色一次提交，可立即撤销。</p>`,fd=>{
@@ -1254,7 +1255,10 @@
     'set-theme':b=>setTheme(b.dataset.id),
     'operations-csv-help':()=>modal('运营 CSV 格式',`<p>使用已有任务和角色 ID（从 JSON 备份查询）。一行错误整份不导入；完成状态不生成收益。</p><div class="list-detail mt"><div><span>progress · 周期状态</span><b>id,date,task_id,role_id,status,completed,target</b></div><div><span>record · 实际执行</span><b>id,date,task_id,role_ids,gold,minutes,online_minutes,batches</b></div><div><span>material · 库存</span><b>id,date,name,quantity；可选 role_id,record_id,unit_price,price_date,tradable</b></div></div><p class="panel-sub mt">role_ids 用 | 分隔；id 必须稳定且仅字母/数字/下划线/连字符。金币和双时间须填写实测值，参考价空白表示未知。工资后续到账和材料出售用分账界面登记，或交换完整 JSON 备份。</p>`,()=>{},'关闭'),
     'operations-csv-template':()=>download('JX3_运营_CSV模板.csv',new Blob(['\uFEFFkind,id,date,task_id,role_ids,role_id,status,completed,target,gold,minutes,online_minutes,batches,other_cost,dungeon_id,record_id,name,quantity,unit_price,price_date,tradable,note\r\n'],{type:'text/csv;charset=utf-8'})),
-    'screenshot-import':()=>screenshotDialog(),'screenshot-recognize':b=>screenshotRecognize(b),
+    'screenshot-import':()=>screenshotDialog(),
+    'screenshot-remove':b=>{if(screenshotBusy)return;const i=Number(b.dataset.index);if(!Number.isInteger(i)||i<0||i>=screenshotQueue.length)return;URL.revokeObjectURL(screenshotQueue[i].url);screenshotQueue.splice(i,1);renderScreenshotQueue();},
+    'screenshot-auto-select':()=>{for(const sel of $('#dialog').querySelectorAll('select[name^="shot-role-"]')){const index=sel.name.replace('shot-role-','');const hint=$('#shot-match-hint-'+index);if(sel.value&&hint?.textContent.includes('姓名准确匹配')){const checkbox=$('#dialog').querySelector('[name="shot-pick-'+index+'"]');if(checkbox)checkbox.checked=true;}}},
+    'screenshot-recognize':b=>screenshotRecognize(b),
     'source-issues':b=>{const x=state.sourceArchives.find(x=>x.id===b.dataset.id);modal('导入待确认 · '+esc(x.name),`<div class="stack">${(x.issues||[]).map(v=>`<p>${esc(v)}</p>`).join('')||'没有未映射项。'}<p>任务列表、攻略、未知状态与未匹配字段可从原始归档查看。补全角色等级、侠客和当前 CD 时使用对应编辑入口。</p></div>`,()=>{},'关闭');},'source-export':b=>{const x=state.sourceArchives.find(x=>x.id===b.dataset.id);download(x.name+'_来源归档.json',new Blob([JSON.stringify(x,null,2)],{type:'application/json'}));},
     'open-wages':()=>{ui.page='assets';ui.assetTab='wages';render();},
     'cd-filter':b=>{ui.cdStatus=b.dataset.id;render();},
@@ -1359,6 +1363,23 @@
     search:()=>{modal('搜索任务或角色',`<input id="global-search" type="search" placeholder="输入名称…" style="width:100%" aria-label="搜索任务或角色"><div id="search-results" class="mt"></div>`);$('#global-search').addEventListener('input',e=>{const q=e.target.value;$('#search-results').innerHTML=q?`<div class="stack">${state.tasks.filter(t=>t.name.includes(q)).slice(0,8).map(t=>button('任务 · '+esc(t.name),'task-detail','',`data-id="${t.id}" type="button"`)).join('')}${state.roles.filter(r=>r.name.includes(q)).slice(0,8).map(r=>button('角色 · '+esc(r.name),'role-detail','',`data-id="${r.id}" type="button"`)).join('')}</div>`:'';});}
   };
   document.addEventListener('toggle',e=>{const el=e.target;if(el.matches?.('.analysis-task-picker'))ui.analysisPicker=el.open;if(el.matches?.('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}},true);
+
+  document.addEventListener('change',e=>{
+    if(e.target.matches?.('select[name^="shot-role-"]')&&e.target.closest('#dialog'))e.target.dataset.manuallyChosen='1';
+  });
+  document.addEventListener('input',e=>{
+    const el=e.target;
+    if(!el.closest?.('#dialog'))return;
+    const m=/^shot-(\d+)-(name|school)$/.exec(el.name||'');
+    if(!m)return;
+    const i=m[1],name=$('#dialog').querySelector('[name="shot-'+i+'-name"]')?.value||'';
+    const school=$('#dialog').querySelector('[name="shot-'+i+'-school"]')?.value||'';
+    const match=WorkbenchScreenshot.suggestRoles(state.roles,name,school);
+    const select=$('#dialog').querySelector('[name="shot-role-'+i+'"]'),hint=$('#shot-match-hint-'+i);
+    if(select&&!select.dataset.manuallyChosen)select.value=match.roleId||'';
+    if(hint)hint.textContent=match.roleId?(match.exact?'姓名准确匹配':'候选匹配，请核对账号和门派'):match.suggestions.length?'建议优先选择：'+match.suggestions.slice(0,3).map(x=>x.name).join('、'):'未匹配，请手动选择';
+  });
+  $('#dialog').addEventListener('close',()=>{clearScreenshotQueue();screenshotDraft=null;});
   document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;try{actions[b.dataset.action]?.(b);}catch(err){if($('#dialog').open&&$('#form-error')){$('#form-error').textContent=err.message;$('#form-error').hidden=false;}else toast(err.message);}});
   let queueDrag=null,queueDragFrame=0;
   function clearQueueDrag(){if(queueDragFrame)cancelAnimationFrame(queueDragFrame);queueDragFrame=0;queueDrag=null;for(const el of document.querySelectorAll('.queue-drop-target,.is-dragging'))el.classList.remove('queue-drop-target','is-dragging');}
