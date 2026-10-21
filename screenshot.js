@@ -24,6 +24,33 @@
     next.imports.push({id,name:'角色截图 · '+name,date,stats:{added:0,updated:changes.length,skipped:rows.length-changes.length,old:0}});return next;
   }
   function lines(tsv){return tsv.split('\n').slice(1).map(l=>l.split('\t')).filter(a=>a[0]==='5'&&a[11]?.trim()).map(a=>({text:a.slice(11).join('\t').trim(),x:Number(a[6]),y:Number(a[7])+Number(a[9])/2,confidence:Number(a[10])}));}
+  // Resolve from the script's own URL, not the page route (Pages lives under /JW3-Work-Pages/).
+  const scriptBase=typeof document!=='undefined'&&document.currentScript?.src||'';
+  const readableError=e=>e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():e&&typeof e.message==='string'&&e.message.trim()?e.message:'浏览器未提供详细错误';
+  async function createOcrWorker(progress){
+    if(!globalThis.Tesseract?.createWorker)throw new Error('本地 OCR 脚本未加载，请刷新工作台后重试');
+    const base=new URL('vendor/ocr/',scriptBase||document.baseURI).href;
+    const asset=name=>new URL(name,base).href;
+    const options={
+      workerPath:asset('worker.min.js'),langPath:base.replace(/\/$/,''),
+      workerBlobURL:false,cacheMethod:'none',
+      logger:m=>progress(m.status==='recognizing text'?'正在识别表格…':'正在加载本地识别引擎…'),
+      // Tesseract.js 6 can also throw a second uncaught error when a worker job rejects.
+      errorHandler:()=>{}
+    };
+    let simdError;
+    try{
+      return await globalThis.Tesseract.createWorker('chi_sim',1,{...options,corePath:base});
+    }catch(e){simdError=readableError(e);}
+    // On devices where the SIMD build fails, use the verified non-SIMD LSTM build.
+    // A full-file corePath is supported by Tesseract.js and prevents auto SIMD selection.
+    progress('SIMD 识别引擎加载失败，正在尝试兼容模式…');
+    try{
+      return await globalThis.Tesseract.createWorker('chi_sim',1,{...options,corePath:asset('tesseract-core-lstm.wasm.js')});
+    }catch(e){
+      throw new Error('OCR 引擎无法启动；SIMD：'+simdError+'；兼容模式：'+readableError(e)+'。请检查 '+asset('tesseract-core-simd-lstm.wasm.js')+' 和 '+asset('tesseract-core-lstm.wasm.js')+' 是否可访问（HTTP 200），刷新后重试');
+    }
+  }
   async function recognize(file,{top=23,bottom=92,progress=()=>{}}={}){
     if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>12*1024*1024)throw new Error('请选择不超过 12 MB 的 PNG / JPG / WebP 图片');
     if(!(top>=0&&bottom<=100&&bottom-top>=10))throw new Error('表格上下边界必须在 0–100%，且间距至少 10%');
@@ -31,8 +58,7 @@
     const bitmap=await createImageBitmap(file);if(bitmap.width*bitmap.height>20000000){bitmap.close();throw new Error('图片分辨率过大，请裁剪后上传');}
     let worker;
     try{
-      const url=p=>new URL('vendor/ocr/'+p,document.baseURI).href;
-      worker=await Tesseract.createWorker('chi_sim',1,{workerPath:url('worker.min.js'),corePath:url(''),langPath:url('').replace(/\/$/,''),workerBlobURL:false,cacheMethod:'none',logger:m=>progress(m.status==='recognizing text'?'正在识别表格…':'正在加载本地识别引擎…')});
+      worker=await createOcrWorker(progress);
       const scale=3,h=Math.round(bitmap.height*(bottom-top)/100)*scale,w=bitmap.width*scale;
       const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,bitmap.height*top/100,bitmap.width,h/scale,0,0,w,h);
       // Dark game UI: turn light glyphs into dark glyphs for OCR, retaining geometry.
