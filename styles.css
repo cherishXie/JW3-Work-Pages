@@ -410,3 +410,86 @@ th:has(.table-sort){padding:0}.table-sort{width:100%;justify-content:space-betwe
 .screenshot-confirm-review{display:flex;align-items:center;gap:9px;padding:13px;border:1px solid var(--wb-warning);border-radius:8px;margin:13px 0;font-size:13px;line-height:1.5}
 .screenshot-select-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:14px 0}
 .screenshot-select-tools small{color:var(--wb-text-muted);font-size:12px}
+
+
+/* 2026-10-21 · Reference-led graphite analytics UI.
+   Presentation only: no changes to calculation, storage, imports or task lifecycle. */
+html[data-theme="deep-ocean"]{
+  --wb-bg:#141416;--wb-sidebar:#19191c;--wb-surface:#232326;--wb-surface-2:#2b2b2f;
+  --wb-hover:#323238;--wb-border:#3c3c43;--wb-text:#f2f2f4;--wb-text-secondary:#c4c4cb;
+  --wb-text-muted:#96969f;--wb-primary:#3985f6;--wb-cyan:#09b9ad;--wb-purple:#a14bf5;
+  --wb-success:#2ac48b;--wb-warning:#f2a42c;--wb-danger:#ef6475
+}
+html[data-theme="deep-ocean"] body{background:var(--wb-bg)}
+html[data-theme="deep-ocean"] .sidebar{background:#19191c;border-right-color:#35353b}
+html[data-theme="deep-ocean"] .topbar{background:#1d1d20;border-bottom-color:#34343a}
+html[data-theme="deep-ocean"] .nav button.active{background:#2b3341;color:#e6f0ff}
+html[data-theme="deep-ocean"] .nav button.active::after{background:#3985f6}
+html[data-theme="deep-ocean"] .card{background:#232326;border-color:#3e3e45;box-shadow:none}
+html[data-theme="deep-ocean"] button:not(.primary):hover{background:#35353b}
+html[data-theme="deep-ocean"] input,html[data-theme="deep-ocean"] select,html[data-theme="deep-ocean"] textarea{background-color:#2a2a2e;border-color:#47474e}
+html[data-theme="deep-ocean"] .primary{background:#3379dc;border-color:#3379dc;color:white}
+html[data-theme="deep-ocean"] .primary:hover{background:#438bee}
+html[data-theme="deep-ocean"] .pill{background:#303036;border-color:#484850}
+html[data-theme="deep-ocean"] .segmented{background:#1b1b1e;border:1px solid #38383d}
+html[data-theme="deep-ocean"] .segmented button.active{background:#eeeeef;color:#18181c}
+html[data-theme="deep-ocean"] .chart-grid{stroke:#3b3b40;stroke-dasharray:0}
+html[data-theme="deep-ocean"] .chart-label{fill:#a5a5af}
+html[data-theme="deep-ocean"] .kpi{min-height:128px;padding:18px 20px}
+html[data-theme="deep-ocean"] .kpi .value{font-size:30px;line-height:1.22;margin-top:12px;letter-spacing:-.9px}
+html[data-theme="deep-ocean"] .kpi .detail{margin-top:8px}
+html[data-theme="deep-ocean"] .kpi .mini-line{opacity:.75}
+html[data-theme="deep-ocean"] .kpi-grid{gap:12px;margin-bottom:12px}
+html[data-theme="deep-ocean"] .dashboard-grid{gap:12px}
+html[data-theme="deep-ocean"] .page-head{margin-bottom:18px}
+html[data-theme="deep-ocean"] .page-head h1{font-size:23px}
+html[data-theme="deep-ocean"] .panel-head{padding:17px 19px 0}
+html[data-theme="deep-ocean"] .panel-head h2{font-size:15px;letter-spacing:-.2px}
+html[data-theme="deep-ocean"] .chart-container{padding:10px 16px 0}
+html[data-theme="deep-ocean"] .rank-bar,html[data-theme="deep-ocean"] .progress{background:#37373d}
+html[data-theme="deep-ocean"] .rank-bar i{background:#3985f6}
+html[data-theme="deep-ocean"] .analysis-focus{gap:12px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+html[data-theme="deep-ocean"] .analysis-focus>.card{background:#232326}
+html[data-theme="deep-ocean"] .analysis-focus>.card::before{display:none}
+html[data-theme="deep-ocean"] .analysis-focus .composition{grid-template-columns:minmax(120px,.72fr) minmax(0,1.4fr);gap:18px;padding:22px 20px}
+html[data-theme="deep-ocean"] .analysis-focus .donut,html[data-theme="deep-ocean"] .analysis-focus .donut svg{width:164px;height:164px}
+html[data-theme="deep-ocean"] .analysis-focus .donut-center b{font-size:29px}
+html[data-theme="deep-ocean"] .analysis-focus .composition-list{gap:12px;max-height:360px}
+html[data-theme="deep-ocean"] .analysis-focus .composition-row .swatch{width:10px;height:10px;border-radius:2px}
+html[data-theme="deep-ocean"] .analysis-focus .composition-row b{font-variant-numeric:tabular-nums}
+html[data-theme="deep-ocean"] .revenue-totals{background:#29292d}
+html[data-theme="deep-ocean"] .tc-heading h1{font-size:23px}
+html[data-theme="deep-ocean"] .tc-bar{border-bottom:0;gap:16px}
+html[data-theme="deep-ocean"] .tc-summary{background:#232326;border:1px solid #3e3e45;border-radius:9px;padding:12px 15px;margin:10px 0 14px}
+html[data-theme="deep-ocean"] .tc-summary b{font-size:19px}
+html[data-theme="deep-ocean"] .task-center .plan-queue{gap:12px}
+html[data-theme="deep-ocean"] .tc-plan-head{padding:15px 17px;background:#29292d}
+html[data-theme="deep-ocean"] .tc-plan-head h2{font-size:15px}
+html[data-theme="deep-ocean"] .tc-batches th{background:#29292d;color:#bcbcc4;font-size:11px;letter-spacing:.2px}
+html[data-theme="deep-ocean"] .tc-batches td{padding:11px 12px;border-bottom-color:#39393e}
+html[data-theme="deep-ocean"] .tc-member{background:#303036;border-color:#42424a;border-radius:6px;padding:3px 7px}
+html[data-theme="deep-ocean"] .tc-next{background:#26323a}
+html[data-theme="deep-ocean"] .tc-next td:first-child{box-shadow:inset 3px 0 #09b9ad}
+html[data-theme="deep-ocean"] .tc-row-actions button{border-radius:6px}
+html[data-theme="deep-ocean"] .tc-more-menu{background:#29292e;border-color:#55555d}
+html[data-theme="deep-ocean"] .value-track{background:#36363b}
+html[data-theme="deep-ocean"] .value-bar-item,html[data-theme="deep-ocean"] .value-bar-button{border-radius:7px}
+html[data-theme="deep-ocean"] .notice{background:#29292e;border-color:#41414c}
+html[data-theme="deep-ocean"] .footer{border-top-color:#35353a}
+@media(min-width:1251px){
+ html[data-theme="deep-ocean"] .sidebar{width:210px;padding:24px 13px 17px}
+ html[data-theme="deep-ocean"] .workspace{margin-left:210px}
+ html[data-theme="deep-ocean"] #app{padding:24px 26px;max-width:1900px}
+ html[data-theme="deep-ocean"] .task-context #app{padding:20px 24px;max-width:1900px}
+}
+@media(max-width:1100px){
+ html[data-theme="deep-ocean"] .analysis-focus{grid-template-columns:1fr}
+ html[data-theme="deep-ocean"] .analysis-focus .composition{grid-template-columns:160px minmax(0,1fr)}
+}
+@media(max-width:767px){
+ html[data-theme="deep-ocean"] .kpi{padding:14px;min-height:112px}
+ html[data-theme="deep-ocean"] .kpi .value{font-size:24px}
+ html[data-theme="deep-ocean"] .analysis-focus .composition{grid-template-columns:1fr}
+ html[data-theme="deep-ocean"] .tc-summary{gap:8px 14px}
+ html[data-theme="deep-ocean"] .tc-plan-head{flex-wrap:wrap}
+}
