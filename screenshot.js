@@ -80,7 +80,7 @@
         }
         const label=String(image.name||'截图 '+(imageIndex+1));
         if(!group.sourceNames.includes(label))group.sourceNames.push(label);
-        group.sources.push({name:label,row:rowIndex+1});
+        group.sources.push({name:label,row:rowIndex+1,recognizedName:name});
         if(name!==group.name){(group.nameCandidates??=[]).push({name,source:label});}
         for(const field of fields.slice(1)){
           const candidate=String(row[field]??'').trim();
@@ -94,7 +94,7 @@
     }
     const rows=[...groups.values()].map(group=>{
       const canonical=roles.find(r=>r.id===group.roleId);
-      const row={name:canonical?clean(canonical.name):group.name,roleId:group.roleId,sourceNames:group.sourceNames,sources:group.sources,occurrences:group.sources.length,conflicts:{},nameCandidates:group.nameCandidates||[]};
+      const row={name:canonical?clean(canonical.name):group.name,roleId:group.roleId,sourceNames:group.sourceNames,sources:group.sources,ocrNames:[...new Set(group.sources.map(x=>x.recognizedName).filter(Boolean))],occurrences:group.sources.length,conflicts:{},nameCandidates:group.nameCandidates||[]};
       for(const field of fields.slice(1)){
         const choices=[...group.candidates[field].values()];
         row[field]=choices[0]?.value||'';
@@ -127,7 +127,7 @@
       if(!Object.keys(changed).length)throw new Error(role.name+' 没有可更新的数值');
       if(row.school?.trim()){changed.school={before:role.school??'',after:row.school.trim()};role.school=row.school.trim();}
       if(changed.observedGold){role.observedDate=date;role.observedGoldSource='茗伊角色统计截图';next.balanceSnapshots??=[];next.balanceSnapshots.push({id:id+'_'+role.id,roleId:role.id,gold:role.observedGold,date,source:'茗伊角色统计截图',importedAt:now,capturedAt});}
-      role.screenshotCapturedAt=capturedAt;role.updatedAt=now;changes.push({roleId:role.id,sourceName:row.name,sources:row.sourceNames||[],changes:changed});
+      role.screenshotCapturedAt=capturedAt;role.updatedAt=now;changes.push({roleId:role.id,sourceName:row.name,ocrNames:row.ocrNames||[row.name],sources:row.sourceNames||[],changes:changed});
     }
     if(!changes.length)throw new Error('请至少选择一行有效角色');
     next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:allowReimport?'mingyi-role-screenshot-review-v1':incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,reviewedDigests:repeated.map(f=>f.sha256),issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。',...(repeated.length?['复核已导入截图：保留原导入档案，新建更正记录；观测余额不计收入。']:[])],updatedAt:now,capturedAt});
