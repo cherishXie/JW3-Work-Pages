@@ -621,11 +621,11 @@
     return changed;
   }
   function confirmedForecast(s,start,end,scope={}){
-    const usage=new Map(),warnings=[],rows=new Map(s.tasks.map(t=>[t.id,[]]));
+    const usage=new Map(),warnings=[],participation=[],rows=new Map(s.tasks.map(t=>[t.id,[]]));
     for(const p of [...s.plans].filter(p=>!p.cancelled&&p.date<=end).sort((a,b)=>instant(a.startedAt||a.date)-instant(b.startedAt||b.date)||(a.createdAt||'').localeCompare(b.createdAt||''))){
       for(const taskId of p.routeTaskIds||[p.taskId]){
         const when=instant(planStart(s,p,taskId)),taskWhen=new Date(when).toISOString(),taskDate=dateKey(new Date(when)),current=s.tasks.find(t=>t.id===taskId);if(!current)continue;
-        const t=taskForVersion(s,p.taskSnapshots?.[taskId]||current),validationTask=taskForVersion(s,{...current,...p.taskSnapshots?.[taskId],enabled:current.enabled}),batches=[],fullBatches=[],done=new Set(recordedBatchIndices(s,p,taskId)),full=eligible(s,validationTask),selected=new Set(eligible(s,validationTask,scope).map(r=>r.id));
+        const t=taskForVersion(s,p.taskSnapshots?.[taskId]||current),validationTask=taskForVersion(s,{...current,...p.taskSnapshots?.[taskId],enabled:current.enabled}),batches=[],fullBatches=[],fullBatchIndices=[],done=new Set(recordedBatchIndices(s,p,taskId)),full=eligible(s,validationTask),selected=new Set(eligible(s,validationTask,scope).map(r=>r.id));
         for(const [i,ids]of p.batches.entries()){
           if(p.closedBatches?.[taskId]?.includes(i))continue;
           const completed=done.has(i),event=executionRecords(s).find(r=>r.planId===p.id&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(i)));
@@ -648,19 +648,19 @@
             }
             if(!allowed.length)continue;
             for(const r of allowed)usage.set(key(r.id),(usage.get(key(r.id))||0)+1);
-            fullBatches.push(allowed);
+            fullBatches.push(allowed);fullBatchIndices.push(i);
             const scoped=completed?new Set(selectedRecordRoles(s,event||{roleIds:ids},scope)):selected;
             if(allowed.every(r=>scoped.has(r.id)))batches.push(allowed);else warnings.push(t.name+'：筛选未包含完整确认批次，未分摊共享收益');
           }catch(e){if(taskDate>=start&&taskDate<=end)warnings.push(t.name+'：'+e.message+'，该批次未计入预测');}
         }
         const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
         const result=pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);
-        if(taskDate>=start&&taskDate<=end)rows.get(taskId).push(result);
+        if(taskDate>=start&&taskDate<=end){rows.get(taskId).push(result);if(!scope.role&&!scope.account&&!scope.group&&fullBatches.length)participation.push({planId:p.id,taskId,date:taskDate,startedAt:new Date(when).toISOString(),prepare:t.prepare||0,batchMinutes:t.minutes/t.efficiency,batchIndices:fullBatchIndices,onlinePerVisit:t.minutes/t.efficiency+t.onlineExtra,batches:fullBatches.map(batch=>batch.map(r=>({roleId:r.id,accountId:r.accountId}))),result});}
       }
     }
     const tasks=s.tasks.filter(t=>t.enabled||rows.get(t.id)?.length).map(task=>({task,...sum(rows.get(task.id)||[],s.config),hasData:true}));
     const seen=new Set();let unassignedTargets=0;for(const d of dates(start,end))for(const t of s.tasks.filter(t=>t.enabled&&t.days.includes(weekday(d))))for(const r of eligible(s,t,scope)){const key=[r.id,cdKey(t),cycle(t,d)].join('|');if(seen.has(key))continue;seen.add(key);const p=getProgress(s,t,r,d);if(p?.status==='skipped')continue;unassignedTargets+=Math.max(0,(p?.target??t.target)-Math.max(p?.completed||0,usage.get(key)||0));}
-    return {...sum(tasks,s.config),tasks,hasData:true,unassignedTargets,forecastWarnings:[...new Set(warnings)],start,end};
+    return {...sum(tasks,s.config),tasks,participation,hasData:true,unassignedTargets,forecastWarnings:[...new Set(warnings)],start,end};
   }
   function incomeRecords(s){
     const ownership=(e,r,ids)=>({roleAccounts:Object.fromEntries(ids.map(id=>[id,e.roleAccounts?.[id]||r?.roleAccounts?.[id]||s.roles.find(x=>x.id===id)?.accountId])),roleGroups:Object.fromEntries(ids.map(id=>[id,e.roleGroups?.[id]??r?.roleGroups?.[id]??s.accounts.find(a=>a.id===(r?.roleAccounts?.[id]||s.roles.find(x=>x.id===id)?.accountId))?.group??'']))});
