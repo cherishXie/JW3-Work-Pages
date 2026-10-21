@@ -4,26 +4,61 @@
   const fields=['name','school','gold','tongbao','level','achievement','petCount','xiaxing','weeklyXiaxing'];
   const labels=['截图角色名','门派','金币（G）','通宝','等级','资历','宠物','侠行','侠行周'];
   const numeric=fields.slice(2),clean=s=>String(s||'').normalize('NFKC').replace(/\s/g,''),base=s=>clean(s).split('@')[0];
-  function match(roles,name){const nameOnly=base(name);if(!nameOnly)return '';const matches=roles.filter(r=>base(r.name)===nameOnly);return matches.length===1?matches[0].id:'';}
+  function editDistance(a,b){
+    if(a===b)return 0;
+    if(Math.abs(a.length-b.length)>2)return 99;
+    const prev=Array.from({length:b.length+1},(_,i)=>i);
+    for(let i=1;i<=a.length;i++){
+      const row=[i];
+      for(let j=1;j<=b.length;j++)row[j]=Math.min(row[j-1]+1,prev[j]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+      for(let j=0;j<row.length;j++)prev[j]=row[j];
+    }
+    return prev[b.length];
+  }
+  function suggestRoles(roles,name,school=''){
+    const key=base(name),full=clean(name),schoolKey=clean(school);
+    if(!key)return {roleId:'',exact:false,auto:false,suggestions:[]};
+    const suggestions=(roles||[]).map(role=>{
+      const target=base(role.name),exact=target===key,fullExact=clean(role.name)===full;
+      const distance=editDistance(key,target),compatibleSchool=!schoolKey||!role.school||clean(role.school)===schoolKey;
+      // Explicitly different @server suffixes must never auto-match.
+      const suffixConflict=full.includes('@')&&clean(role.name).includes('@')&&full.split('@')[1]!==clean(role.name).split('@')[1];
+      const threshold=key.length>=6?2:key.length>=3?1:0;
+      const score=distance-(fullExact?.5:0)-(compatibleSchool&&schoolKey?.15:0)+(suffixConflict?2:0);
+      return {roleId:role.id,name:role.name,school:role.school,distance,exact,fullExact,compatibleSchool,suffixConflict,score,eligible:distance<=threshold&&!suffixConflict};
+    }).filter(r=>r.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
+    const exact=suggestions.filter(x=>x.exact);
+    if(exact.length===1)return {roleId:exact[0].roleId,exact:true,auto:true,suggestions};
+    const best=suggestions[0],second=suggestions[1];
+    // A single OCR typo can be selected when a known school corroborates it.
+    const auto=!!best&&best.distance===1&&key.length>=4&&!!schoolKey&&best.compatibleSchool&&
+      (second===undefined||second.score-best.score>=1);
+    return {roleId:auto?best.roleId:'',exact:false,auto,suggestions};
+  }
+  function match(roles,name){const k=base(name);if(!k)return '';const matches=(roles||[]).filter(r=>base(r.name)===k);return matches.length===1?matches[0].id:'';}
+
   function value(v,key){if(v===''||v==null)return null;const s=String(v).trim();if(!/^\d+(?:\.\d{1,4})?$/.test(s))throw new Error('数值格式不正确：'+key);const n=Number(s);if(!Number.isSafeInteger(Math.round(n*10000))||n<0||key!=='gold'&&!Number.isInteger(n)||key==='level'&&(n<1||n>200))throw new Error('数值超出范围：'+key);return n;}
   // Merge identical names (including any @server suffix) across screenshots.
   // Do not merge unnamed rows or different server suffixes: they may be different roles.
   // Fields are filled from the first nonblank candidate; discrepancies need explicit review.
-  function mergeScreenshots(images){
+  function mergeScreenshots(images,{roles=[]}={}){
     const groups=new Map();let rawRows=0;
     for(const [imageIndex,image] of images.entries()){
       for(const [rowIndex,row] of (image.rows||[]).entries()){
         rawRows++;
-        const name=clean(row.name),key=name?'role:'+name:'unknown:'+imageIndex+':'+rowIndex;
+        const name=clean(row.name),matchInfo=suggestRoles(roles,name,row.school);
+        const matched=matchInfo.auto&&matchInfo.roleId&&(!name.includes('@')||name===clean(roles.find(r=>r.id===matchInfo.roleId)?.name));
+        const key=matched?'matched:'+matchInfo.roleId:name?'role:'+name:'unknown:'+imageIndex+':'+rowIndex;
         let group=groups.get(key);
         if(!group){
-          group={name,sourceNames:[],candidates:{},sources:[]};
+          group={name,roleId:matched?matchInfo.roleId:'',sourceNames:[],candidates:{},sources:[]};
           for(const field of fields.slice(1))group.candidates[field]=new Map();
           groups.set(key,group);
         }
         const label=String(image.name||'截图 '+(imageIndex+1));
         if(!group.sourceNames.includes(label))group.sourceNames.push(label);
         group.sources.push({name:label,row:rowIndex+1});
+        if(name!==group.name){(group.nameCandidates??=[]).push({name,source:label});}
         for(const field of fields.slice(1)){
           const candidate=String(row[field]??'').trim();
           if(!candidate)continue;
@@ -35,7 +70,8 @@
       }
     }
     const rows=[...groups.values()].map(group=>{
-      const row={name:group.name,sourceNames:group.sourceNames,sources:group.sources,occurrences:group.sources.length,conflicts:{}};
+      const canonical=roles.find(r=>r.id===group.roleId);
+      const row={name:canonical?clean(canonical.name):group.name,roleId:group.roleId,sourceNames:group.sourceNames,sources:group.sources,occurrences:group.sources.length,conflicts:{},nameCandidates:group.nameCandidates||[]};
       for(const field of fields.slice(1)){
         const choices=[...group.candidates[field].values()];
         row[field]=choices[0]?.value||'';
@@ -48,14 +84,17 @@
   function importedDigests(state){
     return new Set((state.sourceArchives||[]).flatMap(a=>(a.files||[]).map(f=>f.sha256).filter(Boolean)));
   }
-  function apply(state,rows,{digest,name,files,capturedAt,now=new Date().toISOString(),rawRows,duplicates}){
+  function apply(state,rows,{digest,name,files,capturedAt,now=new Date().toISOString(),rawRows,duplicates,allowReimport=false}){
     if(!/^[a-f0-9]{64}$/.test(digest)||!Number.isFinite(Date.parse(capturedAt))||Date.parse(capturedAt)>Date.parse(now)+60000)throw new Error('截图标识或采集时间无效（不能在未来）');
     const incoming=files||[{name,sha256:digest}];
     if(!Array.isArray(incoming)||!incoming.length||incoming.some(f=>!f.name||!/^[a-f0-9]{64}$/.test(f.sha256))||new Set(incoming.map(f=>f.sha256)).size!==incoming.length)throw new Error('截图文件清单无效或存在重复文件');
     const existing=importedDigests(state);
-    if(incoming.some(f=>existing.has(f.sha256)))throw new Error('该截图已导入；如需重做，请先撤销上次导入');
-    const id='screenshot_'+digest;
-    if((state.sourceArchives||[]).some(x=>x.id===id))throw new Error('该截图批次已导入；如需重做，请先撤销上次导入');
+    const repeated=incoming.filter(f=>existing.has(f.sha256));
+    if(repeated.length&&!allowReimport)throw new Error('包含已导入截图，请勾选“确认复核已导入截图”后再提交');
+    if(allowReimport&&!repeated.length)throw new Error('本批没有已导入截图，无需开启复核模式');
+    let id='screenshot_'+digest;
+    if(allowReimport){id='screenshot_review_'+digest.slice(0,20)+'_'+Date.parse(now).toString(36);}
+    if((state.sourceArchives||[]).some(x=>x.id===id))throw new Error('本次截图记录已存在，请稍后重试');
     const next=structuredClone(state),seen=new Set(),changes=[],date=new Date(Date.parse(capturedAt)+8*3600000).toISOString().slice(0,10);
     for(const row of rows.filter(x=>x.selected)){
       if(Object.keys(row.conflicts||{}).length&&!row.conflictsConfirmed)throw new Error(row.name+' 存在截图数据冲突，请逐项核对并勾选冲突确认');
@@ -68,7 +107,7 @@
       role.screenshotCapturedAt=capturedAt;role.updatedAt=now;changes.push({roleId:role.id,sourceName:row.name,sources:row.sourceNames||[],changes:changed});
     }
     if(!changes.length)throw new Error('请至少选择一行有效角色');
-    next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。'],updatedAt:now,capturedAt});
+    next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:allowReimport?'mingyi-role-screenshot-review-v1':incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,reviewedDigests:repeated.map(f=>f.sha256),issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。',...(repeated.length?['复核已导入截图：保留原导入档案，新建更正记录；观测余额不计收入。']:[])],updatedAt:now,capturedAt});
     next.imports.push({id,name:'角色截图 · '+name,date,stats:{added:0,updated:changes.length,skipped:rows.length-changes.length,old:0}});return next;
   }
   function lines(tsv){return tsv.split('\n').slice(1).map(l=>l.split('\t')).filter(a=>a[0]==='5'&&a[11]?.trim()).map(a=>({text:a.slice(11).join('\t').trim(),x:Number(a[6]),y:Number(a[7])+Number(a[9])/2,confidence:Number(a[10])}));}
@@ -99,7 +138,7 @@
       throw new Error('OCR 引擎无法启动；SIMD：'+simdError+'；兼容模式：'+readableError(e)+'。请检查 '+asset('tesseract-core-simd-lstm.wasm.js')+' 和 '+asset('tesseract-core-lstm.wasm.js')+' 是否可访问（HTTP 200），刷新后重试');
     }
   }
-  async function recognize(file,{top=23,bottom=92,progress=()=>{},worker:sharedWorker}={}){
+  async function recognize(file,{top=23,bottom=92,progress=()=>{},worker:sharedWorker,roles=[]}={}){
     if(!/^image\/(png|jpeg|webp)$/.test(file.type)||file.size>12*1024*1024)throw new Error('请选择不超过 12 MB 的 PNG / JPG / WebP 图片');
     if(!(top>=0&&bottom<=100&&bottom-top>=10))throw new Error('表格上下边界必须在 0–100%，且间距至少 10%');
     if(location.protocol==='file:')throw new Error('截图识别请使用 Pages 站点或本地 HTTP 服务；单文件模式可继续使用 JSON / CSV 导入');
@@ -126,8 +165,31 @@
       }
       const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
       const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
-      return anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+      const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+      // Re-recognize uncertain character names as individual lines with PSM 7.
+      if(roles.length){
+        await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'',preserve_interword_spaces:'0'});
+        for(let i=0;i<parsed.length;i++){
+          const original=parsed[i].name;
+          if(suggestRoles(roles,original,parsed[i].school).exact)continue;
+          progress('正在复核角色名称（'+(i+1)+'/'+parsed.length+'）…');
+          const a=anchors[i],left=Math.round(cuts[0]*w),cropWidth=Math.round((cuts[1]-cuts[0])*w);
+          const cropHeight=Math.max(20,Math.round(Math.min(spacing*.86,h*.13)));
+          const cropY=Math.max(0,Math.min(h-cropHeight,Math.round(a.y-cropHeight/2)));
+          const c=document.createElement('canvas');c.width=cropWidth;c.height=cropHeight;
+          c.getContext('2d').drawImage(canvas,left,cropY,cropWidth,cropHeight,0,0,cropWidth,cropHeight);
+          try{
+            const result=await worker.recognize(c,{}, {text:true});
+            const next=clean(result.data.text).replace(/[|]/g,'');
+            const current=suggestRoles(roles,original,parsed[i].school),candidate=suggestRoles(roles,next,parsed[i].school);
+            if(candidate.exact&&!current.exact||candidate.auto&&!current.auto){
+              parsed[i].name=next;parsed[i].nameCorrected=true;
+            }
+          }catch{ /* Preserve original OCR if the extra pass fails. */ }
+        }
+      }
+      return parsed;
     }finally{bitmap.close();if(!sharedWorker&&worker)await worker.terminate();}
   }
-  return {fields,labels,base,match,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
+  return {fields,labels,base,match,suggestRoles,editDistance,value,mergeScreenshots,importedDigests,apply,recognize,createWorker:createOcrWorker};
 });
