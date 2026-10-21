@@ -29,9 +29,10 @@
     }).filter(r=>r.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
     const exact=suggestions.filter(x=>x.exact);
     if(exact.length===1)return {roleId:exact[0].roleId,exact:true,auto:true,suggestions};
-    const best=suggestions[0],second=suggestions[1];
-    // A single OCR typo can be selected when a known school corroborates it.
-    const auto=!!best&&best.distance===1&&key.length>=4&&!!schoolKey&&best.compatibleSchool&&
+    const corroborated=schoolKey?suggestions.filter(s=>s.compatibleSchool):[];
+    const best=corroborated[0],second=corroborated[1];
+    // Auto-select only when a unique 1-character variant has the same known school.
+    const auto=!!best&&best.distance===1&&key.length>=3&&!!schoolKey&&
       (second===undefined||second.score-best.score>=1);
     return {roleId:auto?best.roleId:'',exact:false,auto,suggestions};
   }
