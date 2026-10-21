@@ -271,7 +271,7 @@
   }
   // New candidate plans require full raids; legacy templates and saved plans keep their own rules.
   function planningTask(task){return task.partyRule==='raid10'?{...task,fillCompanionSlots:true}:task;}
-  function savedPartyTask(task,plan){return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
+  function savedPartyTask(task,plan){const snapshot=plan.taskSnapshots?.[task.id];if(snapshot)task={...task,...Object.fromEntries(['raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'].filter(k=>snapshot[k]!==undefined).map(k=>[k,snapshot[k]]))};return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
   function optimizeTaskBatches(task,batches,capacity,parties=[],locked=[]){
     const cache=new Map(),hasParty=['daily5','raid10'].includes(task.partyRule);
     const rebuild=p=>{
