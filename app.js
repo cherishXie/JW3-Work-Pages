@@ -1079,7 +1079,7 @@
       },'确认更新勾选角色');
       $('#dialog').classList.add('screenshot-wide');
       $('#screenshot-original').onload=()=>URL.revokeObjectURL(picture);
-    }catch(e){status.textContent='识别失败：'+e.message+'。已有数据未修改。';}
+    }catch(e){const detail=e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():'浏览器没有返回具体错误信息';console.error('[OCR] 本地识别失败',e);status.textContent='识别失败：'+detail+'。已有数据未修改。';}
     finally{screenshotBusy=false;b.disabled=false;}
   }
   async function importFile(file){
