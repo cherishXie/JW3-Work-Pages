@@ -1527,7 +1527,7 @@
       if(item&&item.getAttribute('aria-pressed')!=='true')actions[item.dataset.action]?.(item);
     },180));
   },true);
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;try{actions[b.dataset.action]?.(b);}catch(err){if($('#dialog').open&&$('#form-error')){$('#form-error').textContent=err.message;$('#form-error').hidden=false;}else toast(err.message);}});
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;try{if(b.dataset.action==='nav'&&['overview','roi'].includes(b.dataset.page))syncSavedState(false,true);actions[b.dataset.action]?.(b);}catch(err){if($('#dialog').open&&$('#form-error')){$('#form-error').textContent=err.message;$('#form-error').hidden=false;}else toast(err.message);}});
   let queueDrag=null,queueDragFrame=0;
   function clearQueueDrag(){if(queueDragFrame)cancelAnimationFrame(queueDragFrame);queueDragFrame=0;queueDrag=null;for(const el of document.querySelectorAll('.queue-drop-target,.is-dragging'))el.classList.remove('queue-drop-target','is-dragging');}
   function queueDragTarget(x,y){return document.elementFromPoint(x,y)?.closest('[data-plan-id]');}
@@ -1593,10 +1593,19 @@
   });
   document.addEventListener('input',e=>{if(e.target.id==='price-search'){const at=e.target.selectionStart;ui.priceSearch=e.target.value;render();$('#price-search').focus();$('#price-search').setSelectionRange(at,at);}if(e.target.id==='raid-search'){const at=e.target.selectionStart;ui.raidSearch=e.target.value;render();$('#raid-search').focus();$('#raid-search').setSelectionRange(at,at);}if(e.target.id==='task-search'){const at=e.target.selectionStart;ui.search=e.target.value;render();$('#task-search').focus();$('#task-search').setSelectionRange(at,at);}});
   $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog'))$('#dialog').close();});
-  window.addEventListener('storage',e=>{
-    if(e.key!==KEY&&e.key!==null)return;
-    try{const loaded=Store.read(localStorage);dataStore=loaded.store;state=dataStore.active?M.upgradeState(structuredClone(dataStore.active)):M.blank();Ops.ensureDefaults(state);M.capturePlanForecasts(state,dataStore.snapshots);storageError='';storageReadError=false;undoState=null;undoStore=null;clearScope();ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;render();toast('已同步其他标签页的数据');}catch{toast('其他标签页数据无效，当前状态保留');}
-  });
+  function syncSavedState(notify=true,force=false){
+    try{
+      const loaded=Store.read(localStorage),changed=JSON.stringify(loaded.store)!==JSON.stringify(dataStore);if(!force&&!changed)return false;
+      const next=loaded.store.active?M.upgradeState(structuredClone(loaded.store.active)):M.blank();M.freezeHistory(next);Ops.ensureDefaults(next);M.capturePlanForecasts(next,loaded.store.snapshots);M.validateState(next);
+      dataStore=loaded.store;state=next;storageError='';storageReadError=false;if(changed){undoState=null;undoStore=null;clearScope();}ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;
+      if(notify)toast('已同步其他标签页的数据');return true;
+    }catch{if(notify)toast('其他标签页数据无效，当前状态保留');return false;}
+  }
+  function resumeWorkspace(){if(syncSavedState(false))render();}
+  window.addEventListener('storage',e=>{if((e.key===KEY||e.key===null)&&syncSavedState())render();});
+  window.addEventListener('pageshow',resumeWorkspace);
+  window.addEventListener('focus',resumeWorkspace);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeWorkspace();});
   // A fresh opening stays blank. Migrate valid old data without creating a sample.
   try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=structuredClone(state);Store.write(localStorage,dataStore);}}catch(e){storageError='浏览器存储不可用：'+e.message;}
   setInterval(()=>{for(const el of document.querySelectorAll('[data-account-time]')){const a=state.accounts.find(a=>a.id===el.dataset.accountTime);if(a)el.textContent=Ops.duration(Ops.remaining(a),a.billingType==='monthly');}},1000);
