@@ -165,7 +165,10 @@
     const options={
       workerPath:asset('worker.min.js'),langPath:base.replace(/\/$/,''),
       workerBlobURL:false,cacheMethod:'none',
-      logger:m=>progress(m.status==='recognizing text'?'正在识别表格…':'正在加载本地识别引擎…'),
+      logger:m=>{
+        const stages={'loading tesseract core':'加载识别核心','initializing tesseract':'初始化识别核心','loading language traineddata':'下载中文识别模型','initializing api':'初始化中文识别引擎','recognizing text':'正在识别表格'};
+        progress(stages[m.status]||'正在加载本地识别引擎…',{stage:m.status,progress:Number.isFinite(m.progress)?Math.max(0,Math.min(1,m.progress)):null});
+      },
       // Tesseract.js 6 can also throw a second uncaught error when a worker job rejects.
       errorHandler:()=>{}
     };

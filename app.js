@@ -1114,7 +1114,7 @@
       <label class="field mt">添加图片（可分多次选择）<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="screenshot-queue" class="mt" aria-live="polite"></div>
       <div class="form-grid mt"><label class="field">表格数据顶部（图片高度 %）<input id="screenshot-top" type="number" value="23" min="0" max="90"></label><label class="field">表格数据底部（图片高度 %）<input id="screenshot-bottom" type="number" value="92" min="10" max="100"></label></div>
       <p class="panel-sub">使用同一组裁剪比例逐张识别。最多 12 张，每张不超过 12 MB，总计不超过 60 MB；本批相同截图自动去重；已导入截图仍可重新识别并核对。</p>
-      ${button('开始本地识别','screenshot-recognize','primary mt')}<p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
+      ${button('开始本地识别','screenshot-recognize','primary mt')}<div id="screenshot-progress" class="screenshot-progress mt" hidden><div class="screenshot-progress-heading"><span class="spinner" aria-hidden="true"></span><strong id="screenshot-progress-label" role="status" aria-live="polite"></strong><span id="screenshot-elapsed"></span></div><progress id="screenshot-progress-bar" max="100" aria-label="截图识别进度"></progress><small>首次加载需要下载识别资源，请稍候；图片始终在本地识别。</small></div><p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
     $('#screenshot-file').addEventListener('change',screenshotQueueAdd);
     renderScreenshotQueue();
   }
@@ -1125,20 +1125,30 @@
     if(files.length>12){status.textContent='每批最多 12 张截图，请分批导入';return;}
     if(files.reduce((n,f)=>n+f.size,0)>60*1024*1024){status.textContent='截图总大小不可超过 60 MB，请分批导入';return;}
     const top=Number($('#screenshot-top').value),bottom=Number($('#screenshot-bottom').value);
-    screenshotBusy=true;b.disabled=true;status.textContent='正在准备批量识别…';host.innerHTML='';
+    screenshotBusy=true;b.disabled=true;const originalLabel=b.textContent;b.textContent='识别中…';status.textContent='';host.innerHTML='';
+    const panel=$('#screenshot-progress'),bar=$('#screenshot-progress-bar'),label=$('#screenshot-progress-label'),elapsed=$('#screenshot-elapsed'),started=Date.now();
+    const controls=[$('#screenshot-file'),$('#screenshot-top'),$('#screenshot-bottom')];controls.forEach(el=>el.disabled=true);
+    panel.hidden=false;panel.setAttribute('aria-busy','true');
+    const showProgress=(message,fraction=null)=>{
+      if(!panel.isConnected)return;
+      label.textContent=message+(Number.isFinite(fraction)?' · 当前阶段 '+Math.round(fraction*100)+'%':'');
+      if(Number.isFinite(fraction))bar.value=Math.round(fraction*100);else bar.removeAttribute('value');
+    };
+    showProgress('准备识别引擎…');elapsed.textContent='已用时 0 秒';
+    const timer=setInterval(()=>{if(!panel.isConnected){clearInterval(timer);return;}elapsed.textContent='已用时 '+Math.floor((Date.now()-started)/1000)+' 秒';},1000);
     let worker;
     try{
       const imported=WorkbenchScreenshot.importedDigests(state),seen=new Set(),images=[],skipped=[],failed=[];
       for(const [i,file] of files.entries()){
         if(!host.isConnected||!$('#dialog').open)return;
-        status.textContent='正在识别第 '+(i+1)+' / '+files.length+' 张：'+file.name;
+        showProgress('正在准备第 '+(i+1)+' / '+files.length+' 张：'+file.name);
         try{
           if(!/^image\/(png|jpeg|webp)$/.test(file.type)||!file.size||file.size>12*1024*1024)throw new Error('请选择不超过 12 MB 的 PNG / JPG / WebP 图片');
           const digest=await shotDigest(await file.arrayBuffer());
           if(seen.has(digest)){skipped.push(file.name+'（本批重复）');continue;}
           seen.add(digest);
-          if(!worker)worker=await WorkbenchScreenshot.createWorker(t=>{if(host.isConnected)status.textContent='正在加载识别引擎：'+t;});
-          const rows=await WorkbenchScreenshot.recognize(file,{top,bottom,worker,roles:state.roles,progress:t=>{if(host.isConnected)status.textContent='第 '+(i+1)+' / '+files.length+' 张：'+t;}});
+          if(!worker)worker=await WorkbenchScreenshot.createWorker((t,detail)=>{if(!worker)showProgress('加载识别引擎 · '+t,detail?.progress);});
+          const rows=await WorkbenchScreenshot.recognize(file,{top,bottom,worker,roles:state.roles,progress:t=>showProgress('第 '+(i+1)+' / '+files.length+' 张：'+t)});
           if(!rows.length)throw new Error('没有识别到角色行');
           images.push({file,name:file.name,digest,rows,imported:imported.has(digest)});
         }catch(e){
@@ -1149,6 +1159,7 @@
       }
       if(!host.isConnected||!$('#dialog').open)return;
       if(!images.length)throw new Error('没有成功识别的截图。'+[...skipped,...failed].join('；'));
+      showProgress('正在合并重复角色并生成核对表…');
       const merged=WorkbenchScreenshot.mergeScreenshots(images,{roles:state.roles});
       const fileRecords=images.map(image=>({name:image.name,sha256:image.digest}));
       const digest=images.length===1?images[0].digest:await shotDigest(new TextEncoder().encode(images.map(i=>i.digest).sort().join('|')));
@@ -1163,12 +1174,12 @@
         <details class="mt"><summary>查看本批原图（${originals.length} 张）</summary>${originals.map((image,i)=>`<div class="mt"><small>${i+1}. ${esc(image.name)}</small><img class="screenshot-preview-original" src="${image.url}" style="display:block;max-width:100%;height:auto" alt="角色统计截图 ${i+1}"></div>`).join('')}</details>
         ${repeated.length?`<label class="screenshot-confirm-review"><input type="checkbox" name="shot-allow-reimport"> 确认复核已导入截图：保存新的更正记录，保留原始导入档案；不会产生收益记录</label>`:''}
         ${field('screenshot-time','确认本批采集时间（北京时间）',beijingLocal(),'datetime-local','同批所有角色使用同一采集时间；不同日期建议分批导入。','required')}
-        <div class="screenshot-select-tools">${button('勾选已准确匹配的角色','screenshot-auto-select','small','type="button"')}<small>自动匹配仍需核对金额和其他数值</small></div>
+        <p id="screenshot-match-summary" class="screenshot-match-summary" role="status"></p><div class="screenshot-select-tools">${button('勾选已准确匹配的角色','screenshot-auto-select','small','type="button"')}<small>自动匹配仍需核对金额和其他数值</small></div>
         <div class="table-wrap mt"><table><thead><tr><th>更新 / 来源</th><th>匹配已有角色</th>${WorkbenchScreenshot.labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead><tbody>
         ${merged.rows.map((r,i)=>{
           const suggested=WorkbenchScreenshot.suggestRoles(state.roles,r.name,r.school),roleId=r.roleId||suggested.roleId,conflicts=Object.entries(r.conflicts);
-          return `<tr><td><label><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"> 更新</label><small>${r.occurrences} 行 · ${esc(r.sourceNames.join('、'))}</small>${r.ocrNames?.some(n=>n!==r.name)?`<small class="screenshot-ocr-source">截图识别原文：${esc(r.ocrNames.join(' / '))}</small>`:''}${conflicts.length?`<small class="negative">${conflicts.length} 项数据冲突</small><label class="mt"><input type="checkbox" name="shot-confirm-${i}" aria-label="已核对第 ${i+1} 行冲突"> 已核对冲突</label>`:''}</td>
-            <td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${[...suggested.suggestions.map(x=>x.roleId),...state.roles.map(x=>x.id)].filter((id,pos,all)=>all.indexOf(id)===pos).map(id=>{const role=state.roles.find(item=>item.id===id);return `<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`;}).join('')}</select><small id="shot-match-hint-${i}">${roleId?suggested.exact?'姓名准确匹配':'候选匹配，请核对账号和门派':suggested.suggestions.length?'建议优先选择：'+esc(suggested.suggestions.slice(0,3).map(x=>x.name).join('、')):'未匹配，请手动选择'}</small></td>
+          return `<tr data-shot-row="${i}" class="${roleId?'':'screenshot-unmatched'}"><td><span class="screenshot-match-badge" ${roleId?'hidden':''}>待匹配角色</span><label><input type="checkbox" name="shot-pick-${i}" aria-label="更新第 ${i+1} 行"> 更新</label><small>${r.occurrences} 行 · ${esc(r.sourceNames.join('、'))}</small>${r.ocrNames?.some(n=>n!==r.name)?`<small class="screenshot-ocr-source">截图识别原文：${esc(r.ocrNames.join(' / '))}</small>`:''}${conflicts.length?`<small class="negative">${conflicts.length} 项数据冲突</small><label class="mt"><input type="checkbox" name="shot-confirm-${i}" aria-label="已核对第 ${i+1} 行冲突"> 已核对冲突</label>`:''}</td>
+            <td><select name="shot-role-${i}" aria-label="第 ${i+1} 行目标角色"><option value="">待匹配 / 跳过</option>${[...suggested.suggestions.map(x=>x.roleId),...state.roles.map(x=>x.id)].filter((id,pos,all)=>all.indexOf(id)===pos).map(id=>{const role=state.roles.find(item=>item.id===id);return `<option value="${esc(role.id)}" ${role.id===roleId?'selected':''}>${esc(role.name)} · ${esc(state.accounts.find(a=>a.id===role.accountId)?.name)} · ${esc(role.server||'区服待补')}</option>`;}).join('')}</select><small id="shot-match-hint-${i}" class="${roleId?'':'screenshot-match-warning'}">${roleId?suggested.exact?'姓名准确匹配':'候选匹配，请核对账号和门派':suggested.suggestions.length?'建议优先选择：'+esc(suggested.suggestions.slice(0,3).map(x=>x.name).join('、')):'未匹配，请手动选择'}</small></td>
             ${WorkbenchScreenshot.fields.map(k=>{
               const options=r.conflicts[k];
               return `<td><input name="shot-${i}-${k}" aria-label="第 ${i+1} 行${esc(WorkbenchScreenshot.labels[WorkbenchScreenshot.fields.indexOf(k)])}" value="${esc(r[k]||'')}" style="min-width:85px;width:110px">${options?`<small class="negative">冲突：${options.map(o=>esc(o.value)+'（'+esc(o.files.join('、'))+'）').join(' / ')}</small>`:''}</td>`;
@@ -1185,6 +1196,7 @@
           screenshotDraft=null;
         },'确认更新勾选角色');
       $('#dialog').classList.add('screenshot-wide');
+      refreshScreenshotMatches();
       for(const img of $('#dialog').querySelectorAll('.screenshot-preview-original')){
         img.onload=()=>URL.revokeObjectURL(img.src);
         img.onerror=()=>URL.revokeObjectURL(img.src);
@@ -1195,8 +1207,25 @@
       if(status.isConnected)status.textContent='识别失败：'+detail+'。已有数据未修改。';
     }finally{
       if(worker)try{await worker.terminate();}catch(e){console.warn('[OCR] 关闭识别引擎失败',e);}
-      screenshotBusy=false;b.disabled=false;
+      clearInterval(timer);
+      if(panel.isConnected){panel.hidden=true;panel.setAttribute('aria-busy','false');}
+      controls.forEach(el=>{if(el.isConnected)el.disabled=false;});
+      screenshotBusy=false;b.disabled=false;b.textContent=originalLabel;
     }
+  }
+  function refreshScreenshotMatches(){
+    const selects=[...$('#dialog').querySelectorAll('select[name^="shot-role-"]')];
+    let pending=0;
+    for(const select of selects){
+      const row=select.closest('tr'),unmatched=!select.value,index=select.name.replace('shot-role-','');
+      if(unmatched)pending++;
+      row.classList.toggle('screenshot-unmatched',unmatched);
+      row.querySelector('.screenshot-match-badge').hidden=!unmatched;
+      $('#shot-match-hint-'+index)?.classList.toggle('screenshot-match-warning',unmatched);
+      select.setAttribute('aria-describedby','shot-match-hint-'+index);
+    }
+    const summary=$('#screenshot-match-summary');
+    if(summary){summary.textContent=pending?'有 '+pending+' 行待匹配，已高亮标出；请选择已有角色，或取消勾选以跳过。':'所有角色均已匹配，请核对数值后勾选更新。';summary.classList.toggle('has-pending',pending>0);}
   }
   async function importFile(file){
     if(!file)return;
@@ -1388,7 +1417,12 @@
   document.addEventListener('toggle',e=>{const el=e.target;if(el.matches?.('.analysis-task-picker'))ui.analysisPicker=el.open;if(el.matches?.('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}},true);
 
   document.addEventListener('change',e=>{
-    if(e.target.matches?.('select[name^="shot-role-"]')&&e.target.closest('#dialog'))e.target.dataset.manuallyChosen='1';
+    if(e.target.matches?.('select[name^="shot-role-"]')&&e.target.closest('#dialog')){
+      e.target.dataset.manuallyChosen='1';
+      const hint=$('#shot-match-hint-'+e.target.name.replace('shot-role-',''));
+      if(hint)hint.textContent=e.target.value?'已手动匹配，请核对角色和数值':'待匹配，请手动选择已有角色';
+      refreshScreenshotMatches();
+    }
   });
   document.addEventListener('input',e=>{
     const el=e.target;
@@ -1400,7 +1434,8 @@
     const match=WorkbenchScreenshot.suggestRoles(state.roles,name,school);
     const select=$('#dialog').querySelector('[name="shot-role-'+i+'"]'),hint=$('#shot-match-hint-'+i);
     if(select&&!select.dataset.manuallyChosen)select.value=match.roleId||'';
-    if(hint)hint.textContent=match.roleId?(match.exact?'姓名准确匹配':'候选匹配，请核对账号和门派'):match.suggestions.length?'建议优先选择：'+match.suggestions.slice(0,3).map(x=>x.name).join('、'):'未匹配，请手动选择';
+    if(hint)hint.textContent=select?.dataset.manuallyChosen?(select.value?'已手动匹配，请核对角色和数值':'待匹配，请手动选择已有角色'):match.roleId?(match.exact?'姓名准确匹配':'候选匹配，请核对账号和门派'):match.suggestions.length?'建议优先选择：'+match.suggestions.slice(0,3).map(x=>x.name).join('、'):'未匹配，请手动选择';
+    refreshScreenshotMatches();
   });
   $('#dialog').addEventListener('close',()=>{clearScreenshotQueue();screenshotDraft=null;});
   document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;try{actions[b.dataset.action]?.(b);}catch(err){if($('#dialog').open&&$('#form-error')){$('#form-error').textContent=err.message;$('#form-error').hidden=false;}else toast(err.message);}});

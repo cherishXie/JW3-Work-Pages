@@ -568,3 +568,18 @@ html[data-theme="deep-ocean"] .footer{border-top-color:#35353a}
 .analysis-context .raw-data[open]>summary{border-bottom:1px solid var(--wb-border)}
 @media(max-width:900px){.analysis-context .analysis-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.analysis-context .analysis-kpis{grid-template-columns:1fr}}
+
+/* OCR loading feedback and unresolved identity review. */
+.screenshot-progress{padding:16px;border:1px solid var(--wb-notice-border);background:var(--wb-notice-bg);border-radius:10px}
+.screenshot-progress[hidden],.screenshot-match-badge[hidden]{display:none}
+.screenshot-progress-heading{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px}
+.screenshot-progress-heading strong{flex:1;min-width:180px}
+#screenshot-elapsed{font-size:12px;color:var(--wb-text-muted);font-variant-numeric:tabular-nums}
+.screenshot-progress progress{display:block;width:100%;height:12px;margin:12px 0;accent-color:var(--wb-cyan)}
+.screenshot-progress small{font-size:12px;color:var(--wb-text-secondary)}
+.screenshot-match-summary{font-size:13px;margin-top:14px;color:var(--wb-text-secondary)}
+.screenshot-match-summary.has-pending,.screenshot-match-warning{color:var(--wb-warning);font-weight:600}
+#dialog.screenshot-wide tr.screenshot-unmatched>td{background:color-mix(in srgb,var(--wb-warning) 10%,var(--wb-surface));border-bottom:1px solid var(--wb-warning)}
+#dialog.screenshot-wide tr.screenshot-unmatched>td:first-child{box-shadow:inset 4px 0 var(--wb-warning)}
+.screenshot-unmatched select{border:2px solid var(--wb-warning);box-shadow:0 0 0 2px var(--wb-notice-bg)}
+.screenshot-match-badge{display:block;width:max-content;padding:3px 7px;margin-bottom:8px;border:1px solid var(--wb-warning);border-radius:5px;color:var(--wb-warning);font-size:12px;font-weight:600}
