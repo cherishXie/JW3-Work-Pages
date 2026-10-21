@@ -362,28 +362,30 @@
     const status=taskV2BatchStatus(x),t=x.t,companions=x.p.companionAssignments?.[x.i]||[],locked=x.p.lockedBatches?.includes(x.i),position=navigation.findIndex(row=>row.key===x.key);
     const measured=state.records.find(r=>r.planId===x.p.id&&r.taskId===x.id&&(!r.planBatchIndices||r.planBatchIndices.includes(x.i)));
     const adjacent=offset=>{const row=navigation[position+offset];return button(offset<0?'‹ 上一批':'下一批 ›','focus-batch','small',row?'data-key="'+esc(row.key)+'"':'disabled');};
-    const names=x.p.routeTaskIds?.length>1?'<small class="tc-v2-route">串本 · '+(x.p.routeTaskIds||[]).map(id=>esc(state.tasks.find(t=>t.id===id)?.name||id)).join(' → ')+'</small>':'';
+    const names=x.p.routeTaskIds?.length>1?'<details class="tc-v2-route"><summary>串本路线 · '+x.p.routeTaskIds.length+' 个任务</summary><p>'+(x.p.routeTaskIds||[]).map(id=>esc(state.tasks.find(t=>t.id===id)?.name||id)).join(' → ')+'</p></details>':'';
+    const guide=raidGuidePanel(t);
     const attrs='data-plan="'+esc(x.p.id)+'" data-task="'+esc(x.id)+'" data-index="'+x.i+'"';
     return '<section id="tc-v2-focus" class="card tc-v2-focus" aria-label="当前关注批次">'+
       '<div class="tc-v2-focus-top"><span class="tc-v2-eyebrow">'+icon('bolt')+' 当前批次</span><span class="tc-v2-status '+status+'">'+taskV2StatusLabel(status)+'</span></div>'+
       '<div class="tc-v2-navigation">'+adjacent(-1)+'<span>'+(position>=0?(position+1)+' / '+navigation.length:'已结束批次')+'</span>'+adjacent(1)+'</div>'+
       '<div class="tc-v2-focus-heading"><div><h2>'+taskV2Name(x)+' · 第 '+(x.i+1)+' 批</h2>'+names+
       '<p class="panel-sub">'+esc(x.p.date)+(x.p.teamConfigs?.[x.i]?.name?' · '+esc(x.p.teamConfigs[x.i].name):'')+' · '+x.members.length+' 个角色 / '+new Set(x.members.map(id=>state.roles.find(r=>r.id===id)?.accountId)).size+' 个账号 · '+batchDurationLabel(x)+'</p></div></div>'+
-      (measured?'<div class="tc-v2-measured"><small>已保存实测'+(measured.batches>1?' · 本条覆盖 '+measured.batches+' 批':'')+'</small><div><span>金币收益<b>'+num(measured.gold)+' G</b></span><span>操作时间<b>'+num(measured.minutes,1)+' 分钟</b></span><span>累计在线<b>'+num(measured.onlineMinutes,1)+' 分钟</b></span></div></div>':'')+
-      '<div class="tc-v2-member-head"><strong>本批登录角色</strong><span>'+x.members.length+' 个角色</span></div>'+
-      '<div class="tc-v2-person-grid tc-account-grid">'+batchAccountRoster(x.p,x.i,x.id,true)+'</div>'+
-      raidGongzhanNote(t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))+
-      raidPowerNote(x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean),x.p.rulesSnapshot?.raidMode,x.p.rulesSnapshot?.powerBasis)+
-      (x.pending?'<div class="tc-v2-team-tools">'+batchEditControls(x.p,x.i)+'</div>':locked?'<div class="tc-v2-team-tools">'+button('解锁队伍','lock-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'" aria-pressed="true"')+'</div>':'')+
-      (companions.length?'<p class="tc-v2-companion">侠客助战：'+companions.map(c=>esc(c.name)+' · '+duty(c.duty)).join('、')+'</p>':'')+
-      worldPartyNote(t,x.members.length)+raidGuidePanel(t)+
-      '<div class="tc-v2-switch">'+icon('arrow')+'<div><strong>换号建议</strong>'+savedBatchSwitchNote(x)+'</div></div>'+
       '<div class="tc-v2-focus-actions">'+taskV2Action(x)+
       (x.pending?button('MuMu 启动准备','mumu-prepare','small',attrs):'')+
       button('复制本批名单','copy-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'"')+
       '<details class="tc-v2-more"><summary>更多操作</summary><div class="tc-v2-more-body">'+
       (x.pending?button('改期 / 调整','adjust-batch','small',attrs+(locked?' disabled title="请先解锁队伍"':''))+button('删除本批','delete-batch','ghost small',attrs+(locked?' disabled title="请先解锁队伍"':'')):(!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',attrs)+button('撤销完成','reopen-execution','ghost small',attrs):''))+
       button('查看周期进度','plan-progress','small','data-id="'+esc(x.p.id)+'"')+'</div></details></div>'+
+      (measured?'<div class="tc-v2-measured"><small>已保存实测'+(measured.batches>1?' · 本条覆盖 '+measured.batches+' 批':'')+'</small><div><span>金币收益<b>'+num(measured.gold)+' G</b></span><span>操作时间<b>'+num(measured.minutes,1)+' 分钟</b></span><span>累计在线<b>'+num(measured.onlineMinutes,1)+' 分钟</b></span></div></div>':'')+
+      '<div class="tc-v2-focus-layout'+(guide?' has-guide':'')+'"><div class="tc-v2-focus-team"><div class="tc-v2-member-head"><strong>本批登录角色</strong><span>'+x.members.length+' 个角色</span></div>'+
+      '<div class="tc-v2-person-grid tc-account-grid">'+batchAccountRoster(x.p,x.i,x.id,true)+'</div>'+
+      raidGongzhanNote(t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))+
+      raidPowerNote(x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean),x.p.rulesSnapshot?.raidMode,x.p.rulesSnapshot?.powerBasis)+
+      (x.pending?'<div class="tc-v2-team-tools">'+batchEditControls(x.p,x.i)+'</div>':locked?'<div class="tc-v2-team-tools">'+button('解锁队伍','lock-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'" aria-pressed="true"')+'</div>':'')+
+      (companions.length?'<p class="tc-v2-companion">侠客助战：'+companions.map(c=>esc(c.name)+' · '+duty(c.duty)).join('、')+'</p>':'')+
+      worldPartyNote(t,x.members.length)+
+      '<div class="tc-v2-switch">'+icon('arrow')+'<div><strong>换号建议</strong>'+savedBatchSwitchNote(x)+'</div></div>'+
+      '</div>'+(guide?'<div class="tc-v2-focus-guide">'+guide+'</div>':'')+'</div>'+
       (x.fact?'<p class="tc-v2-measure-note">本批已登记完成，实际金币和耗时尚未提供；未填不等于 0。</p>':'')+
       '</section>';
   }
@@ -449,7 +451,7 @@
     return `<div class="tc-v2 flow-workspace"><div class="tc-v2-summary">${[['待执行批次',allPending.length,'pending'],['预计剩余',num(minutes,1)+' 分钟',''],['已完成批次',allRows.filter(x=>!x.pending&&!x.closed).length,''],['待补实测',pendingFacts.length,'unmeasured']].map(([label,value,status])=>status?button('<small>'+label+'</small><strong>'+value+'</strong>','queue-status-button','tc-v2-stat '+(status===ui.queueStatus?'is-active':''),`data-value="${status}" aria-pressed="${status===ui.queueStatus}"`):`<div class="tc-v2-stat"><small>${label}</small><strong>${value}</strong></div>`).join('')}</div>
       <div class="flow-lane-bar"><div class="segmented" aria-label="排程执行分类">${groups.map(g=>button(g.label+' <b>'+g.plans.length+'</b>','flow-lane',g.id===lane.id?'active':'',`data-value="${g.id}" aria-pressed="${g.id===lane.id}"`)).join('')}</div><small>${esc(range)} · 横向滑动选择任务与批次</small>${button('安排新任务','work-view','primary small','data-value="planning"')}</div>
       ${lane.plans.length?`<div class="flow-task-nav"><button type="button" data-action="flow-scroll" data-target="tasks" data-offset="-1" aria-label="上一个任务">‹</button><div class="flow-task-rail" data-flow-rail="tasks" role="group" aria-label="${lane.label}任务">${lane.plans.map(p=>flowTaskButton(p,focusPlan?.id)).join('')}</div><button type="button" data-action="flow-scroll" data-target="tasks" data-offset="1" aria-label="下一个任务">›</button></div>
-      <div class="flow-linked"><section class="flow-batch-panel"><div class="flow-plan-heading"><div><h2>${esc(flowPlanName(focusPlan))}</h2><small>${esc(focusPlan.date)} · ${navigation.length} 个执行单元</small></div>${queueTools(focusPlan)}</div><div class="flow-batch-nav"><button type="button" data-action="flow-scroll" data-target="batches" data-offset="-1" aria-label="向前浏览批次">‹</button><div class="flow-batch-rail" data-flow-rail="batches" role="group" aria-label="任务批次轨道">${navigation.map(x=>flowBatchButton(x,focus?.key)).join('')}</div><button type="button" data-action="flow-scroll" data-target="batches" data-offset="1" aria-label="向后浏览批次">›</button></div><div class="flow-selection-note"><span class="dot"></span>任务 → 批次 → 本批角色与操作</div><details class="flow-management"><summary>排程管理 / 批量操作 / 原始批次</summary>${savedPlanCard(focusPlan,focus?.key)}</details></section><span class="flow-connector" aria-hidden="true"></span><aside class="flow-inspector" aria-label="批次详情">${taskV2FocusCard(focus,navigation)}</aside></div>`:empty(lane.label+'分类暂无排程','可切换其他分类、日期或状态筛选。',button('全部状态','queue-status-button','small','data-value="all"'))}
+      <div class="flow-linked"><section class="flow-batch-panel"><div class="flow-plan-heading"><div><h2>${esc(flowPlanName(focusPlan))}</h2><small>${esc(focusPlan.date)} · ${navigation.length} 个执行单元</small></div>${queueTools(focusPlan)}</div><div class="flow-batch-nav"><button type="button" data-action="flow-scroll" data-target="batches" data-offset="-1" aria-label="向前浏览批次">‹</button><div class="flow-batch-rail" data-flow-rail="batches" role="group" aria-label="任务批次轨道">${navigation.map(x=>flowBatchButton(x,focus?.key)).join('')}</div><button type="button" data-action="flow-scroll" data-target="batches" data-offset="1" aria-label="向后浏览批次">›</button></div><div class="flow-selection-note"><span class="dot"></span>任务 → 批次 → 本批角色与操作</div><details class="flow-management"><summary>排程管理 / 批量操作 / 原始批次</summary>${savedPlanCard(focusPlan,focus?.key)}</details></section><aside class="flow-inspector" aria-label="批次详情">${taskV2FocusCard(focus,navigation)}</aside></div>`:empty(lane.label+'分类暂无排程','可切换其他分类、日期或状态筛选。',button('全部状态','queue-status-button','small','data-value="all"'))}
       <details class="flow-unassigned"><summary>待安排目标 · ${pending.reduce((n,x)=>n+x.remaining,0)} 角色次 <small>已扣除完成、跳过与排程占用</small></summary><div class="tc-v2-unassigned-grid">${pending.map(x=>`<div class="tc-v2-unassigned-item"><div><strong>${esc(x.task.name)}</strong><small>${x.remaining} 角色次</small></div>${button('安排','replan','small',`data-id="${esc(x.task.id)}"`)}</div>`).join('')||'<p class="muted">当前周期没有待安排目标</p>'}</div></details>
       ${archived.length?`<details class="flow-unassigned"><summary>已取消排程 · ${archived.length} 项</summary>${archived.map(p=>savedPlanCard(p)).join('')}</details>`:''}</div>`;
   }
@@ -845,7 +847,7 @@
   function raidGuidePanel(t,readOnly=false){
     if(t?.partyRule!=='raid10')return '';const id=Raids.guideId(t);if(!id)return '';
     const d=Raids.guideDungeons.find(d=>d.id===id),bosses=Raids.guideBosses(id,state.raidGuides);
-    return `<details class="raid-guide-panel" open><summary>${esc(d.fullName)} · 逐首领速刷攻略</summary><p class="panel-sub">用户速刷笔记 · ${bosses.filter(b=>b.note).length} / ${bosses.length} 已补充</p><div class="raid-guide-grid">${bosses.map((b,i)=>`<article class="raid-guide-card"><h4>老${i+1}${b.name?' · '+esc(b.name):''} <span>${esc(b.mode||'待补充')}</span></h4><p>${esc(b.note||'攻略待补充，可在任务设置中编辑。')}</p></article>`).join('')}</div>${readOnly?'':button('编辑本副本攻略','edit-raid-guide','small',`data-id="${id}"`)}</details>`;
+    return `<details class="raid-guide-panel" open><summary>${esc(d.fullName)} · 逐首领速刷攻略</summary><p class="panel-sub">用户速刷笔记 · ${bosses.filter(b=>b.note).length} / ${bosses.length} 已补充</p><div class="raid-guide-grid">${bosses.map((b,i)=>`<article class="raid-guide-card${b.note.length>100?' is-detailed':''}"><h4>老${i+1}${b.name?' · '+esc(b.name):''} <span>${esc(b.mode||'待补充')}</span></h4><p>${esc(b.note||'攻略待补充，可在任务设置中编辑。')}</p></article>`).join('')}</div>${readOnly?'':button('编辑本副本攻略','edit-raid-guide','small',`data-id="${id}"`)}</details>`;
   }
   function raidGuideFields(id){return Raids.guideBosses(id,state.raidGuides).map((b,i)=>`<article class="raid-guide-card"><h4>老${i+1}</h4><div class="form-grid">${field('guide-name-'+i,'首领名称',b.name)}${field('guide-mode-'+i,'操作类型',b.mode)}<label class="field full">速刷攻略<textarea name="guide-note-${i}" rows="4" maxlength="10000" placeholder="待补充">${esc(b.note)}</textarea></label></div></article>`).join('');}
   function raidGuideEditor(id=Raids.guideDungeons[0].id){
