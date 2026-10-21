@@ -31,7 +31,7 @@
  function checkBatch(s,p,taskId,index,when){
   const t=M.savedPartyTask(M.taskForVersion(s,s.tasks.find(t=>t.id===taskId)||{}),p),ids=p.batches[index],members=ids?.map(id=>M.eligible(s,{...t,roleIds:ids}).find(r=>r.id===id));
   if(p.cancelled||!t.enabled||!(p.routeTaskIds||[p.taskId]).includes(taskId)||!remaining(s,p,taskId).includes(index))throw new Error('该批次已结束');
-  if(M.dateKey(new Date(M.planStart(s,p,taskId)))!==M.dateKey(new Date(when.length===10?when+'T12:00:00+08:00':when))||M.cycle(t,when)!==M.cycle(t,M.planStart(s,p,taskId)))throw new Error('执行日期或刷新周期不同，请先调整该批次日期');
+  if(!M.planExecutionValid(s,p,t,when))throw new Error('执行日期或刷新周期不同，请先调整该批次日期');
   if(members.some(r=>!r||!canRegisterPlannedRole(s,t,r.id,when)))throw new Error('成员资格或剩余 CD 已变化，请先调整批次');
   if(new Set(members.map(r=>r.accountId)).size!==members.length||members.length>Math.min(t.maxParallel,s.config.concurrency))throw new Error('同账号冲突或超过并行上限');
   if(['daily5','raid10'].includes(t.partyRule))M.validateParty(M.partyTask(t,p.teamConfigs?.[index]),members,p.companionAssignments?.[index]||[],s.config.concurrency);
