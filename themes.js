@@ -4,7 +4,7 @@
   const KEY='jx3-workbench-theme-v1';
   const names=['bg','sidebar','surface','surface-2','hover','border','text','text-secondary','text-muted','primary','cyan','purple','success','warning','danger','primary-text'];
   const themes=[
-    {id:'deep-ocean',name:'深海蓝',mode:'dark',description:'深色 · 原始战术控制台',colors:['#080F1F','#0C1425','#111C30','#16243A','#1B2E46','#2A3A51','#F1F5FC','#B0BED2','#899BB3','#4A91FF','#37D8E8','#A78BFA','#34D399','#FBBF24','#FB7185','#071326']},
+    {id:'deep-ocean',name:'石墨深色',mode:'dark',description:'深色 · 数据分析工作台',colors:['#141416','#19191C','#232326','#2B2B2F','#323238','#3C3C43','#F2F2F4','#C4C4CB','#96969F','#3985F6','#09B9AD','#A14BF5','#2AC48B','#F2A42C','#EF6475','#FFFFFF']},
     {id:'cloud-blue',name:'云白蓝',mode:'light',description:'浅色 · 清晰明快',colors:['#F3F6FC','#FFFFFF','#FFFFFF','#EDF2FA','#E3EBF7','#D4DEEB','#14213B','#45556F','#586984','#2563EB','#087C8C','#7040B5','#087C58','#986313','#C33850','#FFFFFF']},
     {id:'jade-green',name:'竹青绿',mode:'light',description:'浅色 · 柔和青绿',colors:['#F1F7F4','#FAFDFC','#FFFFFF','#EAF3EF','#DFEEE7','#CBDDD3','#17382C','#435F52','#587365','#087F68','#087F68','#735096','#137648','#886318','#BF3C50','#FFFFFF']},
     {id:'warm-sand',name:'暖砂金',mode:'light',description:'浅色 · 暖白纸感',colors:['#F8F5EE','#FFFCF7','#FFFEFB','#F1EBDF','#EAE1D0','#DED2BE','#3B3023','#665846','#79684F','#A15C16','#87600F','#7951A2','#34703C','#95600C','#BB3746','#FFFFFF']},
