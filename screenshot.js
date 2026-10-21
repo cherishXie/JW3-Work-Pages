@@ -48,7 +48,9 @@
       for(const [rowIndex,row] of (image.rows||[]).entries()){
         rawRows++;
         const name=clean(row.name),matchInfo=suggestRoles(roles,name,row.school);
-        const matched=matchInfo.auto&&matchInfo.roleId&&(!name.includes('@')||name===clean(roles.find(r=>r.id===matchInfo.roleId)?.name));
+        const canonical=clean(roles.find(r=>r.id===matchInfo.roleId)?.name);
+        const sameSuffix=!name.includes('@')||!canonical.includes('@')||name.split('@')[1]===canonical.split('@')[1];
+        const matched=matchInfo.auto&&matchInfo.roleId&&sameSuffix;
         const key=matched?'matched:'+matchInfo.roleId:name?'role:'+name:'unknown:'+imageIndex+':'+rowIndex;
         let group=groups.get(key);
         if(!group){
