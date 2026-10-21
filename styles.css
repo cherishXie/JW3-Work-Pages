@@ -605,3 +605,6 @@ html[data-theme="deep-ocean"] .footer{border-top-color:#35353a}
 .flow-task{grid-template-columns:minmax(0,1fr);justify-content:stretch;min-height:102px;max-height:110px}.flow-task-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:36px;font-size:12px}.flow-task-title small{display:none}.flow-task-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.task-center .tc-bar{padding:8px 12px}.task-center .tc-bar .tabs{margin:0}.task-center .tc-filters{padding:7px 12px;margin:8px 0}.task-center .tc-v2-summary{margin-bottom:0}.flow-inspector .tc-v2-person-grid.tc-account-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.flow-inspector .tc-v2-person{gap:2px}.flow-inspector .tc-v2-person small{font-size:10px}
 @media(max-width:1200px){.flow-inspector .tc-v2-person-grid.tc-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px) and (min-width:600px){.flow-inspector .tc-v2-person-grid.tc-account-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Keep measured duration visible outside the task inspector. */
+.flow-task{max-height:none}.flow-task-duration{font-size:11px;line-height:1.5;color:var(--wb-cyan);white-space:normal}
