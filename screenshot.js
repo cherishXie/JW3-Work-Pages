@@ -54,11 +54,18 @@
   function match(roles,name){const k=base(name);if(!k)return '';const matches=(roles||[]).filter(r=>base(r.name)===k);return matches.length===1?matches[0].id:'';}
 
   const recognizedSchools=['霸刀','七秀','藏剑','纯阳','五毒','长歌','药宗','衍天','唐门','蓬莱','苍云','明教','天策','万花','少林','丐帮','凌雪','刀宗','万灵','段氏'];
-  function canonicalSchool(input){
+  function canonicalSchool(input,roles=[],ocrName=''){
     const key=clean(input);
     if(!key||recognizedSchools.includes(key))return key;
     const options=recognizedSchools.filter(name=>editDistance(key,name)===1);
-    return options.length===1?options[0]:key;
+    if(options.length===1)return options[0];
+    if(options.length>1&&base(ocrName)){
+      // "五帮" can mean 五毒 or 丐帮. Only disambiguate if one existing
+      // same-named character has a school among the OCR candidates.
+      const known=(roles||[]).filter(role=>base(role.name)===base(ocrName)&&options.includes(clean(role.school)));
+      if(known.length===1)return clean(known[0].school);
+    }
+    return key;
   }
   function chooseRecognizedName(roles,variants,school=''){
     const unique=[...new Set(variants.map(x=>clean(x).replace(/[|]/g,'').replace(/@{2,}/g,'@')).filter(Boolean))];
@@ -219,7 +226,7 @@
       }
       const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
       const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
-      const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=i===1?canonicalSchool(words.map(x=>x.text).join('')):words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+      const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=i===1?canonicalSchool(words.map(x=>x.text).join(''),roles,row.name):words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2){const nums=coins.map(col=>col.filter(x=>Math.abs(x.y-a.y)<spacing*.42).map(x=>x.text).join(''));row.gold=nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100?String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000):'';}else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
       // A second whole-column OCR pass uses the color-aware binary image.
       // Compare both passes with the WORKBENCH character names (never use a
       // raw OCR guess to rename a stored role).
