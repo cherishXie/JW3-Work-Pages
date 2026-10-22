@@ -134,9 +134,8 @@
   const timing=executionTiming(date,input,new Set((p.batches[index]||[]).map(id=>copy.roles.find(r=>r.id===id)?.accountId)).size);
   let fact=(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices[0]===index);
   if(copy.records.some(r=>r.planId===planId&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(index))))throw new Error('本批已有实测，请勿重复登记');
-  const values=['gold','minutes','onlineMinutes'].map(k=>input[k]!==undefined&&input[k]!==''&&input[k]!==null),measured=values.every(Boolean);
-  if(values.some(Boolean)&&!measured)throw new Error('请补齐实收、操作分钟和在线分钟，或全部留空仅登记完成');
-  if(fact&&!measured)throw new Error('已登记完成，请填写实测值后补录');
+  const values=['gold','minutes','onlineMinutes'].map(k=>input[k]!==undefined&&input[k]!==''&&input[k]!==null);
+  if(fact&&!values.some(Boolean))throw new Error('已登记完成，请填写金额或耗时后补录');
   if(!fact){
    const when=timing.startedAt||date,t=checkBatch(copy,p,taskId,index,when),ids=[...p.batches[index]],accounts=new Set(ids.map(id=>copy.roles.find(r=>r.id===id).accountId));
    fact={id:M.id('completion'),completionOnly:true,planId,taskId,taskName:t.name,date,startedAt:timing.startedAt,cycle:M.cycle(t,when),roleIds:ids,batches:1,planBatchIndices:[index],source:'完成登记',createdAt:new Date().toISOString(),note:input.note||'',snapshot:M.pricingConfig(copy,when),billingAccounts:copy.accounts.filter(a=>accounts.has(a.id)).map(a=>({...a})),...(t.dungeonId?{dungeonId:t.dungeonId,dungeonName:t.dungeonName,difficulty:t.difficulty,cdSnapshot:{period:t.period,resetDays:t.resetDays||[t.resetDay],resetDay:t.resetDay,resetHour:t.resetHour}}:{})};
@@ -145,10 +144,15 @@
   if(timing.startedAt&&fact.startedAt&&fact.startedAt!==timing.startedAt)throw new Error('补录须沿用完成登记的开始时刻；需要改期请先撤销完成');
   if(timing.startedAt&&!fact.startedAt){if(M.cycle(fact.cycleSnapshot||fact.cdSnapshot||copy.tasks.find(t=>t.id===taskId),timing.startedAt)!==fact.cycle)throw new Error('开始时间属于另一刷新周期，请先撤销完成并改期');fact.startedAt=timing.startedAt;}
   if(timing.endedAt)fact.endedAt=timing.endedAt;
+  const previousMeasurements=fact.measurements||{},measurements={...previousMeasurements,financialAllocation:input.financialAllocation||previousMeasurements.financialAllocation||'none'};
+  for(const k of ['gold','minutes','onlineMinutes','otherCost'])if(input[k]!==undefined&&input[k]!==''&&input[k]!==null)measurements[k]=M.number(input[k],k);
+  if(['gold','minutes','onlineMinutes'].some(k=>measurements[k]!=null))fact.measurements=measurements;
+  const complete=['gold','minutes','onlineMinutes'].every(k=>measurements[k]!=null);
+  input={...input,...measurements};
   let record=null;
-  if(measured){
+  if(complete){
    const pref={timeAllocation:input.timeAllocation||copy.recordingPreferences?.timeAllocation||'attendance',financialAllocation:input.financialAllocation||copy.recordingPreferences?.financialAllocation||'none'},n=fact.roleIds.length;
-   record={...fact,id:M.id('record'),completionOnly:false,completionId:fact.id,gold:M.number(input.gold,'实际金币'),minutes:M.number(input.minutes,'实际操作分钟'),onlineMinutes:M.number(input.onlineMinutes,'账号在线分钟'),otherCost:M.number(input.otherCost??0,'其他成本'),accountMinutes:{},source:'手工实测',note:input.note||fact.note||'',attendanceWeights:Object.fromEntries(fact.roleIds.map(id=>[id,1]))};delete record.billingAccounts;
+   record={...fact,id:M.id('record'),completionOnly:false,completionId:fact.id,gold:M.number(input.gold,'实际金币'),minutes:M.number(input.minutes,'实际操作分钟'),onlineMinutes:M.number(input.onlineMinutes,'账号在线分钟'),otherCost:M.number(input.otherCost??0,'其他成本'),accountMinutes:{},measurementStatus:'confirmed',source:'手工实测',note:input.note||fact.note||'',attendanceWeights:Object.fromEntries(fact.roleIds.map(id=>[id,1]))};delete record.billingAccounts;
    if(pref.timeAllocation==='attendance'||pref.financialAllocation==='attendance'){record.roleOnlineMinutes={};if(pref.financialAllocation==='attendance'){record.roleAllocations={};record.allocationMethod='attendance';}for(const id of fact.roleIds){const account=fact.roleAccounts[id],online=record.onlineMinutes/n;record.roleOnlineMinutes[id]=online;record.accountMinutes[account]=(record.accountMinutes[account]||0)+online;if(record.roleAllocations)record.roleAllocations[id]={gold:record.gold/n,minutes:record.minutes/n,onlineMinutes:online,otherCost:record.otherCost/n};}}
    const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
@@ -235,6 +239,7 @@
    if(previous.onlineMinutes===0&&previous.billableAccountMinutes){const base=previous.snapshot.cardPrice*previous.snapshot.discount/previous.snapshot.cardMinutes;for(const [account,minutes]of Object.entries(r.accountMinutes)){const ratio=base?Math.max(0,Math.min(1,(previous.snapshot.accountBillingRates?.[account]??base)/base)):1;r.billableAccountMinutes[account]=minutes*ratio;r.coveredAccountMinutes[account]=minutes-r.billableAccountMinutes[account];}}
    if(previous.roleOnlineMinutes)r.roleOnlineMinutes=scale(previous.roleOnlineMinutes,r.onlineMinutes,previous.onlineMinutes,roleWeights);
    if(previous.roleAllocations)for(const id of r.roleIds)for(const key of ['gold','minutes','onlineMinutes','otherCost'])r.roleAllocations[id][key]=previous[key]?previous.roleAllocations[id][key]/previous[key]*r[key]:roleWeights[id]*r[key];
+   if(input.gold!==undefined&&input.gold!=='')r.measurementStatus='confirmed';
    r.note=input.note??r.note;r.updatedAt=new Date(Math.max(Date.now(),Date.parse(previous.updatedAt||'')+1||0)).toISOString();r.correctionRevision=(r.correctionRevision||0)+1;r.corrections??=[];const {corrections,...snapshot}=previous;r.corrections.push({at:r.updatedAt,reason:input.reason?.trim()||'用户调整实测',before:snapshot});
   }
   p.updatedAt=new Date().toISOString();M.validateState(copy);Object.assign(s,copy);return r||fact;
