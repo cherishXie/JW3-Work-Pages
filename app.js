@@ -207,7 +207,7 @@
     const pages={overview,task:taskPage,roi:roiPage,plan:taskPage,history:historyPage,roles:rolesPage,assets:assetsPage,settings:workspaceSettings,taskmanage:settingsPage,data:workspaceSettings};
     $('#app').innerHTML=(storageError?notice(esc(storageError),button('导出原始存储','raw-backup')):'')+(ui.page!=='task'&&(ui.role||ui.group||ui.account)&&ui.mode==='estimated'?notice('确认排程按完整批次筛选；只选部分成员时不擅自分摊整队或共享收益。'):'')+(ui.page!=='task'&&(ui.role||ui.group||ui.account)&&ui.mode==='actual'?notice('实测筛选纳入完整出勤记录及明确分摊的角色金额；未分摊整队记录不计入部分角色 ROI。现金流为全空间口径。'):'')+(ui.setup?`<div class="setup-background" inert aria-hidden="true">${overview()}</div><section id="setup-layer" class="setup-layer" role="region" aria-label="工作空间配置引导"><div class="setup-shell">${setupPage()}</div></section>`:pages[ui.page]());
     try{if($('#default-page'))$('#default-page').value=localStorage.getItem('jx3-default-page')||'overview';}catch{}
-    collapseRecordTables();enhanceTables();applyPrivacy();
+    collapseRecordTables();enhanceTables();fitRevenueMapLabels();applyPrivacy();
     syncFlowRails();
     $('#sidebar').inert=ui.setup;$('#topbar').inert=ui.setup;document.body.classList.toggle('setup-open',ui.setup);
     const pageKey=ui.page+(ui.page==='task'?':'+ui.workView:ui.page==='roi'?':'+ui.roiTab+':'+ui.roiSection:'');if(pageKey!==renderedPageKey){renderedPageKey=pageKey;window.scrollTo(0,0);}
@@ -309,12 +309,7 @@
   let colors=Theme.palette(document.documentElement.dataset.theme).chartColors;
   function setTheme(id){const result=Theme.apply(id);colors=result.chartColors;render();toast(result.saved?'已切换为 '+result.theme.name+'，已记住选择':'主题已切换；浏览器存储不可用，刷新后可能恢复默认');}
   function themePanel(){return `<section class="card pad mb"><div class="flex between wrap"><div><h2>外观主题</h2><p class="panel-sub">3 种浅色、2 种深色。页面、图表和战报共用同一套主题，选择会在本机记住。</p></div><span class="pill">外观偏好独立保存</span></div><div class="theme-options mt">${Theme.themes.map(t=>{const p=Theme.palette(t.id).tokens,active=document.documentElement.dataset.theme===t.id;return `<button type="button" class="theme-option ${active?'selected':''}" data-action="set-theme" data-id="${t.id}" aria-pressed="${active}"><span class="theme-swatch" style="background:${p.bg};border-color:${p.border}"><i style="background:${p.sidebar};border-color:${p.border}"></i><span style="background:${p.surface};border-color:${p.border}"><b style="background:${p.primary}"></b><b style="background:${p.cyan}"></b><b style="background:${p.purple}"></b></span></span><strong>${t.name} ${active?'✓':''}</strong><small>${t.description}</small></button>`;}).join('')}</div></section>`;}
-  function composition(s){
-    const value=r=>ui.currency==='gold'?r.gold:r.gross;
-    const rows=s.tasks.filter(x=>value(x)>0).sort((a,b)=>value(b)-value(a));
-    const total=rows.reduce((n,r)=>n+value(r),0);
-    if(!total)return empty(s.hasData?'当前没有收益贡献':'暂无实测数据','收益占比仅使用当前筛选中的正毛收益，缺失值不记为零。');
-    const largest=rows.slice(0,3).reduce((n,r)=>n+value(r),0)/total*100;
+  function revenueMapBlocks(rows,value){
     // Alternating binary proportional partitions, avoiding tiny unreadable labels.
     function split(items,x,y,w,h,depth){
       if(!items.length)return [];
@@ -326,11 +321,36 @@
       if(depth%2===0)return [...split(items.slice(0,i),x,y,w*fraction,h,depth+1),...split(items.slice(i),x+w*fraction,y,w*(1-fraction),h,depth+1)];
       return [...split(items.slice(0,i),x,y,w,h*fraction,depth+1),...split(items.slice(i),x,y+h*fraction,w,h*(1-fraction),depth+1)];
     }
-    const blocks=split(rows,0,0,100,100,0);
+    return split(rows,0,0,100,100,0);
+  }
+  let revenueLabelObserver=null;
+  function fitRevenueMapLabels(){
+    revenueLabelObserver?.disconnect();
+    const fit=map=>{for(const tile of map.querySelectorAll('.revenue-map-tile')){
+      const width=tile.clientWidth,height=tile.clientHeight,share=tile.querySelector('.revenue-map-share');if(!share)continue;
+      const compact=width<100||height<70,pad=compact?3:10,availableW=Math.max(1,width-pad*2),availableH=Math.max(1,height-pad*2),base=compact?16:30;
+      tile.style.padding=pad+'px';tile.dataset.labelLevel='full';share.style.fontSize=base+'px';share.style.removeProperty('transform');
+      const natural=share.scrollWidth||share.getBoundingClientRect().width,rotate=availableW<32&&availableH>availableW*2;
+      const size=Math.max(.1,Math.min(base,base*(rotate?availableH:availableW)/Math.max(1,natural),rotate?availableW:availableH));
+      share.style.fontSize=size+'px';tile.dataset.shareVertical=String(rotate);
+      const shareHeight=size*1.25,name=tile.querySelector('.revenue-map-name'),amount=tile.querySelector('small'),nameWidth=name?.scrollWidth||0,amountWidth=amount?.scrollWidth||0;
+      tile.dataset.labelLevel='share';
+      if(!rotate&&availableW>=Math.min(70,nameWidth)&&availableH>=shareHeight+24)tile.dataset.labelLevel=nameWidth<=availableW&&amountWidth<=availableW&&availableH>=shareHeight+47?'full':'name';
+    }};
+    const maps=[...document.querySelectorAll('.revenue-map')];maps.forEach(fit);
+    if(typeof ResizeObserver!=='undefined'){revenueLabelObserver=new ResizeObserver(entries=>entries.forEach(e=>fit(e.target)));maps.forEach(map=>revenueLabelObserver.observe(map));}
+  }
+  function composition(s){
+    const value=r=>ui.currency==='gold'?r.gold:r.gross;
+    const rows=s.tasks.filter(x=>value(x)>0).sort((a,b)=>value(b)-value(a));
+    const total=rows.reduce((n,r)=>n+value(r),0);
+    if(!total)return empty(s.hasData?'当前没有收益贡献':'暂无实测数据','收益占比仅使用当前筛选中的正毛收益，缺失值不记为零。');
+    const largest=rows.slice(0,3).reduce((n,r)=>n+value(r),0)/total*100;
+    const blocks=revenueMapBlocks(rows,value);
     return `<div class="revenue-map-layout"><div class="revenue-map" role="list" aria-label="按任务正毛收益的面积占比图">${blocks.map(({row:r,x,y,w,h},i)=>{
       const share=value(r)/total*100;
-      return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:${colors[i%colors.length]}" title="${esc(r.task.name)}：${pct(share)} · ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong>${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
-    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}"><i style="background:${colors[i%colors.length]}"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">图中 ${rows.length} 项正毛收益任务参与面积占比；零收入及其他任务在详细收益中核对。点击任意任务查看明细。成本、净收益与亏损仍按原有规则独立计算。</p>`;
+      return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:${colors[i%colors.length]}" title="${esc(r.task.name)}：${pct(share)} · ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong class="revenue-map-share">${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
+    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}" title="${esc(r.task.name)} · ${pct(value(r)/total*100)}"><i style="background:${colors[i%colors.length]}"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">图中 ${rows.length} 项正毛收益任务参与面积占比；零收入及其他任务在详细收益中核对。点击任意任务查看明细。成本、净收益与亏损仍按原有规则独立计算。</p>`;
   }
   function todoList(limit=4){const rows=state.tasks.filter(t=>t.enabled&&t.days.includes(M.weekday(today))).map(t=>({task:t,...M.plan(state,t,today,scope(),true)})).filter(t=>t.executions>0).sort((a,b)=>(b.hourly??0)-(a.hourly??0));if(!state.roles.length)return empty('尚未配置账号与角色','先建立档案，再选择常用任务。',button('开始配置','setup','primary'));if(!rows.length)return empty('当前没有待安排建议','可以选择其他日期，或为角色安排新任务。',button('查看任务矩阵','nav','','data-page="task"'));return `<div class="todo-list">${rows.slice(0,limit).map(r=>`<div class="todo-row"><span class="task-icon">${icon(r.task.type==='team'?'shield':'bolt')}</span><div class="todo-name"><strong>${esc(r.task.name)}</strong><small>${r.executions} ${r.task.type==='team'?'队通关':'角色次'}待做 · ${r.batches.length} 批 · ${num(r.minutes)} 分钟</small></div><div class="todo-value"><b class="cyan">${amount(r.net,r.netGold)}</b><small>预计净收益</small></div>${button(icon('chevron'),'task-detail','ghost small',`data-id="${r.task.id}" aria-label="查看${esc(r.task.name)}"`)}</div>`).join('')}</div>`;}
   function taskScopeSummary(){
@@ -932,7 +952,7 @@
   }
   let submitModal=null;
   function modal(title,body,handler=null,label='保存'){
-    $('#dialog').classList.remove('screenshot-wide');
+    $('#dialog').classList.remove('screenshot-wide','report-dialog');
     submitModal=handler;
     $('#dialog-content').innerHTML=`<form id="modal-form"><div class="dialog-head"><h2>${title}</h2>${button(icon('close'),'close','ghost','type="button" aria-label="关闭对话框"')}</div><div class="dialog-body">${body}</div><div class="dialog-foot"><div id="form-error" class="error" role="alert" tabindex="-1" hidden></div>${button(handler?'取消':'关闭','close','','type="button"')}${handler?`<button type="submit" class="primary">${label}</button>`:''}</div></form>`;
     if(!$('#dialog').open)$('#dialog').showModal();
@@ -1201,66 +1221,107 @@
   function download(name,blob){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   function exportData(){download('JX3_Workbench_'+M.dateKey()+'.json',new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));toast('完整备份已导出（含账号别名与角色名，请妥善保存）');}
   function shareForm(){
-    const s=M.summary(state,ui.start,ui.end,scope(),ui.mode),roles=activeRoles();
-    modal('分享战报 · 收益与效率',`<p class="panel-sub">${ui.start} — ${ui.end} · ${esc([ui.group,state.accounts.find(a=>a.id===ui.account)?.name,state.roles.find(r=>r.id===ui.role)?.name].filter(Boolean).join(' / ')||'全部账号与角色')}</p><div class="share-options"><span>${badge()}</span><label>任务排行<select id="share-ranking"><option value="hourly">净时薪</option><option value="net">净收益</option><option value="gross">毛收益</option></select></label><label class="share-privacy"><input type="checkbox" id="share-private" checked> 隐藏账号、角色、服务器</label></div><div class="share-metrics" aria-label="战报核心数据"><span>毛收益<b>${s.hasData?amount(s.gross,s.gold):'暂无数据'}</b></span><span>经济净收益<b>${s.hasData?amount(s.net,s.netGold):'暂无数据'}</b></span></div><canvas id="share-canvas" width="1080" height="1440" class="share-preview" role="img" aria-label="收益与效率战报：毛收益与净收益并列，附成本、操作时间、净时薪、收入来源和任务排名"></canvas><p class="share-hint">1080 × 1440 PNG · 沿用当前统计期间、筛选、收益显示与主题。默认匿名，下载前可预览。</p>`,()=>download('JX3_战报_'+ui.start+'_'+ui.end+'.png',canvasBlob()),'下载 PNG');
-    function draw(){
-      const canvas=$('#share-canvas'),c=canvas.getContext('2d'),palette=Theme.palette(document.documentElement.dataset.theme),p=palette.tokens,privateMode=$('#share-private').checked,metric=$('#share-ranking').value;
-      const metricName={hourly:'净时薪',net:'净收益',gross:'毛收益'}[metric],font='-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
-      const identities=[...state.accounts.map(a=>a.name),...state.roles.flatMap(r=>[r.name,r.server])].filter(Boolean).sort((a,b)=>b.length-a.length);
-      const safe=value=>privateMode?identities.reduce((text,name)=>text.split(name).join('已隐藏'),String(value)):String(value);
-      function text(value,x,y,size=24,color=p['text'],width=952,weight=400,align='left'){
-        value=privacyText(value);
-        c.save();let str=String(value),actual=size;c.textBaseline='top';c.textAlign=align;
-        const setFont=()=>{c.font=`${weight} ${actual}px ${font}`;};setFont();
-        while(c.measureText(str).width>width&&actual>18){actual--;setFont();}
-        if(c.measureText(str).width>width){while(str.length&&c.measureText(str+'…').width>width)str=str.slice(0,-1);str+='…';}
-        c.fillStyle=color;c.fillText(str,x,y);c.restore();
-      }
-      function panel(x,y,w,h,fill=p['surface'],border=p['border'],radius=20){c.beginPath();c.roundRect(x,y,w,h,radius);c.fillStyle=fill;c.fill();c.strokeStyle=border;c.lineWidth=1;c.stroke();}
-      function line(x,y,w,color=p['border']){c.fillStyle=color;c.fillRect(x,y,w,1);}
-      function amounts(yuan,gold){
-        const cash=yuan==null?'—':money(yuan),coins=gold==null?'金值不可换算':num(gold,1)+' 金';
-        return ui.currency==='rmb'?{main:cash,secondary:'人民币估值'}:ui.currency==='gold'?{main:coins,secondary:'金币口径'}:{main:coins,secondary:cash};
-      }
-      function revenueCard(x,label,yuan,gold,color,note){
-        panel(x,232,466,228);c.fillStyle=color;c.fillRect(x+24,256,4,24);
-        text(label,x+42,254,27,p['text-secondary'],390,500);
-        const v=amounts(yuan,gold);text(s.hasData?v.main:'暂无数据',x+26,306,53,color,414,650);text(s.hasData?v.secondary:'选择其他口径或补充记录',x+28,371,29,p['text-secondary'],410,500);
-        text(note,x+28,421,21,p['text-muted'],410);
-      }
-      c.clearRect(0,0,1080,1440);c.fillStyle=p['bg'];c.fillRect(0,0,1080,1440);
-      c.save();c.globalAlpha=.06;c.fillStyle=p['primary'];c.beginPath();c.arc(1015,90,190,0,Math.PI*2);c.fill();c.restore();
-      text('JX3  /  PERSONAL REPORT',64,51,23,p['text-muted'],580,500);
-      panel(772,44,244,38,p['primary-soft'],p['notice-border'],10);text(kind(),894,53,20,p['primary-label'],220,500,'center');
-      text(ui.range==='today'?'今日收益战报':ui.range==='week'?'本周收益战报':ui.range==='last-week'?'上周收益战报':'期间收益战报',64,111,54,p['text'],952,650);
-      text(ui.start+' — '+ui.end,64,181,26,p['text-secondary'],580);
-      text(`${roles.length} 个角色 · ${new Set(roles.map(r=>r.accountId)).size} 个账号`,1016,185,23,p['text-muted'],340,400,'right');
-      revenueCard(64,'毛收益',s.gross,s.gold,p['purple'],'金币收入估值 · 扣除成本前');
-      revenueCard(550,'经济净收益',s.net,s.netGold,s.net<0?p['danger']:p['cyan'],'扣除手续费、点卡用量及其他成本');
-      const width=(952-32)/3;
-      const metrics=[{label:'综合成本',main:s.hasData?money(s.cost):'—',sub:'手续费 + 点卡用量 + 其他成本',color:p['text']},{label:'操作时间',main:s.hasData?num(s.minutes/60,1)+' 小时':'—',sub:s.hasData?'账号在线 '+num(s.onlineMinutes/60,1)+' 小时':'暂无操作记录',color:p['text']},{label:'净时薪',main:s.hasData&&s.hourly!==null?amounts(s.hourly,s.hourlyGold).main:'不适用',sub:s.hasData&&s.hourly!==null?(ui.currency==='both'?money(s.hourly)+' / 小时':'净收益 ÷ 操作小时'):'需要大于零的操作时间',color:s.hourly<0?p['danger']:p['cyan']}];
-      metrics.forEach((m,i)=>{const x=64+i*(width+16);panel(x,482,width,140);text(m.label,x+22,502,22,p['text-muted'],width-44);text(m.main,x+22,540,34,m.color,width-44,600);text(m.sub,x+22,591,20,p['text-muted'],width-44);});
-      panel(64,644,952,40,p['primary-soft'],p['notice-border'],10);text('毛收益 − 综合成本 = 经济净收益',540,653,22,p['text-secondary'],900,500,'center');
-      panel(64,704,952,190);text('收入来源',88,725,26,p['text'],500,600);
-      const sourceValue=r=>ui.currency==='gold'?r.gold:r.gross,sources=s.tasks.filter(r=>r.hasData&&sourceValue(r)>0).sort((a,b)=>sourceValue(b)-sourceValue(a)),grossTotal=sources.reduce((sum,r)=>sum+sourceValue(r),0);
-      text(grossTotal?'按正毛收益贡献排序':'当前口径暂无正毛收益',992,729,21,p['text-muted'],470,400,'right');
-      if(grossTotal){
-        const grouped=sources.length>3?[...sources.slice(0,2).map(r=>({name:r.task.name,value:sourceValue(r)})),{name:'其他 '+(sources.length-2)+' 项任务',value:sources.slice(2).reduce((sum,r)=>sum+sourceValue(r),0)}]:sources.map(r=>({name:r.task.name,value:sourceValue(r)}));
-        c.save();c.beginPath();c.roundRect(88,773,904,15,7);c.clip();let x=88;grouped.forEach((r,i)=>{const w=r.value/grossTotal*904;c.fillStyle=palette.chartColors[i];c.fillRect(x,773,w,15);x+=w;});c.restore();
-        grouped.forEach((r,i)=>{const x=88+i*306;c.fillStyle=palette.chartColors[i];c.fillRect(x,812,8,22);text(safe(r.name),x+18,811,23,p['text-secondary'],266,500);text(pct(r.value/grossTotal*100),x+18,849,23,p['text'],266,600);});
-      }else{text('记录收入后，这里展示各任务的收益贡献。',88,798,24,p['text-muted'],904);}
-      text('任务效率',64,927,29,p['text'],500,600);text(metricName+' TOP 3',1016,933,22,p['text-muted'],420,500,'right');
-      const ranks=s.tasks.filter(r=>r.hasData&&r[metric]!==null&&(metric!=='hourly'||r.minutes>0)).sort((a,b)=>b[metric]-a[metric]).slice(0,3),max=Math.max(1,...ranks.map(r=>Math.abs(r[metric])));
-      ranks.forEach((r,i)=>{const y=981+i*80,color=r[metric]<0?p['danger']:p['cyan'],value=amounts(r[metric],metric==='hourly'?r.hourlyGold:metric==='net'?r.netGold:r.gold);panel(64,y,34,30,i===0?p['primary-soft']:p['surface-2'],p['border'],7);text(String(i+1).padStart(2,'0'),81,y+5,20,i===0?p['primary-label']:p['text-muted'],30,500,'center');text(safe(r.task.name),114,y,27,p['text'],544,500);text(value.main+(metric==='hourly'?' /h':''),1016,y,27,color,340,600,'right');text('操作 '+num(r.minutes,1)+' 分钟',114,y+36,21,p['text-muted'],400);text(ui.currency==='both'?value.secondary+(metric==='hourly'?' /h':''):metricName,1016,y+36,21,p['text-muted'],460,400,'right');c.fillStyle=p['track'];c.fillRect(114,y+66,902,4);c.fillStyle=color;c.fillRect(114,y+66,Math.abs(r[metric])/max*902,4);});
-      if(!ranks.length){text('暂无可比较任务',64,1001,28,p['text-secondary'],952,500);text('选择其他口径或补充任务收入与操作时间。',64,1048,24,p['text-muted'],952);}
-      line(64,1240,952);
-      text(ui.mode==='actual'?'历史实测 · 各次记录沿用当时币价快照':'未来估值 · 币价 '+money(state.config.goldPrice)+' / '+num(state.config.goldUnit)+' G',64,1264,22,p['text-secondary'],952);
-      text(privateMode?'匿名战报 · 账号、角色及服务器名称已隐藏':'参与角色：'+roles.map(r=>r.name).join('、'),64,1301,22,p['text-muted'],952);
-      text('金币估值不等于兑现现金；点卡按账号在线用量折算。',64,1338,21,p['text-muted'],952);
-      text(state.dataKind==='simulated'?'示例 / 模拟数据 · 不代表真实已实现收益':'手工 / 文件导入 · 仅供个人复盘',64,1390,20,p['text-muted'],820);text('JX3',1016,1384,24,p['primary-label'],120,600,'right');
+    // A report is a frozen view: changing another tab cannot mix dates or prices between images.
+    const source=structuredClone(state),range={start:ui.start,end:ui.end,mode:ui.mode,currency:ui.currency},selection={...scope()},roles=activeRoles().map(r=>({...r})),s=M.summary(source,range.start,range.end,selection,range.mode),complete=M.completion(source,range.start,range.end,selection);
+    const kinds=[['summary','收益总览'],['distribution','任务收益分布'],['ranking','任务效率排行'],['trend','收益与投入趋势'],['progress','执行进度']],theme=document.documentElement.dataset.theme;
+    const sourceValue=r=>range.currency==='gold'?r.gold:r.gross,sources=s.tasks.filter(r=>r.hasData&&sourceValue(r)>0).sort((a,b)=>sourceValue(b)-sourceValue(a)),sourceTotal=sources.reduce((n,r)=>n+sourceValue(r),0),blocks=revenueMapBlocks(sources,sourceValue);
+    const days=M.dates(range.start,range.end),groups=days.length>14?Array.from({length:Math.ceil(days.length/7)},(_,i)=>days.slice(i*7,i*7+7)):days.map(d=>[d]);
+    const trend=groups.map(ds=>({start:ds[0],end:ds.at(-1),actual:M.summary(source,ds[0],ds.at(-1),selection,'actual'),estimate:M.summary(source,ds[0],ds.at(-1),selection,'estimated')}));
+    const roleIds=new Set(roles.map(r=>r.id)),plans=source.plans.filter(p=>!p.cancelled&&planInRange(p,range.start,range.end)),pending=plans.flatMap(p=>(p.routeTaskIds||[p.taskId]).flatMap(id=>M.pendingBatchIndices(source,p,id).filter(i=>p.batches[i].some(r=>roleIds.has(r))))).length;
+    const facts=M.completionRecords(source).filter(r=>r.date>=range.start&&r.date<=range.end&&M.selectedRecordRoles(source,r,selection).length).length,forecast=M.summary(source,range.start,range.end,selection,'estimated');
+    const chunks=(rows,n)=>Array.from({length:Math.max(1,Math.ceil(rows.length/n))},(_,i)=>rows.slice(i*n,(i+1)*n));
+    let pages=[],active=0,busy=false,cancelled=false;
+    modal('分享战报 · 多图导出',`<div class="report-settings"><fieldset><legend>选择分享内容</legend><div class="report-kind-options">${kinds.map(([v,l])=>`<label><input type="checkbox" name="report-kind" value="${v}" checked> ${l}</label>`).join('')}</div></fieldset><div class="report-controls"><label>战报样式<select id="report-style"><option value="cloud-blue">清爽浅色</option><option value="deep-ocean">石墨深色</option><option value="current">当前工作台主题</option></select></label><label>排行指标<select id="share-ranking"><option value="hourly">净时薪</option><option value="net">经济净收益</option><option value="gross">毛收益</option></select></label><label>趋势指标<select id="report-trend"><option value="net">经济净收益</option><option value="minutes">操作时间</option></select></label></div><label class="share-privacy"><input type="checkbox" id="share-private" checked> 隐藏账号、角色、分组与服务器</label><p class="share-hint">${range.start} — ${range.end} · ${range.mode==='actual'?'历史实测':'已确认排程预测'} · 1080 × 1440 PNG。分布与排行较多时自动分页，默认匿名；每张图均保留期间与统计说明。</p></div><div class="report-layout"><nav class="report-pages" aria-label="战报图片列表"></nav><div class="report-stage"><div class="report-preview-heading"><strong id="report-page-title"></strong><span id="report-page-count"></span></div><canvas id="share-canvas" width="1080" height="1440" class="share-preview" role="img" aria-label="当前战报图片预览"></canvas><p id="report-status" class="share-hint" role="status" aria-live="polite"></p></div></div>`,null);
+    $('#dialog').classList.add('report-dialog');
+    const form=$('#modal-form'),canvas=$('#share-canvas'),list=form.querySelector('.report-pages'),status=$('#report-status'),footer=form.querySelector('.dialog-foot');
+    footer.insertAdjacentHTML('afterbegin','<button type="button" id="report-current-download" aria-label="下载当前图片">下载本张</button><button type="button" id="report-all-download" class="primary">打包下载全部图片</button>');
+    const currentButton=$('#report-current-download'),allButton=$('#report-all-download');
+    const identityMap=new Map();source.accounts.forEach((a,i)=>{if(a.name)identityMap.set(a.name,'账号 '+String(i+1).padStart(2,'0'));if(a.group)identityMap.set(a.group,'分组已隐藏');});source.roles.forEach((r,i)=>{if(r.name)identityMap.set(r.name,'角色 '+String(i+1).padStart(2,'0'));if(r.server)identityMap.set(r.server,'区服已隐藏');});
+    const identities=[...identityMap].sort((a,b)=>b[0].length-a[0].length),scopeName=[selection.group,source.accounts.find(a=>a.id===selection.account)?.name,source.roles.find(r=>r.id===selection.role)?.name].filter(Boolean).join(' / ')||'全部账号与角色';
+    function options(){return {style:$('#report-style').value,private:ui.privacy||$('#share-private').checked,ranking:$('#share-ranking').value,trend:$('#report-trend').value};}
+    function safe(value,o){return o.private?identities.reduce((v,[name,label])=>v.split(name).join(label),String(value)):String(value);}
+    function value(yuan,gold){
+      if(yuan==null&&gold==null)return {main:'—',secondary:'暂无适用数据'};
+      const known=gold!=null,coins=known?gold:source.config.goldPrice>0&&yuan!=null?yuan*source.config.goldUnit/source.config.goldPrice:null;
+      return range.currency==='rmb'?{main:money(yuan),secondary:'人民币估值'}:range.currency==='gold'?{main:coins==null?'不可换算':num(coins,2)+' 金',secondary:known?'金币口径':'按现价折合'}:{main:coins==null?'不可换算':num(coins,2)+' 金',secondary:money(yuan)+(known?'':' · 按现价折合')};
     }
-    function canvasBlob(){const data=atob($('#share-canvas').toDataURL('image/png').split(',')[1]);return new Blob([Uint8Array.from(data,c=>c.charCodeAt(0))],{type:'image/png'});}
-    $('#share-private').addEventListener('change',draw);$('#share-ranking').addEventListener('change',draw);draw();
+    function buildPages(o){
+      const enabled=new Set([...form.querySelectorAll('[name="report-kind"]:checked')].map(x=>x.value)),rank=s.tasks.filter(r=>r.hasData&&Number.isFinite(r[o.ranking])&&(o.ranking!=='hourly'||r.minutes>0)).sort((a,b)=>b[o.ranking]-a[o.ranking]),result=[];
+      for(const [kind,title]of kinds){if(!enabled.has(kind))continue;const sets=kind==='distribution'?chunks(sources,8):kind==='ranking'?chunks(rank,6):kind==='trend'?chunks(trend,10):[[]];sets.forEach((rows,i)=>result.push({kind,title,rows,part:i+1,parts:sets.length,key:kind+'-'+i}));}return result;
+    }
+    function paint(target,page,o,index){
+      const c=target.getContext('2d'),palette=Theme.palette(o.style==='current'?theme:o.style),p=palette.tokens,colors=palette.chartColors,font='-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',W=1080,H=1440;
+      c.setTransform(target.width/W,0,0,target.height/H,0,0);c.clearRect(0,0,W,H);c.fillStyle=p.bg;c.fillRect(0,0,W,H);
+      function text(v,x,y,size=24,color=p.text,width=952,weight=400,align='left',minimum=18){
+        let str=String(v),n=size;c.save();c.textBaseline='top';c.textAlign=align;const set=()=>c.font=`${weight} ${n}px ${font}`;set();while(c.measureText(str).width>width&&n>minimum){n--;set();}if(c.measureText(str).width>width){while(str.length&&c.measureText(str+'…').width>width)str=str.slice(0,-1);str+='…';}c.fillStyle=color;c.fillText(str,x,y);c.restore();
+      }
+      function panel(x,y,w,h,fill=p.surface,r=22){c.save();c.beginPath();c.roundRect(x,y,w,h,r);c.fillStyle=fill;c.fill();c.strokeStyle=p.border;c.lineWidth=1;c.stroke();c.restore();}
+      function line(x,y,w){c.fillStyle=p.border;c.fillRect(x,y,w,1);}
+      function amount(v,x,y,width=420,size=48,color=p.text){text(v.main,x,y,size,color,width,650);text(v.secondary,x,y+size+12,23,p['text-secondary'],width,450);}
+      function card(x,y,w,h,label,main,sub='',color=p.text){panel(x,y,w,h);text(label,x+24,y+23,23,p['text-secondary'],w-48,500);text(main,x+24,y+67,40,color,w-48,650);if(sub)text(sub,x+24,y+h-40,20,p['text-muted'],w-48);}
+      function emptyChart(title,note){panel(64,340,952,800);text(title,540,620,40,p['text-secondary'],820,600,'center');text(note,540,694,25,p['text-muted'],820,400,'center');}
+      text('JX3  /  WORKBENCH REPORT',64,52,22,p['text-muted'],640,550);
+      panel(770,44,246,42,p['surface-2'],10);text(range.mode==='actual'?'历史实测':'确认排程预测',893,56,20,p.primary,220,600,'center');
+      text(page.title,64,112,54,p.text,952,700);text(range.start+' — '+range.end,64,188,26,p['text-secondary'],650,450);
+      text(o.private?`身份已隐藏 · ${new Set(roles.map(r=>r.accountId)).size} 个账号 / ${roles.length} 个角色`:scopeName,64,232,21,p['text-muted'],952);line(64,274,952);
+      if(page.kind==='summary'){
+        panel(64,304,952,276,p['surface-2']);text('本期经济净收益',96,336,28,p['text-secondary'],888,500);amount(s.hasData?value(s.net,s.netGold):{main:'暂无数据',secondary:'选择其他口径或补充实测'},96,396,864,82,s.net<0?p.danger:p.cyan);
+        card(64,608,306,172,'毛收益',s.hasData?value(s.gross,s.gold).main:'—',s.hasData?value(s.gross,s.gold).secondary:'暂无数据',p.purple);card(387,608,306,172,'综合成本',s.hasData?money(s.cost):'—','手续费 · 点卡 · 经营成本');card(710,608,306,172,'净时薪',s.hasData&&s.hourly!==null?value(s.hourly,s.hourlyGold).main:'不适用','每操作小时的经济净收益',p.cyan);
+        card(64,808,466,166,'操作时间',s.hasData?num(s.minutes/60,1)+' 小时':'—',s.hasData?'账号累计在线 '+num(s.onlineMinutes/60,1)+' 小时':'暂无操作记录');card(550,808,466,166,'目标完成率',complete.rate==null?'无适用目标':pct(complete.rate),complete.done+' / '+complete.total+' 角色次');
+        panel(64,1010,952,216);text('毛收益 − 综合成本 = 经济净收益',96,1042,30,p.text,888,600);text('金币收入按所选口径估值；经济收益不等于已兑现现金。',96,1100,23,p['text-secondary'],888);text(range.mode==='actual'?'历史金额沿用记录时的价格与成本快照。':'预测来自已确认排程，不包含未确认的模板试算。',96,1144,23,p['text-secondary'],888);text('操作时间与账号累计在线时间分别核算。',96,1184,22,p['text-muted'],888);
+      }
+      if(page.kind==='distribution'){
+        if(!sources.length)emptyChart('当前没有正毛收益','正毛收益为零、亏损与缺失数据均不绘制虚构面积。');else{
+          text(sources.length+' 项收益来源',64,312,31,p.text,450,600);text('前三项贡献 '+pct(sources.slice(0,3).reduce((n,r)=>n+sourceValue(r),0)/sourceTotal*100),1016,318,26,p['text-secondary'],490,500,'right');
+          const X=64,Y=390,MW=952,MH=510;panel(X,Y,MW,MH,p['surface-2'],14);
+          blocks.forEach(({row:r,x,y,w,h},i)=>{
+            const bx=X+x/100*MW,by=Y+y/100*MH,bw=w/100*MW,bh=h/100*MH,pad=5,share=pct(sourceValue(r)/sourceTotal*100),color=colors[i%colors.length];c.save();c.beginPath();c.rect(bx+1,by+1,Math.max(0,bw-2),Math.max(0,bh-2));c.clip();c.globalAlpha=.19;c.fillStyle=color;c.fillRect(bx,by,bw,bh);c.globalAlpha=1;
+            // Fit the percentage first. Name and amount use only the remaining space.
+            c.font=`650 30px ${font}`;const natural=c.measureText(share).width,rotate=bw<38&&bh>bw*2,n=Math.max(1,Math.min(30,30*(rotate?bh-2*pad:bw-2*pad)/Math.max(1,natural),rotate?bw-4:bh-4));
+            function percentage(x,y,limit,align='left'){c.save();c.translate(x,y);c.font=`650 ${n}px ${font}`;c.textBaseline='top';c.textAlign=align;c.fillStyle=p.text;const scale=Math.min(1,limit/Math.max(1,c.measureText(share).width));c.scale(scale,Math.min(1,Math.max(.1,bh-2)/n));c.fillText(share,0,0);c.restore();}if(rotate){c.translate(bx+bw/2,by+bh/2);c.rotate(-Math.PI/2);percentage(0,-n/2,Math.max(.1,bh-4),'center');}else{const nameSpace=bw>=85&&bh>=n+40;let sy=by+Math.max(1,(bh-n)/2);if(nameSpace){text(safe(r.task.name,o),bx+pad,by+10,22,p['text-secondary'],bw-2*pad,500,'left',12);sy=by+40;}percentage(bx+Math.min(5,bw*.1),sy,Math.max(.1,bw-Math.min(10,bw*.2)));if(nameSpace&&bh>n+86&&bw>160)text(value(r.gross,r.gold).main,bx+pad,sy+n+12,20,p['text-secondary'],bw-2*pad,400,'left',12);}
+            c.restore();c.strokeStyle=p.bg;c.lineWidth=3;c.strokeRect(bx,by,bw,bh);
+          });
+          text('任务明细'+(page.parts>1?' · '+page.part+' / '+page.parts:''),64,936,25,p.text,952,600);
+          page.rows.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),x=64+col*486,y=984+row*64,idx=sources.indexOf(r);c.fillStyle=colors[idx%colors.length];c.fillRect(x,y+5,8,22);text(safe(r.task.name,o),x+20,y,23,p.text,340,500);text(pct(sourceValue(r)/sourceTotal*100),x+460,y,25,p.text,98,650,'right');text(value(r.gross,r.gold).main,x+20,y+30,19,p['text-muted'],430);});
+        }
+      }
+      if(page.kind==='ranking'){
+        const label={hourly:'净时薪',net:'经济净收益',gross:'毛收益'}[o.ranking];text('按'+label+'排序'+(page.parts>1?' · 第 '+page.part+' / '+page.parts+' 页':''),64,312,29,p.text,952,550);
+        if(!page.rows.length)emptyChart('当前没有可比较任务','净时薪需要大于零的操作时间；可更换排行指标。');else{
+          const max=Math.max(1,...page.rows.map(r=>r[o.ranking])),min=Math.min(0,...page.rows.map(r=>r[o.ranking])),span=max-min||1,zero=-min/span*888;
+          page.rows.forEach((r,i)=>{const y=392+i*140,n=(page.part-1)*6+i+1,v=value(r[o.ranking],o.ranking==='hourly'?r.hourlyGold:o.ranking==='net'?r.netGold:r.gold),color=r[o.ranking]<0?p.danger:p.cyan;panel(64,y,952,122);text(String(n).padStart(2,'0'),88,y+24,24,p['text-muted'],60,600);text(safe(r.task.name,o),148,y+22,27,p.text,510,550);text(v.main+(o.ranking==='hourly'?' /h':''),992,y+23,29,color,320,650,'right');text('净收益 '+value(r.net,r.netGold).main+' · 操作 '+num(r.minutes,1)+' 分钟',148,y+68,21,p['text-secondary'],610);text(range.currency==='both'?v.secondary:'',992,y+69,21,p['text-muted'],240,450,'right');c.fillStyle=p.track;c.fillRect(96,y+106,888,4);c.fillStyle=color;c.fillRect(96+Math.min(zero,(r[o.ranking]-min)/span*888),y+106,Math.max(2,Math.abs(r[o.ranking])/span*888),4);});
+        }
+      }
+      if(page.kind==='trend'){
+        const minutes=o.trend==='minutes',rows=page.rows,metric=r=>minutes?r.minutes/60:range.currency==='gold'?(Number.isFinite(r.netGold)?r.netGold:source.config.goldPrice>0?r.net*source.config.goldUnit/source.config.goldPrice:null):r.net,actualRows=rows.filter(r=>r.actual.hasData),estimated=rows.reduce((n,r)=>n+(metric(r.estimate)||0),0),actual=actualRows.reduce((n,r)=>n+(metric(r.actual)||0),0),format=v=>minutes?num(v,2)+' 小时':range.currency==='gold'?num(v,2)+' 金':money(v);
+        card(64,304,466,136,'本图范围 · 确认排程预测',format(estimated),'',p.purple);card(550,304,466,136,'本图范围 · 已录实测',actualRows.length?format(actual):'暂无实测','',p.cyan);
+        text('确认排程预测',98,474,21,p.purple,340,550);text('历史实测',390,474,21,p.cyan,300,550);text(minutes?'操作小时':range.currency==='gold'?'金（历史价折算）':'人民币估值 / 元',1016,474,21,p['text-muted'],400,450,'right');
+        const X=130,Y=538,CW=856,CH=520,vals=rows.flatMap(r=>[metric(r.estimate),r.actual.hasData?metric(r.actual):null]).filter(Number.isFinite),lo=Math.min(0,...vals),hi=Math.max(1,...vals),pad=(hi-lo)*.1,low=lo<0?lo-pad:0,high=hi+pad,py=v=>Y+CH-(v-low)/(high-low)*CH,zero=py(0),slot=CW/Math.max(1,rows.length),bw=Math.min(26,slot*.27);
+        for(let i=0;i<5;i++){const v=low+(high-low)*i/4,y=py(v);line(X,y,CW);text(num(v,Math.abs(high)<10?1:0),X-18,y-10,20,p['text-muted'],78,450,'right');}line(X,zero,CW);
+        rows.forEach((r,i)=>{const x=X+slot*(i+.5);for(const [type,dx,color]of [['estimate',-bw-3,p.purple],['actual',3,p.cyan]]){const v=metric(r[type]);if(type==='actual'&&!r.actual.hasData){text('—',x+dx+bw/2,zero-28,20,p['text-muted'],bw+10,400,'center');continue;}if(!Number.isFinite(v))continue;c.fillStyle=color;c.globalAlpha=type==='estimate'?.55:1;c.fillRect(x+dx,Math.min(zero,py(v)),bw,Math.max(2,Math.abs(py(v)-zero)));c.globalAlpha=1;}text(r.start.slice(5),x,Y+CH+20,20,p['text-secondary'],slot-4,450,'center',14);});
+        panel(64,1140,952,112);text(rows.length?rows[0].start+' — '+rows.at(-1).end:'当前期间',88,1162,25,p.text,904,550);text(`实测覆盖 ${actualRows.length} / ${rows.length} 个${days.length>14?'周区间':'日期'}；— 为缺少实测，零值表示已记录为零。`,88,1206,22,p['text-secondary'],904);
+      }
+      if(page.kind==='progress'){
+        panel(64,304,952,242,p['surface-2']);text('角色目标完成率',96,338,28,p['text-secondary'],888,550);text(complete.rate==null?'无适用目标':pct(complete.rate),96,392,80,p.cyan,630,700);text(complete.done+' / '+complete.total+' 角色次',984,436,25,p['text-secondary'],360,500,'right');c.fillStyle=p.track;c.fillRect(96,504,888,12);c.fillStyle=p.cyan;c.fillRect(96,504,888*Math.max(0,Math.min(100,complete.rate||0))/100,12);
+        card(64,578,466,200,'本期待执行',pending+' 批','按任务 / 副本分别计数');card(550,578,466,200,'尚未安排目标',num(forecast.unassignedTargets||0)+' 角色次','与已确认排程分开统计');card(64,802,466,200,'待补实测',facts+' 条','已登记完成，金额或耗时待补');card(550,802,466,200,'当前参与范围',roles.length+' 个角色',new Set(roles.map(r=>r.accountId)).size+' 个账号');panel(64,1040,952,172);text('完成标记不等于已记录收入',96,1072,29,p.text,888,600);text('完成率按期间内角色任务周期目标统计。',96,1126,24,p['text-secondary'],888);text('仅完成登记的批次，在补录实测前不会作为零收益样本。',96,1168,22,p['text-muted'],888);
+      }
+      line(64,1292,952);const notes={summary:'经济收益为估值，不等于已兑现现金。',distribution:'面积仅表示正毛收益占比；成本与亏损独立核算。',ranking:'同一统计范围与口径；零耗时时薪保留为不适用。',trend:'实测沿用历史快照；未录入实测不代表没有收益。',progress:'按当前范围统计；共享批次仅计一次，不自动分摊收益。'};
+      text(notes[page.kind],64,1320,22,p['text-secondary'],952);text(source.dataKind==='simulated'?'示例 / 模拟数据':'手工 / 文件导入 · 个人复盘',64,1376,20,p['text-muted'],800);text(String(index+1).padStart(2,'0')+' / '+String(pages.length).padStart(2,'0'),1016,1376,22,p['text-muted'],150,550,'right');
+    }
+    function select(index){active=Math.max(0,Math.min(pages.length-1,index));if(!pages.length)return;const o=options(),page=pages[active];paint(canvas,page,o,active);$('#report-page-title').textContent=page.title+(page.parts>1?' · '+page.part+'/'+page.parts:'');$('#report-page-count').textContent=(active+1)+' / '+pages.length;canvas.setAttribute('aria-label',page.title+'战报图片预览，第 '+(active+1)+' 张');list.querySelectorAll('button').forEach((b,i)=>b.setAttribute('aria-pressed',String(i===active)));}
+    function redraw(){
+      const key=pages[active]?.key,o=options();pages=buildPages(o);active=Math.max(0,pages.findIndex(x=>x.key===key));list.innerHTML=pages.map((page,i)=>`<button type="button" class="report-page" data-report-page="${i}" aria-label="预览第 ${i+1} 张 ${page.title}" aria-pressed="${i===active}"><canvas width="162" height="216" aria-hidden="true"></canvas><span>${i+1}. ${page.title}${page.parts>1?' '+page.part+'/'+page.parts:''}</span></button>`).join('');list.querySelectorAll('canvas').forEach((target,i)=>paint(target,pages[i],o,i));currentButton.disabled=allButton.disabled=!pages.length;allButton.textContent='打包下载 '+pages.length+' 张图片';canvas.hidden=!pages.length;status.textContent=pages.length?'可逐张预览和下载，也可一次下载包含全部 PNG 的 ZIP。'+(ui.privacy?'全局隐私遮罩已开启，导出仍隐藏身份。':''):'至少选择一种分享内容。';if(pages.length)select(active);else{$('#report-page-title').textContent='尚未选择内容';$('#report-page-count').textContent='0 张';}
+    }
+    const png=target=>new Promise((resolve,reject)=>target.toBlob(b=>b?resolve(b):reject(new Error('图片生成失败，请重试')),'image/png'));
+    const filename=(page,i)=>'JX3_战报_'+range.start+'_'+range.end+'_'+String(i+1).padStart(2,'0')+'_'+page.title+(page.parts>1?'_'+page.part:'')+'.png';
+    async function save(all){
+      if(busy||!pages.length)return;busy=true;const targets=all?pages.map((page,i)=>({page,i})):[{page:pages[active],i:active}],o=options(),controls=[...form.querySelectorAll('input,select,button')].filter(el=>el.dataset.action!=='close');controls.forEach(el=>el.disabled=true);
+      try{if(all&&typeof JSZip==='undefined')throw new Error('打包组件未加载，请逐张下载图片');const zip=all?new JSZip():null,work=document.createElement('canvas');work.width=1080;work.height=1440;
+        for(let n=0;n<targets.length;n++){if(cancelled)return;const {page,i}=targets[n];status.textContent='正在生成 '+(n+1)+' / '+targets.length+' 张图片…';await new Promise(resolve=>requestAnimationFrame(resolve));paint(work,page,o,i);const blob=await png(work);if(cancelled)return;if(zip)zip.file(filename(page,i),blob);else download(filename(page,i),blob);}
+        if(zip){status.textContent='正在打包 PNG 图片…';const blob=await zip.generateAsync({type:'blob',compression:'STORE'});if(!cancelled)download('JX3_多图战报_'+range.start+'_'+range.end+'.zip',blob);}work.width=work.height=0;if(!cancelled)status.textContent=all?'已导出 '+targets.length+' 张 PNG 图片。':'当前图片已下载。';
+      }catch(e){if(!cancelled)status.textContent='导出失败：'+e.message;}finally{busy=false;controls.forEach(el=>el.disabled=false);}
+    }
+    form.querySelector('.report-settings').addEventListener('change',redraw);list.addEventListener('click',e=>{const b=e.target.closest('[data-report-page]');if(b&&!busy)select(Number(b.dataset.reportPage));});currentButton.addEventListener('click',()=>save(false));allButton.addEventListener('click',()=>save(true));$('#dialog').addEventListener('close',()=>{cancelled=true;},{once:true});redraw();
   }
   function parseCSV(text){
     const operational=Importer.operationsCSV(text,state);if(operational)return operational;
