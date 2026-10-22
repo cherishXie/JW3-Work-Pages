@@ -661,3 +661,34 @@ html[data-theme] .revenue-map-tile[data-share-vertical="true"] .revenue-map-shar
 #dialog.report-dialog{width:min(1040px,calc(100vw - 24px))}.report-dialog .dialog-body{padding:20px;max-height:calc(90vh - 156px)}.report-dialog .dialog-head{padding:16px 20px}.report-dialog .dialog-foot{flex-wrap:wrap;padding:12px 20px}.report-settings{display:grid;gap:14px;margin-bottom:18px}.report-settings fieldset{border:1px solid var(--wb-border);border-radius:10px;padding:12px 14px;min-width:0}.report-settings legend{padding:0 6px;font-size:12px;color:var(--wb-text-secondary)}.report-kind-options{display:flex;gap:12px 20px;flex-wrap:wrap}.report-kind-options label,.report-controls>label,.report-settings>.share-privacy{font-size:12px;display:flex;align-items:center;gap:7px}.report-controls{display:flex;gap:12px;flex-wrap:wrap}.report-controls>label{flex:1;min-width:180px}.report-controls select{flex:1;min-width:0}.report-layout{display:grid;grid-template-columns:180px minmax(0,1fr);gap:22px;align-items:start}.report-pages{display:grid;gap:12px;max-height:590px;overflow:auto;padding:2px 8px 8px 2px;scrollbar-width:thin}.report-page{display:grid;gap:7px;min-width:0;padding:7px;border-radius:10px;text-align:left;white-space:normal;background:var(--wb-surface-2)}.report-page canvas{display:block;width:100%;height:auto;aspect-ratio:3/4;border:1px solid var(--wb-border);border-radius:6px}.report-page span{font-size:11px;line-height:1.6}.report-page[aria-pressed="true"]{border-color:var(--wb-primary);box-shadow:0 0 0 1px var(--wb-primary);color:var(--wb-primary)}.report-stage{min-width:0;border:1px solid var(--wb-border);padding:16px;border-radius:12px;background:var(--wb-surface-2)}.report-preview-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px}.report-preview-heading>span{color:var(--wb-text-muted)}.report-stage .share-preview{width:min(420px,100%);margin:14px auto;box-shadow:0 8px 24px var(--wb-shadow)}.report-stage .share-preview[hidden]{display:none}.report-stage .share-hint{margin-top:10px;min-height:21px}.report-dialog button:disabled{cursor:default;opacity:.55}
 @media(max-width:767px){.report-dialog .dialog-body{padding:12px}.report-dialog .dialog-head{padding:12px}.report-dialog .dialog-head h2{font-size:17px}.report-layout{grid-template-columns:minmax(0,1fr);gap:12px}.report-pages{display:flex;overflow-x:auto;max-height:none;gap:10px;padding:3px 3px 10px}.report-page{flex:0 0 100px}.report-page span{font-size:10px}.report-kind-options{gap:10px 14px}.report-controls>label{min-width:100%;justify-content:space-between}.report-controls select{flex:0 1 70%}.report-stage{padding:10px}.report-dialog .dialog-foot{padding:10px;gap:6px}.report-dialog .dialog-foot button{flex:1;white-space:normal;min-height:40px;font-size:12px}.report-dialog .dialog-foot .primary{flex:2}.report-settings .share-hint{font-size:11px}}
 .revenue-map-line span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.revenue-map-line b{white-space:nowrap;flex-shrink:0}
+
+/* A single execution card holds batch selection, roster and recording actions. */
+.flow-inspector .tc-v2-focus>.flow-batch-nav{margin:0 0 16px;padding-bottom:10px;border-bottom:1px solid var(--wb-border)}
+.flow-workspace .flow-batch{flex-basis:170px;min-height:66px;padding:8px 10px;gap:8px}
+.flow-workspace .flow-batch-dot{width:26px;height:26px;flex:0 0 26px}
+.flow-workspace .flow-batch small{font-size:11px}
+.flow-workspace .flow-task{min-height:94px;padding:12px;gap:6px}
+.flow-workspace .flow-task-title{min-height:0}
+.flow-workspace .flow-task-nav.is-single .flow-task{min-height:64px}
+.flow-inspector .flow-management{margin-top:12px}
+.tc-completion-roster{width:100%;margin:10px 0 0;padding:12px;border:1px solid var(--wb-border);border-radius:10px;background:var(--wb-surface-2);min-width:0}
+.tc-completion-roster .tc-v2-member-head{margin-bottom:10px}
+.tc-completion-roster .tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tc-completion-roster .tc-v2-person{padding:10px;min-width:0;gap:4px;background:var(--wb-surface)}
+.tc-completion-roster .tc-v2-person small{font-size:11px;line-height:1.6;white-space:normal}
+.tc-person-progress{color:var(--wb-text-secondary)}
+@media(max-width:600px){.flow-workspace .flow-batch{flex-basis:155px}.tc-completion-roster{padding:10px}.tc-completion-roster .tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tc-completion-roster .tc-v2-person{padding:8px}.tc-completion-roster .tc-v2-member-head{flex-wrap:wrap;gap:4px}}
+#dialog:has(.tc-completion-roster){width:min(900px,calc(100vw - 24px))}
+.tc-completion-roster .tc-v2-person-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tc-completion-roster .combat-tag{display:none}
+@media(max-width:600px){.tc-completion-roster .tc-v2-person-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}.tc-completion-roster .tc-v2-person{flex:0 0 145px;scroll-snap-align:start}.tc-completion-roster .tc-v2-member-head>span::after{content:' · 左右滑动查看'}}
+@media(min-width:900px){
+#dialog:has(.tc-completion-roster){width:min(1040px,calc(100vw - 40px))}
+#dialog:has(.tc-completion-roster) .dialog-body{display:grid;grid-template-columns:310px minmax(0,1fr);column-gap:24px;align-items:start}
+#dialog:has(.tc-completion-roster) .tc-quick-context{grid-column:1;grid-row:1/span 3;align-content:start;border-bottom:0}
+#dialog:has(.tc-completion-roster) .tc-quick-context>span{width:100%}
+#dialog:has(.tc-completion-roster) .tc-quick-note{grid-column:2;margin-top:0}
+#dialog:has(.tc-completion-roster) .tc-quick-fields,#dialog:has(.tc-completion-roster) .tc-quick-options{grid-column:2}
+#dialog:has(.tc-completion-roster) .tc-quick-fields .field:nth-child(3){grid-column:auto}
+#dialog:has(.tc-completion-roster) .tc-completion-roster .tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
