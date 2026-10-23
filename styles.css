@@ -737,3 +737,12 @@ button,input,select,textarea{transition:background-color var(--wb-motion-fast) e
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 
 .task-content{min-width:0}
+
+/* Data blocks use solid Radix fills, separate from quiet UI surfaces. */
+.revenue-map-tile,.revenue-map-tile strong,.revenue-map-tile .revenue-map-name,.revenue-map-tile small{color:var(--tile-text)}
+.revenue-map-tile{background:var(--tile-bg);border-color:var(--wb-bg)}
+.revenue-map-tile:hover,.revenue-map-tile:focus-visible{background:var(--tile-bg);outline-color:var(--tile-text)}
+
+.account-placeholder{min-height:220px;padding:20px;display:grid;align-content:start;gap:18px}.account-placeholder i{display:block;height:14px;background:var(--wb-surface-2);border-radius:4px}.account-placeholder i:first-child{width:45%}.account-placeholder i:last-child{width:70%}
+
+.trend-placeholder{height:340px;margin:12px 16px;background:var(--wb-surface-2);border-radius:4px}

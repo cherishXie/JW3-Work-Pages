@@ -40,9 +40,12 @@ SOFTWARE.
     const p={bg:n[0],sidebar:n[1],surface:n[1],'surface-2':n[2],hover:n[3],border:n[5],text:n[11],'text-secondary':n[10],'text-muted':n[10],primary:theme.mode==='light'&&['jade','bronze'].includes(theme.accent)?a[10]:a[8],cyan:at('teal',11),purple:at('violet',11),success:at('green',11),warning:at('amber',11),danger:at('red',11),'primary-text':'#ffffff',
       'input-bg':n[2],'control-border':n[6],'primary-soft':a[2],'primary-hover':theme.mode==='dark'?a[8]:['jade','bronze'].includes(theme.accent)?a[10]:a[9],'primary-label':theme.mode==='light'?a[11]:a[10],
       'notice-bg':a[2],'notice-border':a[5],'success-bg':at('green',3),'success-border':at('green',6),'forecast-bg':at('violet',3),'forecast-border':at('violet',6),'warning-bg':at('amber',3),'warning-border':at('amber',6),
-      'chart-bg-0':at('indigo',3),'chart-bg-1':at('teal',3),'chart-bg-2':at('violet',3),'chart-bg-3':at('bronze',3),'chart-bg-4':n[2],'chart-bg-5':at('cyan',3),track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
+      'chart-bg-0':at('indigo',9),'chart-bg-1':at('teal',9),'chart-bg-2':at('violet',9),'chart-bg-3':at('bronze',9),'chart-bg-4':n[8],'chart-bg-5':at('cyan',9),track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
+    // Radix whiteA12 / blackA12; choose the readable ink for each solid tile.
+    const luminance=hex=>{const c=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
+    for(let i=0;i<6;i++){const l=luminance(p['chart-bg-'+i]);p['chart-text-'+i]=1.05/(l+.05)>=(l+.05)/.05?'#ffffff':'#000000';}
     return {theme,tokens:p,chartColors:[p['chart-primary'],p['chart-cyan'],p['chart-purple'],at('bronze',9),n[8],at('cyan',9)]};
   }
   function preference(){try{const id=localStorage.getItem(KEY);return themes.some(t=>t.id===id)?id:'deep-ocean';}catch{return 'deep-ocean';}}
