@@ -293,7 +293,7 @@
  function isPendingPlan(s,p){return !p.cancelled&&(p.routeTaskIds||[p.taskId]).some(id=>remaining(s,p,id).length);}
  function queueCompare(s,a,b,referenceDate=M.dateKey()){
   const ap=isPendingPlan(s,a),bp=isPendingPlan(s,b);if(ap!==bp)return ap?-1:1;
-  if(!ap)return completedTime(s,b)-completedTime(s,a);
+  if(!ap)return (Date.parse(b.createdAt)||0)-(Date.parse(a.createdAt)||0)||s.plans.indexOf(b)-s.plans.indexOf(a);
   // Today and upcoming dates first; earlier dates follow in calendar order.
   const pastA=a.date<referenceDate,pastB=b.date<referenceDate;if(pastA!==pastB)return pastA?1:-1;
   const dateOrder=(a.date||'').localeCompare(b.date||'');if(dateOrder)return dateOrder;
