@@ -15,7 +15,7 @@
     }
     return prev[b.length];
   }
-  function suggestRoles(roles,name,school=''){
+  function suggestRoles(roles,name,school='',resources={}){
     const key=base(name),full=clean(name),schoolKey=canonicalSchool(school),all=roles||[];
     if(!key)return {roleId:'',exact:false,auto:false,suggestions:[]};
     const ocrServer=full.includes('@')?full.split('@').slice(1).join('@'):'';
@@ -30,26 +30,38 @@
       const threshold=key.length>=6?2:key.length>=2?1:0;
       const score=distance+(suffixStatus==='conflict'?2:suffixStatus==='ocr-typo'?.2:0)
         +(schoolKnown&&!compatibleSchool?2:0)-(fullExact?.5:0);
+      // Resource observations can corroborate a difficult short name, but never
+      // identify a character on their own. Ignore empty/zero/rounded balances.
+      const gold=String(resources.gold??''),previous=String(role.observedGold??'');
+      const balanceEvidence=/^\d+\.\d{3,4}$/.test(gold)&&Number(gold)>0&&Number(gold)===Number(previous);
+      const stableEvidence=['achievement','petCount','tongbao','xiaxing','weeklyXiaxing'].filter(k=>
+        /^\d+$/.test(String(resources[k]??''))&&Number(resources[k])>0&&role[k]!=null&&Number(resources[k])===Number(role[k])).length>=2;
       return {roleId:role.id,name:role.name,school:role.school,distance,exact,fullExact,
+        created:role.creationStatus!=='planned',resourceEvidence:balanceEvidence||stableEvidence,
         compatibleSchool,schoolKnown,suffixStatus,suffixConflict:suffixStatus==='conflict',
         score,eligible:distance<=threshold};
     }).filter(x=>x.eligible).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'zh-CN'));
     // A full existing character name outranks an identical short base name on
     // another server. This occurs in the two real screenshots (same 3-character
     // name, but different school and @ suffix).
-    const fullMatches=suggestions.filter(x=>x.fullExact);
+    const fullMatches=suggestions.filter(x=>x.fullExact&&x.created);
     if(fullMatches.length===1)return {roleId:fullMatches[0].roleId,exact:true,auto:true,suggestions};
-    const exactMatches=suggestions.filter(x=>x.exact&&!x.suffixConflict);
+    const exactMatches=suggestions.filter(x=>x.exact&&!x.suffixConflict&&x.created);
     const schoolMatches=exactMatches.filter(x=>x.schoolKnown&&x.compatibleSchool);
     const validExact=exactMatches.length===1?exactMatches[0]:schoolMatches.length===1?schoolMatches[0]:null;
     const exactAuto=!!validExact&&(validExact.suffixStatus==='exact'||validExact.schoolKnown&&validExact.compatibleSchool);
     if(exactAuto)return {roleId:validExact.roleId,exact:true,auto:true,suggestions};
     // A one-character OCR error needs corroborating school AND one unique safe candidate.
-    const supported=suggestions.filter(x=>x.distance<=1&&x.schoolKnown&&x.compatibleSchool&&!x.suffixConflict);
+    const supported=suggestions.filter(x=>x.distance<=1&&x.schoolKnown&&x.compatibleSchool&&!x.suffixConflict&&x.created);
     const best=supported[0],second=supported[1];
     const auto=!!best&&best.distance===1&&key.length>=3&&
       (second===undefined||second.score-best.score>=1)&&!suggestions.some(x=>x.exact&&!x.suffixConflict);
-    return {roleId:auto?best.roleId:'',exact:false,auto,suggestions};
+    if(auto)return {roleId:best.roleId,exact:false,auto:true,suggestions};
+    // With multiple similar names (or only two characters), require independent
+    // matching observations as well as school and a one-character name error.
+    const corroborated=supported.filter(x=>x.distance===1&&key.length>=2&&x.resourceEvidence);
+    const verified=corroborated.length===1&&!exactMatches.length?corroborated[0]:null;
+    return {roleId:verified?.roleId||'',exact:false,auto:!!verified,suggestions};
   }
   function match(roles,name){const k=base(name);if(!k)return '';const matches=(roles||[]).filter(r=>base(r.name)===k);return matches.length===1?matches[0].id:'';}
 
@@ -88,7 +100,7 @@
     for(const [imageIndex,image] of images.entries()){
       for(const [rowIndex,row] of (image.rows||[]).entries()){
         rawRows++;
-        const name=clean(row.name),matchInfo=suggestRoles(roles,name,row.school);
+        const name=clean(row.name),matchInfo=suggestRoles(roles,name,row.school,row);
         // suggestRoles already rejects known conflicting servers; OCR typos in an
         // unknown suffix may still refer to the same existing role.
         const matched=matchInfo.auto&&!!matchInfo.roleId;
@@ -263,6 +275,25 @@
       const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
       const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
       const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=i===1?canonicalSchool(words.map(x=>x.text).join(''),roles,row.name):words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2)row.gold='';else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+      // Column segmentation occasionally drops one otherwise readable number.
+      // Retry only blank numeric cells, with padding and the row background removed.
+      await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'0123456789',preserve_interword_spaces:'0'});
+      for(let row=0;row<parsed.length;row++)for(let col=3;col<9;col++){
+        if(parsed[row][fields[col]]!=='')continue;
+        progress('正在复核遗漏数值（'+(row+1)+'/'+parsed.length+' · '+labels[col]+'）…');
+        const left=Math.round(cuts[col]*w),width=Math.round((cuts[col+1]-cuts[col])*w),height=Math.round(spacing*.72);
+        const sy=Math.max(0,Math.min(h-height,Math.round(anchors[row].y-height/2)));
+        const c=document.createElement('canvas');c.width=width+24;c.height=height+24;
+        const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
+        const patch=ctx.createImageData(width,height);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+          const src=((sy+y)*w+left+x)*4,dst=(y*width+x)*4;
+          const light=Math.max(originalPixels[src],originalPixels[src+1],originalPixels[src+2]);
+          const v=light>120?255-light:255;patch.data[dst]=patch.data[dst+1]=patch.data[dst+2]=v;patch.data[dst+3]=255;
+        }
+        cx.putImageData(patch,12,12);
+        try{const result=await worker.recognize(c),text=clean(result.data.text);if(/^\d+$/.test(text))parsed[row][fields[col]]=text;}catch{ /* Leave uncertain values blank. */ }
+      }
       // Locate currency icons in each row before OCR: their positions move with
       // the number of digits. The silver ingot has the same silhouette as the
       // gold ingot, so correlate it within the same image (no shipped template).
