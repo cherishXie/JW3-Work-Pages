@@ -489,14 +489,14 @@
   function taskForVersion(s,t){return {...t,levelCap:levelCap(s),minLevel:Math.min(t.minLevel||0,levelCap(s))};}
   function eligible(s,t,scope={}) {t=taskForVersion(s,t);return s.roles.filter(r=>r.enabled!==false&&isMaxLevel(s,r)&&t.roleIds.includes(r.id)&&s.accounts.some(a=>a.id===r.accountId&&a.enabled!==false)&&(!t.requiresCamp||['hao','e'].includes(r.camp))&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)&&(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));}
   function cdKey(t){return t.dungeonId?'raid_'+t.dungeonId+'_'+(t.difficulty||'10人普通'):t.id;}
-  function getProgress(s,t,r,date) {return s.progress.find(p=>p.roleId===r.id&&(p.cdKeySnapshot||cdKey(s.tasks.find(x=>x.id===p.taskId)||{}))===cdKey(t)&&p.cycle===cycle(t,date));}
+  function getProgress(s,t,r,date) {const key=cdKey(t),period=cycle(t,date);return s.progress.find(p=>p.roleId===r.id&&(p.cdKeySnapshot||cdKey(s.tasks.find(x=>x.id===p.taskId)||{}))===key&&p.cycle===period);}
   // Completion facts consume targets/CD, but never enter income or timing samples.
   function completionRecords(s){if(!s.plans.some(p=>p.completionFacts?.length))return [];const measured=new Set(),whole=new Set();for(const r of s.records)if(r.planId){const key=r.planId+'|'+r.taskId;if(!r.planBatchIndices)whole.add(key);else for(const i of r.planBatchIndices)measured.add(key+'|'+i);}return s.plans.flatMap(p=>(p.completionFacts||[]).filter(f=>!whole.has(p.id+'|'+f.taskId)&&!measured.has(p.id+'|'+f.taskId+'|'+f.planBatchIndices[0])));}
   function executionRecords(s){return [...s.records,...completionRecords(s)];}
-  function cdRecord(s,t,roleId,date){return t.dungeonId?executionRecords(s).find(r=>{const source=r.dungeonId?{dungeonId:r.dungeonId,difficulty:r.difficulty}:null;return source&&cdKey(source)===cdKey(t)&&r.roleIds.includes(roleId)&&(r.cycle||cycle(t,r.date))===cycle(t,date);}):null;}
-  function effectiveProgress(s,t,r,when){
-    const manual=getProgress(s,t,r,when),target=manual?.target??t.target;
-    const records=executionRecords(s).filter(x=>x.roleIds.includes(r.id)&&(x.dungeonId?cdKey(x)===cdKey(t):x.taskId===t.id)&&(x.cycle||cycle(t,x.startedAt||x.date))===cycle(t,when));
+  function cdRecord(s,t,roleId,date){if(!t.dungeonId)return null;const key=cdKey(t),period=cycle(t,date);return executionRecords(s).find(r=>{const source=r.dungeonId?{dungeonId:r.dungeonId,difficulty:r.difficulty}:null;return source&&cdKey(source)===key&&r.roleIds.includes(roleId)&&(r.cycle||cycle(t,r.date))===period;});}
+  function effectiveProgress(s,t,r,when,lookup){
+    const manual=lookup?lookup.manual.get(r.id):getProgress(s,t,r,when),target=manual?.target??t.target,period=lookup?.period||cycle(t,when);
+    const records=lookup?lookup.records.get(r.id)||[]:executionRecords(s).filter(x=>x.roleIds.includes(r.id)&&(x.dungeonId?cdKey(x)===cdKey(t):x.taskId===t.id)&&(x.cycle||cycle(t,x.startedAt||x.date))===period);
     const actualCompleted=records.reduce((n,x)=>n+(x.attendanceWeights?.[r.id]??(x.planBatchIndices?x.planBatchIndices.reduce((k,i)=>k+Number(s.plans.find(p=>p.id===x.planId)?.batches[i]?.includes(r.id)),0):1)),0);
     const completed=Math.max(manual?.completed||0,actualCompleted),status=completed>=target&&completed>0?'completed':completed>0?'progressing':manual?.status||'planned';
     const completionOnly=records.some(x=>x.completionOnly),measuredCompleted=records.filter(x=>!x.completionOnly).length;
@@ -687,7 +687,26 @@
     const hasData=mode!=='actual'||actualRows.some(r=>r.date>=start&&r.date<=end&&inScope(s,r,scope));
     return {...sum(perTask,s.config),tasks:perTask,hasData,start,end};
   }
-  function completion(s,start,end,scope={}) {let total=0,done=0;const seen=new Set();for(const d of dates(start,end))for(const t of s.tasks.filter(t=>t.enabled&&t.days.includes(weekday(d))))for(const r of eligible(s,t,scope)){const key=[r.id,cdKey(t),cycle(t,d)].join('|');if(seen.has(key))continue;seen.add(key);const p=effectiveProgress(s,t,r,d),target=p.target;if(p?.status==='skipped')continue;total+=target;done+=Math.min(target,p?.completed||(cdRecord(s,t,r.id,d)?1:0));}return {total,done,rate:total?done/total*100:null};}
+  function completion(s,start,end,scope={}) {
+    let total=0,done=0;const seen=new Set(),lookups=new Map(),roles=new Map(),records=executionRecords(s);
+    // Build each task/cycle lookup once instead of rescanning all history for every role/day.
+    for(const d of dates(start,end))for(const t of s.tasks.filter(t=>t.enabled&&t.days.includes(weekday(d)))){
+      const period=cycle(t,d),key=cdKey(t),cacheKey=t.id+'|'+period;
+      if(!roles.has(t.id))roles.set(t.id,eligible(s,t,scope));
+      if(!lookups.has(cacheKey)){
+        const lookup={period,manual:new Map(),records:new Map()};
+        for(const p of s.progress)if(p.cycle===period&&(p.cdKeySnapshot||cdKey(s.tasks.find(x=>x.id===p.taskId)||{}))===key&&!lookup.manual.has(p.roleId))lookup.manual.set(p.roleId,p);
+        for(const x of records)if((x.dungeonId?cdKey(x)===key:x.taskId===t.id)&&(x.cycle||cycle(t,x.startedAt||x.date))===period)for(const id of new Set(x.roleIds)){if(!lookup.records.has(id))lookup.records.set(id,[]);lookup.records.get(id).push(x);}
+        lookups.set(cacheKey,lookup);
+      }
+      for(const r of roles.get(t.id)){
+        const unique=[r.id,key,period].join('|');if(seen.has(unique))continue;seen.add(unique);
+        const p=effectiveProgress(s,t,r,d,lookups.get(cacheKey)),target=p.target;if(p?.status==='skipped')continue;
+        total+=target;done+=Math.min(target,p?.completed||(cdRecord(s,t,r.id,d)?1:0));
+      }
+    }
+    return {total,done,rate:total?done/total*100:null};
+  }
   function cashSummary(s,start,end) {const list=s.cash.filter(c=>c.date>=start&&c.date<=end),income=list.filter(c=>c.type==='income').reduce((n,c)=>n+c.amount,0),expense=list.filter(c=>c.type==='expense').reduce((n,c)=>n+c.amount,0);return {income,expense,net:income-expense,roi:expense?((income-expense)/expense*100):null,hasData:list.length>0};}
   function budget(s,summary) {return s.accounts.filter(a=>a.enabled!==false).map(a=>{
     const minutes=summary.accountMinutes[a.id]||0,monthly=a.billingType==='monthly',known=Object.prototype.hasOwnProperty.call(summary.billableAccountMinutes||{},a.id),expiry=a.monthlyExpiresAt?Date.parse(a.monthlyExpiresAt):null;

@@ -51,7 +51,7 @@
     const prior=motionState,change=motionCommit;motionState=next;motionCommit=null;
     if(!prior||motionPreference.matches)return;
     if(prior.view!==next.view){
-      const content=ui.page==='task'?document.querySelector('.task-content')||$('#app'):$('#app');
+      const content=document.querySelector('nav [data-page="'+ui.page+'"].active')||document.querySelector('.tabs button.active');
       animateUI(content,[{opacity:.9},{opacity:1}],120,'wb-tab');
       for(const selected of document.querySelectorAll('.tabs button.active'))animateUI(selected,[{backgroundColor:'var(--wb-surface-2)'},{backgroundColor:getComputedStyle(selected).backgroundColor}],160,'wb-tab-indicator');
       return;
@@ -68,10 +68,10 @@
       }
     }
   }
-  // Only cache read-only views; an exact business-state fingerprint invalidates
-  // in-place edits, undo, imports and cross-tab updates before the next render.
-  const viewResults=new Map();let viewFingerprint='',viewCacheActive=false,overviewJob=0,overviewDeferred=null;
-  function prepareViewCache(){const fingerprint=JSON.stringify(state);if(fingerprint!==viewFingerprint){viewResults.clear();viewFingerprint=fingerprint;}viewCacheActive=true;}
+  // Cache read-only results by business revision. Navigation never serializes archives.
+  const viewResults=new Map();let viewFingerprint=0,viewState=state,viewCacheActive=false,overviewJob=0,overviewDeferred=null;
+  function invalidateViewCache(){viewResults.clear();viewFingerprint++;viewState=state;}
+  function prepareViewCache(){if(viewState!==state)invalidateViewCache();viewCacheActive=true;}
   const viewKey=(name,start,end,selection={},mode='estimated')=>JSON.stringify([name,start,end,selection.group||'',selection.account||'',selection.role||'',mode]);
   function viewCalculation(name,s,start,end,selection={},mode='estimated'){
     if(!viewCacheActive||s!==state||name==='summary'&&!['estimated','actual'].includes(mode))return M[name](s,start,end,selection,mode);
@@ -87,7 +87,7 @@
     const deferred=overviewDeferred;if(!deferred)return;const job=overviewJob,fingerprint=viewFingerprint,accounts=deferred.accounts?overviewScopedAccounts():[],groups=deferred.trend?overviewTrendGroups():[];let index=0,trendIndex=0,trendDone=false;
     const enqueue=fn=>{if(typeof requestIdleCallback==='function')requestIdleCallback(fn,{timeout:80});else setTimeout(fn,0);};
     const step=()=>{
-      if(job!==overviewJob||ui.page!=='overview'||JSON.stringify(state)!==fingerprint)return;
+      if(job!==overviewJob||ui.page!=='overview'||viewFingerprint!==fingerprint)return;
       const active=viewCacheActive;viewCacheActive=true;
       try{
         if(trendIndex<groups.length){const days=groups[trendIndex++];for(const mode of ['estimated','actual'])summaryView(state,days[0],days.at(-1),scope(),mode);enqueue(step);return;}
@@ -105,7 +105,7 @@
   function kind(mode=ui.mode){const label=mode==='actual'?'历史实测':'已确认排程预测';return state.dataKind==='simulated'?'示例 / '+label:label;}
   function badge(mode=ui.mode){return `<span class="pill ${state.dataKind==='simulated'?'simulated':mode}">${kind(mode)}</span>`;}
   function toast(message,undo=false){clearTimeout(toastTimer);$('#toast').innerHTML=esc(message)+(undo?'<button data-action="undo">撤销</button>':'');$('#toast').classList.add('show');animateUI($('#toast'),[{opacity:0,transform:'translateX(-50%) translateY(8px)'},{opacity:1,transform:'translateX(-50%) translateY(0)'}],200,'wb-toast');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),undo?10000:4000);}
-  function persist(next){if(storageReadError)throw new Error('请先导出原始数据或重置以处理本地读取异常');Store.write(localStorage,next);dataStore=next;storageError='';}
+  function persist(next){if(storageReadError)throw new Error('请先导出原始数据或重置以处理本地读取异常');Store.write(localStorage,next);savedStorageRaw=localStorage.getItem(KEY);dataStore=next;invalidateViewCache();storageError='';}
   function save(undo=true){
     if(undo){undoState=dataStore.active?structuredClone(dataStore.active):M.blank();undoStore=structuredClone(dataStore);}
     Ops.ensureDefaults(state);state.updatedAt=new Date().toISOString();
@@ -335,7 +335,7 @@
   }
   function overviewBreakdown(s){
     const rows=s.tasks.filter(r=>r.hasData),total=rows.reduce((n,r)=>n+Math.max(0,r.gross),0);
-    return `<details class="insight-breakdown-fold" data-raw-key="overview-breakdown" ${analysisDetails.has('overview-breakdown')?'open':''}><summary>任务详细收益 / ${rows.length} 项</summary><div class="insight-breakdown">${rows.map((r,i)=>`<details class="insight-detail" data-raw-key="overview-${esc(r.task.id)}" ${analysisDetails.has('overview-'+r.task.id)?'open':''}><summary><i style="background:${colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i><strong>${esc(r.task.name)}</strong><b>${amount(r.gross,r.gold)}</b><small>${total?pct(Math.max(0,r.gross)/total*100):'—'}</small></summary><div class="insight-detail-body"><span>净收益 <b>${amount(r.net,r.netGold)}</b></span><span>操作 <b>${num(r.minutes,1)} 分钟</b></span>${button('查看任务明细','task-analysis','small',`data-id="${esc(r.task.id)}"`)}</div></details>`).join('')}</div></details>`;
+    return `<details class="insight-breakdown-fold" data-raw-key="overview-breakdown" ${analysisDetails.has('overview-breakdown')?'open':''}><summary>任务详细收益 / ${rows.length} 项</summary><div class="insight-breakdown">${rows.map((r,i)=>`<details class="insight-detail" data-raw-key="overview-${esc(r.task.id)}" ${analysisDetails.has('overview-'+r.task.id)?'open':''}><summary><i style="background:var(--wb-chart-bg-${categoryIndex(r.task.id)})"></i><strong>${esc(r.task.name)}</strong><b>${amount(r.gross,r.gold)}</b><small>${total?pct(Math.max(0,r.gross)/total*100):'—'}</small></summary><div class="insight-detail-body"><span>净收益 <b>${amount(r.net,r.netGold)}</b></span><span>操作 <b>${num(r.minutes,1)} 分钟</b></span>${button('查看任务明细','task-analysis','small',`data-id="${esc(r.task.id)}"`)}</div></details>`).join('')}</div></details>`;
   }
   function overviewAccounts(){
     const q=ui.overviewSearch.trim().toLowerCase();
@@ -409,17 +409,21 @@
   let revenueLabelObserver=null;
   function fitRevenueMapLabels(){
     revenueLabelObserver?.disconnect();
-    const fit=map=>{for(const tile of map.querySelectorAll('.revenue-map-tile')){
-      const width=tile.clientWidth,height=tile.clientHeight,share=tile.querySelector('.revenue-map-share');if(!share)continue;
-      const compact=width<100||height<70,pad=compact?3:10,availableW=Math.max(1,width-pad*2),availableH=Math.max(1,height-pad*2),base=compact?16:24;
-      tile.style.padding=pad+'px';tile.dataset.labelLevel='full';share.style.fontSize=base+'px';share.style.removeProperty('transform');
-      const natural=share.scrollWidth||share.getBoundingClientRect().width,rotate=availableW<32&&availableH>availableW*2;
-      const fitSize=Math.min(base,base*(rotate?availableH:availableW)/Math.max(1,natural),rotate?availableW:availableH),size=fitSize>=24?24:fitSize>=16?16:12;
-      share.style.fontSize=size+'px';share.style.visibility=fitSize<12?'hidden':'visible';tile.dataset.shareVertical=String(rotate);
-      const shareHeight=size*1.25,name=tile.querySelector('.revenue-map-name'),amount=tile.querySelector('small'),nameWidth=name?.scrollWidth||0,amountWidth=amount?.scrollWidth||0;
-      tile.dataset.labelLevel='share';
-      if(!rotate&&availableW>=Math.min(70,nameWidth)&&availableH>=shareHeight+24)tile.dataset.labelLevel=nameWidth<=availableW&&amountWidth<=availableW&&availableH>=shareHeight+47?'full':'name';
-    }};
+    const fit=map=>{
+      // Read all geometry before any style writes to avoid one forced layout per tile.
+      const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+      const items=[...map.querySelectorAll('.revenue-map-tile')].map(tile=>({tile,width:tile.clientWidth,height:tile.clientHeight,share:tile.querySelector('.revenue-map-share'),nameWidth:tile.querySelector('.revenue-map-name')?.scrollWidth||0,amountWidth:tile.querySelector('small')?.scrollWidth||0}));
+      const family=getComputedStyle(map).fontFamily;
+      for(const {tile,width,height,share,nameWidth,amountWidth}of items){
+        if(!share)continue;
+        const compact=width<100||height<70,pad=compact?3:10,availableW=Math.max(1,width-pad*2),availableH=Math.max(1,height-pad*2),base=compact?16:24;
+        context.font=`650 ${base}px ${family}`;const natural=context.measureText(share.textContent).width,rotate=availableW<32&&availableH>availableW*2;
+        const fitSize=Math.min(base,base*(rotate?availableH:availableW)/Math.max(1,natural),rotate?availableW:availableH),size=fitSize>=24?24:fitSize>=16?16:12;
+        tile.style.padding=pad+'px';share.style.removeProperty('transform');share.style.fontSize=size+'px';share.style.visibility=fitSize<12?'hidden':'visible';tile.dataset.shareVertical=String(rotate);
+        const shareHeight=size*1.25;tile.dataset.labelLevel='share';
+        if(!rotate&&availableW>=Math.min(70,nameWidth)&&availableH>=shareHeight+24)tile.dataset.labelLevel=nameWidth<=availableW&&amountWidth<=availableW&&availableH>=shareHeight+47?'full':'name';
+      }
+    };
     const maps=[...document.querySelectorAll('.revenue-map')];maps.forEach(fit);
     if(typeof ResizeObserver!=='undefined'){revenueLabelObserver=new ResizeObserver(entries=>entries.forEach(e=>fit(e.target)));maps.forEach(map=>revenueLabelObserver.observe(map));}
   }
@@ -432,8 +436,8 @@
     const blocks=revenueMapBlocks(rows,value);
     return `<div class="revenue-map-layout"><div class="revenue-map" role="list" aria-label="按任务正毛收益的面积占比图">${blocks.map(({row:r,x,y,w,h},i)=>{
       const share=value(r)/total*100;
-      return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:${colors[categoryIndex(r.task?.id||r.id||r.label)]};--tile-bg:var(--wb-chart-bg-${categoryIndex(r.task.id)});--tile-text:var(--wb-chart-text-${categoryIndex(r.task.id)})" title="${esc(r.task.name)}：${pct(share)} / ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong class="revenue-map-share">${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
-    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}" title="${esc(r.task.name)} / ${pct(value(r)/total*100)}"><i style="background:${colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">按正毛收益计算面积占比；净收益与亏损见任务明细。</p>`;
+      return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:var(--wb-chart-bg-${categoryIndex(r.task.id)});--tile-bg:var(--wb-chart-bg-${categoryIndex(r.task.id)});--tile-text:var(--wb-chart-text-${categoryIndex(r.task.id)})" title="${esc(r.task.name)}：${pct(share)} / ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong class="revenue-map-share">${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
+    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}" title="${esc(r.task.name)} / ${pct(value(r)/total*100)}"><i style="background:var(--wb-chart-bg-${categoryIndex(r.task.id)})"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">按正毛收益计算面积占比；净收益与亏损见任务明细。</p>`;
   }
   function todoList(limit=4){const rows=state.tasks.filter(t=>t.enabled&&t.days.includes(M.weekday(today))).map(t=>({task:t,...M.plan(state,t,today,scope(),true)})).filter(t=>t.executions>0).sort((a,b)=>(b.hourly??0)-(a.hourly??0));if(!state.roles.length)return empty('尚未配置账号与角色','先建立档案，再选择常用任务。',button('开始配置','setup','primary'));if(!rows.length)return empty('当前没有待安排建议','可以选择其他日期，或为角色安排新任务。',button('查看任务矩阵','nav','','data-page="task"'));return `<div class="todo-list">${rows.slice(0,limit).map(r=>`<div class="todo-row"><span class="task-icon">${icon(r.task.type==='team'?'shield':'bolt')}</span><div class="todo-name"><strong>${esc(r.task.name)}</strong><small>${r.executions} ${r.task.type==='team'?'队通关':'角色次'}待做 / ${r.batches.length} 批 / ${num(r.minutes)} 分钟</small></div><div class="todo-value"><b class="cyan">${amount(r.net,r.netGold)}</b><small>预计净收益</small></div>${button(icon('chevron'),'task-detail','ghost small',`data-id="${r.task.id}" aria-label="查看${esc(r.task.name)}"`)}</div>`).join('')}</div>`;}
   function queueBounds(){
@@ -1394,7 +1398,7 @@
             c.restore();c.strokeStyle=p.bg;c.lineWidth=3;c.strokeRect(bx,by,bw,bh);
           });
           text('任务明细'+(page.parts>1?' / '+page.part+' / '+page.parts:''),64,936,25,p.text,952,600);
-          page.rows.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),x=64+col*486,y=984+row*64,idx=sources.indexOf(r);c.fillStyle=colors[categoryIndex(r.task.id)];c.fillRect(x,y+5,8,22);text(safe(r.task.name,o),x+20,y,23,p.text,340,500);text(pct(sourceValue(r)/sourceTotal*100),x+460,y,25,p.text,98,650,'right');text(value(r.gross,r.gold).main,x+20,y+30,19,p['text-muted'],430);});
+          page.rows.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),x=64+col*486,y=984+row*64,idx=sources.indexOf(r);c.fillStyle=p['chart-bg-'+categoryIndex(r.task.id)];c.fillRect(x,y+5,8,22);text(safe(r.task.name,o),x+20,y,23,p.text,340,500);text(pct(sourceValue(r)/sourceTotal*100),x+460,y,25,p.text,98,650,'right');text(value(r.gross,r.gold).main,x+20,y+30,19,p['text-muted'],430);});
         }
       }
       if(page.kind==='ranking'){
@@ -1637,7 +1641,7 @@
       try{Store.write(localStorage,next);}catch(e){throw new Error('重置未保存，原数据保留：'+e.message);}
       // The empty store is authoritative, even if removing an old migration backup fails.
       try{localStorage.removeItem(Store.LEGACY_KEY);}catch{}
-      dataStore=next;state=M.blank();Ops.ensureDefaults(state);M.capturePlanForecasts(state,dataStore.snapshots);storageError='';storageReadError=false;undoState=before;undoStore=previous;clearScope();ui.setup=true;ui.setupStep=0;ui.page='overview';render();toast('已恢复空白，可重新配置或跳过引导',true);
+      savedStorageRaw=localStorage.getItem(KEY);dataStore=next;state=M.blank();Ops.ensureDefaults(state);M.capturePlanForecasts(state,dataStore.snapshots);storageError='';storageReadError=false;undoState=before;undoStore=previous;clearScope();ui.setup=true;ui.setupStep=0;ui.page='overview';render();toast('已恢复空白，可重新配置或跳过引导',true);
     },'确认重置');
   }
   function archivePanel(){
@@ -1805,7 +1809,7 @@
     'raw-backup':()=>download('JX3_raw_storage.txt',new Blob([JSON.stringify({current:localStorage.getItem(KEY),legacy:localStorage.getItem(Store.LEGACY_KEY)},null,2)],{type:'text/plain'})),
     'preset-sources':()=>presetSources(),'reset-blank':()=>confirmReset(),
     'csv-template':()=>download('JX3_roles_template.csv',new Blob(['\uFEFFaccount_id,account_name,group,role_id,role_name,server,school,stance,duty,level,score,opening_gold,balance,tags,companion,region,billing_type,monthly_expires_at,tongbao,points,camp,observed_gold,energy,energyCap,weeklyEnergy,contribution,chivalry,prestige,achievement,stage,huashang,homeSeason,resource_date,reference_dps,gongzhan_buff\na_example,账号示例,主力组,r_example,角色示例,梦江南,七秀,云裳心经,heal,130,85000,18000,1600,日常,,电信区,point,,,,unknown,,0,3000,,,,,,,,,2026-10-14,,unknown\n'],{type:'text/csv;charset=utf-8'})),
-    undo:()=>{if(undoState&&undoStore){motionCommit={rows:motionRows()};Store.write(localStorage,undoStore);state=undoState;dataStore=undoStore;undoState=null;undoStore=null;storageError='';storageReadError=false;clearScope();ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;render();toast('上一步变更已撤销');}},
+    undo:()=>{if(undoState&&undoStore){motionCommit={rows:motionRows()};Store.write(localStorage,undoStore);savedStorageRaw=localStorage.getItem(KEY);state=undoState;dataStore=undoStore;undoState=null;undoStore=null;storageError='';storageReadError=false;clearScope();ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;render();toast('上一步变更已撤销');}},
     search:()=>{modal('搜索任务或角色',`<input id="global-search" type="search" placeholder="输入名称…" style="width:100%" aria-label="搜索任务或角色"><div id="search-results" class="mt"></div>`);$('#global-search').addEventListener('input',e=>{const q=e.target.value;$('#search-results').innerHTML=q?`<div class="stack">${state.tasks.filter(t=>t.name.includes(q)).slice(0,8).map(t=>button('任务 / '+esc(t.name),'task-detail','',`data-id="${t.id}" type="button"`)).join('')}${state.roles.filter(r=>r.name.includes(q)).slice(0,8).map(r=>button('角色 / '+esc(r.name),'role-detail','',`data-id="${r.id}" type="button"`)).join('')}</div>`:'';});}
   };
   document.addEventListener('toggle',e=>{const el=e.target;if(el.matches?.('.analysis-task-picker'))ui.analysisPicker=el.open;if(el.matches?.('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}},true);
@@ -1927,9 +1931,10 @@
   $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog'))$('#dialog').close();});
   function syncSavedState(notify=true,force=false){
     try{
-      const loaded=Store.read(localStorage),changed=JSON.stringify(loaded.store)!==JSON.stringify(dataStore);if(!force&&!changed)return false;
+      const raw=localStorage.getItem(KEY),changed=raw!==savedStorageRaw;if(!force&&!changed)return false;
+      const loaded=Store.read(localStorage);
       const next=loaded.store.active?M.upgradeState(structuredClone(loaded.store.active)):M.blank();M.freezeHistory(next);Ops.ensureDefaults(next);M.capturePlanForecasts(next,loaded.store.snapshots);M.validateState(next);
-      dataStore=loaded.store;state=next;storageError='';storageReadError=false;if(changed){undoState=null;undoStore=null;clearScope();}ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;
+      savedStorageRaw=raw;dataStore=loaded.store;state=next;storageError='';storageReadError=false;if(changed){undoState=null;undoStore=null;clearScope();}ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;
       if(notify)toast('已同步其他标签页的数据');return true;
     }catch{if(notify)toast('其他标签页数据无效，当前状态保留');return false;}
   }
@@ -1940,6 +1945,7 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeWorkspace();});
   // A fresh opening stays blank. Migrate valid old data without creating a sample.
   try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=structuredClone(state);Store.write(localStorage,dataStore);}}catch(e){storageError='浏览器存储不可用：'+e.message;}
+  let savedStorageRaw;try{savedStorageRaw=localStorage.getItem(KEY);}catch{}
   setInterval(()=>{for(const el of document.querySelectorAll('[data-account-time]')){const a=state.accounts.find(a=>a.id===el.dataset.accountTime);if(a)el.textContent=Ops.duration(Ops.remaining(a),a.billingType==='monthly');}},1000);
   render();
 })();
