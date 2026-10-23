@@ -291,9 +291,12 @@
   entry.restoredAt=new Date(Math.max(Date.now(),Date.parse(entry.updatedAt)+1)).toISOString();entry.updatedAt=entry.restoredAt;M.validateState(copy);Object.assign(s,copy);return entry;
  }
  function isPendingPlan(s,p){return !p.cancelled&&(p.routeTaskIds||[p.taskId]).some(id=>remaining(s,p,id).length);}
- function queueCompare(s,a,b){
+ function queueCompare(s,a,b,referenceDate=M.dateKey()){
   const ap=isPendingPlan(s,a),bp=isPendingPlan(s,b);if(ap!==bp)return ap?-1:1;
   if(!ap)return completedTime(s,b)-completedTime(s,a);
+  // Today and upcoming dates first; earlier dates follow in calendar order.
+  const pastA=a.date<referenceDate,pastB=b.date<referenceDate;if(pastA!==pastB)return pastA?1:-1;
+  const dateOrder=(a.date||'').localeCompare(b.date||'');if(dateOrder)return dateOrder;
   if(!!a.queuePinned!==!!b.queuePinned)return a.queuePinned?-1:1;
   const ar=Number.isFinite(a.queuePosition),br=Number.isFinite(b.queuePosition);if(ar!==br)return ar?1:-1;
   if(ar&&a.queuePosition!==b.queuePosition)return a.queuePosition-b.queuePosition;
@@ -302,6 +305,7 @@
  function reorderQueue(s,sourceId,targetId){
   const source=s.plans.find(p=>p.id===sourceId),target=s.plans.find(p=>p.id===targetId);
   if(!source||!target||source===target||!isPendingPlan(s,source)||!isPendingPlan(s,target))throw new Error('只能调整未完成排程的顺序');
+  if(source.date!==target.date)throw new Error('请在同一排程日期内调整顺序');
   if(!!source.queuePinned!==!!target.queuePinned)throw new Error('请在同一置顶分组内拖动，或先调整置顶状态');
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
