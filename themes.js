@@ -38,7 +38,7 @@ SOFTWARE.
   function palette(id){
     const theme=themes.find(t=>t.id===id)||themes[0],s=scales[theme.mode],n=s[theme.neutral],a=s[theme.accent],at=(name,step)=>s[name][step-1];
     const p={bg:n[0],sidebar:n[1],surface:n[1],'surface-2':n[2],hover:n[3],border:n[5],text:n[11],'text-secondary':n[10],'text-muted':n[10],primary:a[8],cyan:at('teal',11),purple:at('violet',11),success:at('green',11),warning:at('amber',11),danger:at('red',11),'primary-text':theme.accent==='violet'?'#ffffff':'#111111',
-      'input-bg':n[2],'control-border':n[6],'primary-soft':a[4],'primary-hover':a[9],'primary-label':a[10],
+      'input-bg':n[2],'control-border':n[6],'primary-soft':a[4],'primary-hover':theme.accent==='violet'?a[8]:a[9],'primary-label':theme.mode==='light'?a[11]:a[10],
       'notice-bg':a[2],'notice-border':a[5],'success-bg':at('green',3),'success-border':at('green',6),'forecast-bg':at('violet',3),'forecast-border':at('violet',6),'warning-bg':at('amber',3),'warning-border':at('amber',6),
       'chart-bg-0':a[3],'chart-bg-1':at('teal',4),'chart-bg-2':at('violet',4),'chart-bg-3':at('amber',4),'chart-bg-4':at('green',4),'chart-bg-5':at('red',4),track:n[3],grid:n[5],'avatar-bg':a[3],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
