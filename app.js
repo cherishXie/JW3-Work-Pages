@@ -32,21 +32,57 @@
   const taskFold=(key,initial=false)=>(taskFolds.get(key)??initial)?'open':'';
   let renderedPageKey='';
   let undoState=null,undoStore=null,toastTimer,previewImport=null;
+  const motionPreference=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const motionActive=new Set(),motionByElement=new WeakMap();
+  let motionState=null,motionCommit=null,motionDisclosure=null;
+  function animateUI(el,frames,duration=250,id='wb-enter'){
+    if(!el||!el.isConnected||motionPreference.matches||typeof el.animate!=='function')return null;
+    const running=motionByElement.get(el);if(running){const current=getComputedStyle(el),start={...frames[0]};for(const key of ['opacity','transform','height','backgroundColor'])if(key in start)start[key]=current[key];frames=[start,...frames.slice(1)];running.cancel();}
+    const animation=el.animate(frames,{duration,easing:'cubic-bezier(0.16, 1, 0.3, 1)'});animation.id=id;
+    motionByElement.set(el,animation);motionActive.add(animation);
+    const cleanup=()=>{motionActive.delete(animation);if(motionByElement.get(el)===animation)motionByElement.delete(el);};
+    animation.addEventListener('finish',cleanup,{once:true});animation.addEventListener('cancel',cleanup,{once:true});return animation;
+  }
+  motionPreference.addEventListener?.('change',()=>{if(motionPreference.matches)for(const a of [...motionActive])a.cancel();});
+  function motionRows(){return new Map([...document.querySelectorAll('.flow-task[data-id],.account-archive[data-account-id],.tc-v2-stat')].filter(el=>{const r=el.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight;}).slice(0,20).map((el,i)=>[el.dataset.id||el.dataset.accountId||'stat-'+i,{el,rect:el.getBoundingClientRect(),text:el.textContent}]));}
+  function captureMotion(){return {focus:$('#tc-v2-focus'),focusRect:$('#tc-v2-focus')?.getBoundingClientRect(),rows:motionCommit?.rows||motionRows()};}
+  function finishRenderMotion(before){
+    const next={view:[ui.page,ui.workView,ui.roiTab,ui.roiSection,ui.settingsTab,ui.assetTab,ui.historyTab,ui.dataTab,ui.planTab].join('|'),page:ui.page,focus:ui.focusBatchKey};
+    const prior=motionState,change=motionCommit;motionState=next;motionCommit=null;
+    if(!prior||motionPreference.matches)return;
+    if(prior.view!==next.view){
+      const content=ui.page==='task'?document.querySelector('.task-content')||$('#app'):$('#app');
+      animateUI(content,[{opacity:.45},{opacity:1}],220,'wb-tab');
+      for(const selected of document.querySelectorAll('.tabs button.active'))animateUI(selected,[{backgroundColor:'var(--wb-surface-2)'},{backgroundColor:getComputedStyle(selected).backgroundColor}],160,'wb-tab-indicator');
+      return;
+    }
+    if(prior.focus!==next.focus&&ui.page==='task'){
+      const focus=$('#tc-v2-focus'),height=focus?.getBoundingClientRect().height,oldHeight=before.focusRect?.height,resize=height&&oldHeight&&Math.abs(height-oldHeight)<240;
+      animateUI(focus,[{opacity:.6,transform:'translateX(8px)',...(resize?{height:oldHeight+'px'}:{})},{opacity:1,transform:'none',...(resize?{height:height+'px'}:{})}],250,'wb-schedule');
+    }
+    if(change){
+      const fresh=motionRows();for(const [key,item]of fresh){const el=item.el,old=before.rows.get(key);
+        if(!old)animateUI(el,[{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'none'}],250,'wb-add');
+        else if(old.text!==item.text)animateUI(el,[{backgroundColor:'var(--wb-success-bg)'},{backgroundColor:getComputedStyle(el).backgroundColor}],300,'wb-update');
+        else {const dx=old.rect.left-item.rect.left,dy=old.rect.top-item.rect.top;if((Math.abs(dx)>1||Math.abs(dy)>1)&&Math.abs(dx)<innerWidth&&Math.abs(dy)<innerHeight)animateUI(el,[{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],250,'wb-reorder');}
+      }
+    }
+  }
   function scope(){return {group:ui.group,account:ui.account,role:ui.role};}
   function kind(mode=ui.mode){const label=mode==='actual'?'历史实测':'已确认排程预测';return state.dataKind==='simulated'?'示例 / '+label:label;}
   function badge(mode=ui.mode){return `<span class="pill ${state.dataKind==='simulated'?'simulated':mode}">${kind(mode)}</span>`;}
-  function toast(message,undo=false){clearTimeout(toastTimer);$('#toast').innerHTML=esc(message)+(undo?'<button data-action="undo">撤销</button>':'');$('#toast').classList.add('show');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),undo?10000:4000);}
+  function toast(message,undo=false){clearTimeout(toastTimer);$('#toast').innerHTML=esc(message)+(undo?'<button data-action="undo">撤销</button>':'');$('#toast').classList.add('show');animateUI($('#toast'),[{opacity:0,transform:'translateX(-50%) translateY(8px)'},{opacity:1,transform:'translateX(-50%) translateY(0)'}],200,'wb-toast');toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),undo?10000:4000);}
   function persist(next){if(storageReadError)throw new Error('请先导出原始数据或重置以处理本地读取异常');Store.write(localStorage,next);dataStore=next;storageError='';}
   function save(undo=true){
     if(undo){undoState=dataStore.active?structuredClone(dataStore.active):M.blank();undoStore=structuredClone(dataStore);}
     Ops.ensureDefaults(state);state.updatedAt=new Date().toISOString();
-    try{persist(Store.withState(dataStore,state));}catch(e){storageError='未保存至本地：'+e.message;render();throw e;}
+    try{persist(Store.withState(dataStore,state));}catch(e){storageError='未保存至本地：'+e.message;motionCommit=null;render();throw e;}
     render();
   }
   function commit(change,message,undo=true){
     const before=structuredClone(state),beforeStore=structuredClone(dataStore);
-    try{M.capturePlanForecasts(state,dataStore.snapshots);M.freezeHistory(state);change();M.capturePlanForecasts(state,dataStore.snapshots);M.freezeHistory(state);M.validateState(state);save(false);if(undo){undoState=before;undoStore=beforeStore;}toast(message,undo);}
-    catch(e){state=before;dataStore=beforeStore;render();throw e;}
+    try{M.capturePlanForecasts(state,dataStore.snapshots);M.freezeHistory(state);change();M.capturePlanForecasts(state,dataStore.snapshots);M.freezeHistory(state);M.validateState(state);motionCommit={rows:motionRows()};save(false);if(undo){undoState=before;undoStore=beforeStore;}toast(message,undo);}
+    catch(e){motionCommit=null;state=before;dataStore=beforeStore;render();throw e;}
   }
   function empty(title,detail='',action=''){return `<div class="empty">${icon('data')}<h3>${esc(title)}</h3><p>${esc(detail)}</p>${action}</div>`;}
   function button(label,action,style='',data=''){return `<button ${/type=/.test(data)?'':'type="button"'} class="${style}" data-action="${action}" ${data}>${label}</button>`;}
@@ -85,7 +121,7 @@
   function valueBars(rows,format,action=''){
     const valid=rows.filter(r=>chartNumber(r.value)),lo=Math.min(0,...valid.map(r=>r.value)),hi=Math.max(0,...valid.map(r=>r.value)),span=hi-lo||1,zero=-lo/span*100;
     if(!valid.length)return empty('当前没有可绘制的数据','可调整筛选或补充数据；缺失值不作为零值绘制。');
-    return `<div class="value-bars" role="list" aria-label="数值对比图">${valid.map((r,i)=>{const tip=r.label+'：'+format(r.value)+(r.note?'；'+r.note:''),body=`<div class="value-bar-heading"><span>${esc(r.label)}</span><b class="number ${r.value<0?'negative':''}">${esc(format(r.value))}</b></div><div class="value-track"><span class="value-zero" style="left:${zero}%"></span><i style="left:${Math.min(zero,(r.value-lo)/span*100)}%;width:${Math.abs(r.value)/span*100}%;background:${r.value<0?'var(--wb-danger)':colors[i%colors.length]}"></i>${r.value===0?`<em style="left:${zero}%"></em>`:''}</div>${r.note?`<small>${esc(r.note)}</small>`:''}`;return `<div role="listitem">${action?button(body,action,'value-bar-button',`data-id="${esc(r.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.id}"`):`<div class="value-bar-item" tabindex="0" title="${esc(tip)}" aria-label="${esc(tip)}">${body}</div>`}</div>`;}).join('')}</div>`;
+    return `<div class="value-bars" role="list" aria-label="数值对比图">${valid.map((r,i)=>{const tip=r.label+'：'+format(r.value)+(r.note?'；'+r.note:''),body=`<div class="value-bar-heading"><span>${esc(r.label)}</span><b class="number ${r.value<0?'negative':''}">${esc(format(r.value))}</b></div><div class="value-track"><span class="value-zero" style="left:${zero}%"></span><i style="left:${Math.min(zero,(r.value-lo)/span*100)}%;width:${Math.abs(r.value)/span*100}%;background:${r.value<0?'var(--wb-danger)':colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i>${r.value===0?`<em style="left:${zero}%"></em>`:''}</div>${r.note?`<small>${esc(r.note)}</small>`:''}`;return `<div role="listitem">${action?button(body,action,'value-bar-button',`data-id="${esc(r.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.id}"`):`<div class="value-bar-item" tabindex="0" title="${esc(tip)}" aria-label="${esc(tip)}">${body}</div>`}</div>`;}).join('')}</div>`;
   }
   function operationCards(items,key,limit=6){
     const card=x=>`<article class="decision-card"><header><h3>${x.title}</h3>${x.tag?`<span class="pill">${x.tag}</span>`:''}</header>${x.body||''}${x.actions?`<div class="flex wrap mt">${x.actions}</div>`:''}</article>`;
@@ -117,7 +153,7 @@
   function scatterPlot(rows,key){
     const xkey=ui.analysisX,valid=rows.filter(r=>chartNumber(r[xkey]));if(!valid.length)return empty('当前没有可比较的任务','选择其他指标或任务；零成本 ROI、零时间时薪保留为不适用。');
     const W=window.innerWidth<768?Math.max(310,window.innerWidth-64):760,H=340,L=64,R=22,T=24,B=52,xmax=Math.max(1,...valid.map(r=>r[xkey])),ymin=Math.min(0,...valid.map(r=>analysisValue(r,key))),ymax=Math.max(0,...valid.map(r=>analysisValue(r,key))),yrange=ymax-ymin||1,X=v=>L+v/xmax*(W-L-R),Y=v=>H-B-(v-ymin)/yrange*(H-T-B);
-    return `<svg class="roi-scatter" viewBox="0 0 ${W} ${H}" role="group" aria-label="任务收益与投入散点图"><text x="${L}" y="14" class="chart-label">${esc({roi:'成本净 ROI（%）',hourly:'净时薪',net:'经济净收益',gross:'毛收益',cost:'成本（元）',minutes:'操作分钟'}[key])}</text>${Array.from({length:5},(_,i)=>{const y=ymin+yrange*i/4,x=xmax*i/4;return `<line x1="${L}" y1="${Y(y)}" x2="${W-R}" y2="${Y(y)}" class="chart-grid"/><text x="${L-9}" y="${Y(y)+4}" text-anchor="end" class="chart-label">${num(y,1)}</text><text x="${X(x)}" y="${H-B+22}" text-anchor="middle" class="chart-label">${num(x,1)}</text>`;}).join('')}<line x1="${L}" y1="${Y(0)}" x2="${W-R}" y2="${Y(0)}" stroke="var(--wb-text-muted)" stroke-dasharray="4 4"/><text x="${W-R}" y="${H-6}" text-anchor="end" class="chart-label">${xkey==='minutes'?'操作时间（分钟）':'综合成本（元）'}</text>${valid.map((r,i)=>{const tip=r.task.name+' / '+analysisFormat(xkey,r[xkey])+' / '+analysisFormat(key,analysisValue(r,key));return `<g class="scatter-point" tabindex="0" role="button" data-action="analysis-inspect" data-id="${esc(r.task.id)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.task.id}"><title>${esc(tip)}</title><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="15" fill="transparent"/><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="7" fill="${r.net<0?'var(--wb-danger)':colors[i%colors.length]}" stroke="var(--wb-surface)" stroke-width="2"/><text x="${X(r[xkey])}" y="${Y(analysisValue(r,key))+4}" text-anchor="middle" fill="var(--wb-bg)" font-size="12">${i+1}</text></g>`;}).join('')}</svg><div class="scatter-legend">${valid.map((r,i)=>button(`<i class="swatch" style="background:${r.net<0?'var(--wb-danger)':colors[i%colors.length]}"></i>${i+1}. ${esc(r.task.name)}`,'analysis-inspect','ghost small',`data-id="${esc(r.task.id)}" aria-pressed="${ui.analysisFocus===r.task.id}"`)).join('')}</div>`;
+    return `<svg class="roi-scatter" viewBox="0 0 ${W} ${H}" role="group" aria-label="任务收益与投入散点图"><text x="${L}" y="14" class="chart-label">${esc({roi:'成本净 ROI（%）',hourly:'净时薪',net:'经济净收益',gross:'毛收益',cost:'成本（元）',minutes:'操作分钟'}[key])}</text>${Array.from({length:5},(_,i)=>{const y=ymin+yrange*i/4,x=xmax*i/4;return `<line x1="${L}" y1="${Y(y)}" x2="${W-R}" y2="${Y(y)}" class="chart-grid"/><text x="${L-9}" y="${Y(y)+4}" text-anchor="end" class="chart-label">${num(y,1)}</text><text x="${X(x)}" y="${H-B+22}" text-anchor="middle" class="chart-label">${num(x,1)}</text>`;}).join('')}<line x1="${L}" y1="${Y(0)}" x2="${W-R}" y2="${Y(0)}" stroke="var(--wb-text-muted)" stroke-dasharray="4 4"/><text x="${W-R}" y="${H-6}" text-anchor="end" class="chart-label">${xkey==='minutes'?'操作时间（分钟）':'综合成本（元）'}</text>${valid.map((r,i)=>{const tip=r.task.name+' / '+analysisFormat(xkey,r[xkey])+' / '+analysisFormat(key,analysisValue(r,key));return `<g class="scatter-point" tabindex="0" role="button" data-action="analysis-inspect" data-id="${esc(r.task.id)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.task.id}"><title>${esc(tip)}</title><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="15" fill="transparent"/><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="7" fill="${r.net<0?'var(--wb-danger)':colors[categoryIndex(r.task?.id||r.id||r.label)]}" stroke="var(--wb-surface)" stroke-width="2"/><text x="${X(r[xkey])}" y="${Y(analysisValue(r,key))+4}" text-anchor="middle" fill="var(--wb-bg)" font-size="12">${i+1}</text></g>`;}).join('')}</svg><div class="scatter-legend">${valid.map((r,i)=>button(`<i class="swatch" style="background:${r.net<0?'var(--wb-danger)':colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i>${i+1}. ${esc(r.task.name)}`,'analysis-inspect','ghost small',`data-id="${esc(r.task.id)}" aria-pressed="${ui.analysisFocus===r.task.id}"`)).join('')}</div>`;
   }
   function priceChart(rows){
     const groups=new Map();for(const q of rows){const id=JSON.stringify([q.kind,q.server||'',q.itemId||q.name]);if(!groups.has(id))groups.set(id,[]);groups.get(id).push(q);}
@@ -203,13 +239,21 @@
   }
   function rememberAnalysisDetails(){for(const el of document.querySelectorAll('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}}
   function render(){
+    const beforeMotion=captureMotion();
     for(const el of document.querySelectorAll('[data-task-fold]'))taskFolds.set(el.dataset.taskFold,el.open);
     rememberRoute();renderSidebar();renderTopbar();rememberTaskView();document.body.classList.toggle('task-context',ui.page==='task'&&!ui.setup);document.body.classList.toggle('analysis-context',['overview','roi'].includes(ui.page));
     const pages={overview,task:taskPage,roi:roiPage,plan:taskPage,history:historyPage,roles:rolesPage,assets:assetsPage,settings:workspaceSettings,taskmanage:settingsPage,data:workspaceSettings};
     $('#app').innerHTML=(storageError?notice(esc(storageError),button('导出原始存储','raw-backup')):'')+(ui.page!=='task'&&(ui.role||ui.group||ui.account)&&ui.mode==='estimated'?notice('确认排程按完整批次筛选；只选部分成员时不擅自分摊整队或共享收益。'):'')+(ui.page!=='task'&&(ui.role||ui.group||ui.account)&&ui.mode==='actual'?notice('实测筛选纳入完整出勤记录及明确分摊的角色金额；未分摊整队记录不计入部分角色 ROI。现金流为全空间口径。'):'')+(ui.setup?`<div class="setup-background" inert aria-hidden="true">${overview()}</div><section id="setup-layer" class="setup-layer" role="region" aria-label="工作空间配置引导"><div class="setup-shell">${setupPage()}</div></section>`:pages[ui.page]());
     try{if($('#default-page'))$('#default-page').value=localStorage.getItem('jx3-default-page')||'overview';}catch{}
+    const focusNow=$('#tc-v2-focus');
+    if(beforeMotion.focus&&focusNow&&motionState?.page==='task'&&ui.page==='task'){
+      for(const attr of [...beforeMotion.focus.attributes])beforeMotion.focus.removeAttribute(attr.name);
+      for(const attr of [...focusNow.attributes])beforeMotion.focus.setAttribute(attr.name,attr.value);
+      beforeMotion.focus.replaceChildren(...focusNow.childNodes);focusNow.replaceWith(beforeMotion.focus);
+    }
     collapseRecordTables();enhanceTables();fitRevenueMapLabels();applyPrivacy();
     syncFlowRails();
+    finishRenderMotion(beforeMotion);
     $('#sidebar').inert=ui.setup;$('#topbar').inert=ui.setup;document.body.classList.toggle('setup-open',ui.setup);
     const pageKey=ui.page+(ui.page==='task'?':'+ui.workView:ui.page==='roi'?':'+ui.roiTab+':'+ui.roiSection:'');if(pageKey!==renderedPageKey){renderedPageKey=pageKey;window.scrollTo(0,0);}
     document.title=ui.setup?'配置引导 / 剑网三工作台':({overview:'总览',task:'任务中心',roi:'收益分析',plan:'任务中心',history:'任务历史',roles:'账号角色',assets:'资产台账',settings:'工作台设置',taskmanage:'管理任务',data:'工作台设置'}[ui.page])+' / 剑网三工作台';
@@ -254,7 +298,7 @@
   }
   function overviewBreakdown(s){
     const rows=s.tasks.filter(r=>r.hasData),total=rows.reduce((n,r)=>n+Math.max(0,r.gross),0);
-    return `<details class="insight-breakdown-fold" data-raw-key="overview-breakdown" ${analysisDetails.has('overview-breakdown')?'open':''}><summary>任务详细收益 / ${rows.length} 项</summary><div class="insight-breakdown">${rows.map((r,i)=>`<details class="insight-detail" data-raw-key="overview-${esc(r.task.id)}" ${analysisDetails.has('overview-'+r.task.id)?'open':''}><summary><i style="background:${colors[i%colors.length]}"></i><strong>${esc(r.task.name)}</strong><b>${amount(r.gross,r.gold)}</b><small>${total?pct(Math.max(0,r.gross)/total*100):'—'}</small></summary><div class="insight-detail-body"><span>净收益 <b>${amount(r.net,r.netGold)}</b></span><span>操作 <b>${num(r.minutes,1)} 分钟</b></span>${button('查看任务明细','task-analysis','small',`data-id="${esc(r.task.id)}"`)}</div></details>`).join('')}</div></details>`;
+    return `<details class="insight-breakdown-fold" data-raw-key="overview-breakdown" ${analysisDetails.has('overview-breakdown')?'open':''}><summary>任务详细收益 / ${rows.length} 项</summary><div class="insight-breakdown">${rows.map((r,i)=>`<details class="insight-detail" data-raw-key="overview-${esc(r.task.id)}" ${analysisDetails.has('overview-'+r.task.id)?'open':''}><summary><i style="background:${colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i><strong>${esc(r.task.name)}</strong><b>${amount(r.gross,r.gold)}</b><small>${total?pct(Math.max(0,r.gross)/total*100):'—'}</small></summary><div class="insight-detail-body"><span>净收益 <b>${amount(r.net,r.netGold)}</b></span><span>操作 <b>${num(r.minutes,1)} 分钟</b></span>${button('查看任务明细','task-analysis','small',`data-id="${esc(r.task.id)}"`)}</div></details>`).join('')}</div></details>`;
   }
   function overviewAccounts(){
     const q=ui.overviewSearch.trim().toLowerCase();
@@ -307,6 +351,7 @@
     for(const item of chart.querySelectorAll('.trend-group')){item.classList.toggle('is-active',item===group);item.setAttribute('aria-pressed',String(item.dataset.index===chart.dataset.selected));}
     chart.querySelector('.trend-detail').textContent=group.dataset.info;
   }
+  function categoryIndex(key){let hash=0;for(const c of String(key||''))hash=(Math.imul(hash,31)+c.charCodeAt(0))|0;return (hash>>>0)%6;}
   let colors=Theme.palette(document.documentElement.dataset.theme).chartColors;
   function setTheme(id){const result=Theme.apply(id);colors=result.chartColors;render();toast(result.saved?'已切换为 '+result.theme.name+'，已记住选择':'主题已切换；浏览器存储不可用，刷新后可能恢复默认');}
   function themePanel(){return `<section class="card pad mb"><div class="flex between wrap"><div><h2>外观主题</h2><p class="panel-sub">3 种浅色、2 种深色。页面、图表和战报共用同一套主题，选择会在本机记住。</p></div><span class="pill">外观偏好独立保存</span></div><div class="theme-options mt">${Theme.themes.map(t=>{const p=Theme.palette(t.id).tokens,active=document.documentElement.dataset.theme===t.id;return `<button type="button" class="theme-option ${active?'selected':''}" data-action="set-theme" data-id="${t.id}" aria-pressed="${active}"><span class="theme-swatch" style="background:${p.bg};border-color:${p.border}"><i style="background:${p.sidebar};border-color:${p.border}"></i><span style="background:${p.surface};border-color:${p.border}"><b style="background:${p.primary}"></b><b style="background:${p.cyan}"></b><b style="background:${p.purple}"></b></span></span><strong>${t.name} ${active?'✓':''}</strong><small>${t.description}</small></button>`;}).join('')}</div></section>`;}
@@ -350,8 +395,8 @@
     const blocks=revenueMapBlocks(rows,value);
     return `<div class="revenue-map-layout"><div class="revenue-map" role="list" aria-label="按任务正毛收益的面积占比图">${blocks.map(({row:r,x,y,w,h},i)=>{
       const share=value(r)/total*100;
-      return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:${colors[i%colors.length]};--tile-bg:var(--wb-chart-bg-${i%colors.length})" title="${esc(r.task.name)}：${pct(share)} / ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong class="revenue-map-share">${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
-    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}" title="${esc(r.task.name)} / ${pct(value(r)/total*100)}"><i style="background:${colors[i%colors.length]}"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">按正毛收益计算面积占比；净收益与亏损见任务明细。</p>`;
+      return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:${colors[categoryIndex(r.task?.id||r.id||r.label)]};--tile-bg:var(--wb-chart-bg-${categoryIndex(r.task.id)})" title="${esc(r.task.name)}：${pct(share)} / ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong class="revenue-map-share">${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
+    }).join('')}</div><div class="revenue-map-detail"><div class="revenue-map-summary"><small>收益来源</small><strong>${rows.length} <span>项任务</span></strong><small>前三项贡献 ${pct(largest)}</small></div><div class="revenue-map-list" role="list">${rows.map((r,i)=>`<button type="button" class="revenue-map-line" data-action="task-analysis" data-id="${esc(r.task.id)}" title="${esc(r.task.name)} / ${pct(value(r)/total*100)}"><i style="background:${colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i><span>${esc(r.task.name)}</span><b>${pct(value(r)/total*100)}</b></button>`).join('')}</div></div></div><p class="composition-note">按正毛收益计算面积占比；净收益与亏损见任务明细。</p>`;
   }
   function todoList(limit=4){const rows=state.tasks.filter(t=>t.enabled&&t.days.includes(M.weekday(today))).map(t=>({task:t,...M.plan(state,t,today,scope(),true)})).filter(t=>t.executions>0).sort((a,b)=>(b.hourly??0)-(a.hourly??0));if(!state.roles.length)return empty('尚未配置账号与角色','先建立档案，再选择常用任务。',button('开始配置','setup','primary'));if(!rows.length)return empty('当前没有待安排建议','可以选择其他日期，或为角色安排新任务。',button('查看任务矩阵','nav','','data-page="task"'));return `<div class="todo-list">${rows.slice(0,limit).map(r=>`<div class="todo-row"><span class="task-icon">${icon(r.task.type==='team'?'shield':'bolt')}</span><div class="todo-name"><strong>${esc(r.task.name)}</strong><small>${r.executions} ${r.task.type==='team'?'队通关':'角色次'}待做 / ${r.batches.length} 批 / ${num(r.minutes)} 分钟</small></div><div class="todo-value"><b class="cyan">${amount(r.net,r.netGold)}</b><small>预计净收益</small></div>${button(icon('chevron'),'task-detail','ghost small',`data-id="${r.task.id}" aria-label="查看${esc(r.task.name)}"`)}</div>`).join('')}</div>`;}
   function queueBounds(){
@@ -371,7 +416,7 @@
     if(!state.roles.length)return pageHead('TASK CENTER','任务中心','先建立角色档案，再选择常用任务。')+empty('尚未建立账号与角色','任务模板已预置。完成档案配置后即可分配任务、安排与执行。',button('开始配置','setup','primary'));
     ui.search='';ui.taskFilter='';ui.queueStatus='all';ui.progressStatus='all';
     const queue=ui.workView==='queue'?executionQueue(true):null,progress=ui.workView==='progress'?progressPanel(true):null;
-    return `<div class="task-center"><div class="tc-heading"><div><h1>任务中心</h1><span class="muted"></span></div></div><section class="card tc-command" aria-label="任务控制中心"><div class="tc-command-top">${tabs([['queue','执行任务'],['planning','安排任务'],['progress','任务查漏']],ui.workView,'work-view')}<div class="flex wrap">${button(icon('settings')+'管理任务','nav','tc-manage','data-page="taskmanage"')}<details class="module-tools"><summary>历史与工具</summary><div>${button('任务历史 / 副本 CD','open-task-history','small')}${button('MuMu 设置','mumu-settings','small')}${button('回收站','task-recycle','small')}</div></details></div></div><div class="tc-command-filters">${ui.workView==='planning'?`<label class="plan-type-field">任务类型<select id="plan-type" aria-label="任务类型"><option value="batches" ${ui.planTab==='batches'?'selected':''}>日常任务（含大战）</option><option value="teams" ${ui.planTab==='teams'?'selected':''}>副本任务（十人本）</option></select></label>`:''}${ui.workView==='queue'?taskRangePicker():`<div class="tc-date flex wrap">${button('‹','task-date-step','small','data-offset="-1" aria-label="上一日期"')}<label><span class="sr-only">任务日期</span><input id="task-date" aria-label="任务日期" type="date" value="${ui.taskDate}"></label>${button('›','task-date-step','small','data-offset="1" aria-label="下一日期"')}${button('今天','task-today','small')}</div>`}</div>${queue?.controls||progress?.controls||''}</section>${ui.workView==='planning'?planPage():ui.workView==='progress'?progress.content:queue.content}</div>`;
+    return `<div class="task-center"><div class="tc-heading"><div><h1>任务中心</h1><span class="muted"></span></div></div><section class="card tc-command" aria-label="任务控制中心"><div class="tc-command-top">${tabs([['queue','执行任务'],['planning','安排任务'],['progress','任务查漏']],ui.workView,'work-view')}<div class="flex wrap">${button(icon('settings')+'管理任务','nav','tc-manage','data-page="taskmanage"')}<details class="module-tools"><summary>历史与工具</summary><div>${button('任务历史 / 副本 CD','open-task-history','small')}${button('MuMu 设置','mumu-settings','small')}${button('回收站','task-recycle','small')}</div></details></div></div><div class="tc-command-filters">${ui.workView==='planning'?`<label class="plan-type-field">任务类型<select id="plan-type" aria-label="任务类型"><option value="batches" ${ui.planTab==='batches'?'selected':''}>日常任务（含大战）</option><option value="teams" ${ui.planTab==='teams'?'selected':''}>副本任务（十人本）</option></select></label>`:''}${ui.workView==='queue'?taskRangePicker():`<div class="tc-date flex wrap">${button('‹','task-date-step','small','data-offset="-1" aria-label="上一日期"')}<label><span class="sr-only">任务日期</span><input id="task-date" aria-label="任务日期" type="date" value="${ui.taskDate}"></label>${button('›','task-date-step','small','data-offset="1" aria-label="下一日期"')}${button('今天','task-today','small')}</div>`}</div>${queue?.controls||progress?.controls||''}</section><div class="task-content">${ui.workView==='planning'?planPage():ui.workView==='progress'?progress.content:queue.content}</div></div>`;
   }
   function planFinished(p){return (p.routeTaskIds||[p.taskId]).every(id=>!Daily.remaining(state,p,id).length);}
   const recentCompletedBatch=(a,b)=>Daily.completedTime(state,b.p,b.id,b.i)-Daily.completedTime(state,a.p,a.id,a.i);
@@ -982,7 +1027,8 @@
     $('#dialog').classList.remove('screenshot-wide','report-dialog');
     submitModal=handler;
     $('#dialog-content').innerHTML=`<form id="modal-form"><div class="dialog-head"><h2>${title}</h2>${button(icon('close'),'close','ghost','type="button" aria-label="关闭对话框"')}</div><div class="dialog-body">${body}</div><div class="dialog-foot"><div id="form-error" class="error" role="alert" tabindex="-1" hidden></div>${button(handler?'取消':'关闭','close','','type="button"')}${handler?`<button type="submit" class="primary">${label}</button>`:''}</div></form>`;
-    if(!$('#dialog').open)$('#dialog').showModal();
+    const wasOpen=$('#dialog').open;if(!wasOpen)$('#dialog').showModal();
+    animateUI(wasOpen?$('#dialog .dialog-body'):$('#dialog'),[{opacity:.4,transform:wasOpen?'translateY(4px)':'translateY(8px) scale(.985)'},{opacity:1,transform:'none'}],250,wasOpen?'wb-dialog-content':'wb-dialog');
     const form=$('#modal-form'),error=$('#form-error');
     const showError=message=>{error.textContent=message;error.hidden=false;};
     form.addEventListener('submit',e=>{e.preventDefault();error.hidden=true;try{if(submitModal){const data=new FormData(e.target);data.set('_submit',e.submitter?.value||'');submitModal(data,e.target);$('#dialog').close();submitModal=null;}}catch(err){showError(err.message);error.focus();}});
@@ -1304,14 +1350,14 @@
           text(sources.length+' 项收益来源',64,312,31,p.text,450,600);text('前三项贡献 '+pct(sources.slice(0,3).reduce((n,r)=>n+sourceValue(r),0)/sourceTotal*100),1016,318,26,p['text-secondary'],490,500,'right');
           const X=64,Y=390,MW=952,MH=510;panel(X,Y,MW,MH,p['surface-2'],14);
           blocks.forEach(({row:r,x,y,w,h},i)=>{
-            const bx=X+x/100*MW,by=Y+y/100*MH,bw=w/100*MW,bh=h/100*MH,pad=5,share=pct(sourceValue(r)/sourceTotal*100),color=colors[i%colors.length];c.save();c.beginPath();c.rect(bx+1,by+1,Math.max(0,bw-2),Math.max(0,bh-2));c.clip();c.globalAlpha=.19;c.fillStyle=color;c.fillRect(bx,by,bw,bh);c.globalAlpha=1;
+            const bx=X+x/100*MW,by=Y+y/100*MH,bw=w/100*MW,bh=h/100*MH,pad=5,share=pct(sourceValue(r)/sourceTotal*100),color=colors[categoryIndex(r.task?.id||r.id||r.label)];c.save();c.beginPath();c.rect(bx+1,by+1,Math.max(0,bw-2),Math.max(0,bh-2));c.clip();c.globalAlpha=.19;c.fillStyle=color;c.fillRect(bx,by,bw,bh);c.globalAlpha=1;
             // Fit the percentage first. Name and amount use only the remaining space.
             c.font=`650 30px ${font}`;const natural=c.measureText(share).width,rotate=bw<38&&bh>bw*2,n=Math.max(1,Math.min(30,30*(rotate?bh-2*pad:bw-2*pad)/Math.max(1,natural),rotate?bw-4:bh-4));
             function percentage(x,y,limit,align='left'){c.save();c.translate(x,y);c.font=`650 ${n}px ${font}`;c.textBaseline='top';c.textAlign=align;c.fillStyle=p.text;const scale=Math.min(1,limit/Math.max(1,c.measureText(share).width));c.scale(scale,Math.min(1,Math.max(.1,bh-2)/n));c.fillText(share,0,0);c.restore();}if(rotate){c.translate(bx+bw/2,by+bh/2);c.rotate(-Math.PI/2);percentage(0,-n/2,Math.max(.1,bh-4),'center');}else{const nameSpace=bw>=85&&bh>=n+40;let sy=by+Math.max(1,(bh-n)/2);if(nameSpace){text(safe(r.task.name,o),bx+pad,by+10,22,p['text-secondary'],bw-2*pad,500,'left',12);sy=by+40;}percentage(bx+Math.min(5,bw*.1),sy,Math.max(.1,bw-Math.min(10,bw*.2)));if(nameSpace&&bh>n+86&&bw>160)text(value(r.gross,r.gold).main,bx+pad,sy+n+12,20,p['text-secondary'],bw-2*pad,400,'left',12);}
             c.restore();c.strokeStyle=p.bg;c.lineWidth=3;c.strokeRect(bx,by,bw,bh);
           });
           text('任务明细'+(page.parts>1?' / '+page.part+' / '+page.parts:''),64,936,25,p.text,952,600);
-          page.rows.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),x=64+col*486,y=984+row*64,idx=sources.indexOf(r);c.fillStyle=colors[idx%colors.length];c.fillRect(x,y+5,8,22);text(safe(r.task.name,o),x+20,y,23,p.text,340,500);text(pct(sourceValue(r)/sourceTotal*100),x+460,y,25,p.text,98,650,'right');text(value(r.gross,r.gold).main,x+20,y+30,19,p['text-muted'],430);});
+          page.rows.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),x=64+col*486,y=984+row*64,idx=sources.indexOf(r);c.fillStyle=colors[categoryIndex(r.task.id)];c.fillRect(x,y+5,8,22);text(safe(r.task.name,o),x+20,y,23,p.text,340,500);text(pct(sourceValue(r)/sourceTotal*100),x+460,y,25,p.text,98,650,'right');text(value(r.gross,r.gold).main,x+20,y+30,19,p['text-muted'],430);});
         }
       }
       if(page.kind==='ranking'){
@@ -1709,7 +1755,7 @@
     'manage-remaining':b=>remainingForm(state.plans.find(p=>p.id===b.dataset.id)),
     'execute-plan':b=>chooseExecution(state.plans.find(p=>p.id===b.dataset.id),b.dataset.task||state.plans.find(p=>p.id===b.dataset.id).taskId),
     'schedule-edit':b=>scheduleEdit(state.tasks.find(t=>t.id===b.dataset.task),b.dataset.date),
-    'analysis-inspect':b=>{ui.analysisFocus=b.dataset.id;render();$('.analysis-inspector')?.scrollIntoView({block:'nearest',behavior:'smooth'});},
+    'analysis-inspect':b=>{ui.analysisFocus=b.dataset.id;render();$('.analysis-inspector')?.scrollIntoView({block:'nearest',behavior:motionPreference.matches?'auto':'smooth'});},
     'analysis-clear':()=>{ui.analysisFocus='';render();},
     'analysis-reset':()=>{Object.assign(ui,{analysisTasks:null,analysisType:'',analysisStatus:'all',analysisView:'bar',analysisMetric:'hourly',analysisX:'minutes',analysisOrder:'desc',analysisLimit:'6',analysisFocus:''});render();},
     'analysis-select-all':()=>{ui.analysisTasks=null;render();},
@@ -1722,7 +1768,7 @@
     'raw-backup':()=>download('JX3_raw_storage.txt',new Blob([JSON.stringify({current:localStorage.getItem(KEY),legacy:localStorage.getItem(Store.LEGACY_KEY)},null,2)],{type:'text/plain'})),
     'preset-sources':()=>presetSources(),'reset-blank':()=>confirmReset(),
     'csv-template':()=>download('JX3_roles_template.csv',new Blob(['\uFEFFaccount_id,account_name,group,role_id,role_name,server,school,stance,duty,level,score,opening_gold,balance,tags,companion,region,billing_type,monthly_expires_at,tongbao,points,camp,observed_gold,energy,energyCap,weeklyEnergy,contribution,chivalry,prestige,achievement,stage,huashang,homeSeason,resource_date,reference_dps,gongzhan_buff\na_example,账号示例,主力组,r_example,角色示例,梦江南,七秀,云裳心经,heal,130,85000,18000,1600,日常,,电信区,point,,,,unknown,,0,3000,,,,,,,,,2026-10-14,,unknown\n'],{type:'text/csv;charset=utf-8'})),
-    undo:()=>{if(undoState&&undoStore){Store.write(localStorage,undoStore);state=undoState;dataStore=undoStore;undoState=null;undoStore=null;storageError='';storageReadError=false;clearScope();ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;render();toast('上一步变更已撤销');}},
+    undo:()=>{if(undoState&&undoStore){motionCommit={rows:motionRows()};Store.write(localStorage,undoStore);state=undoState;dataStore=undoStore;undoState=null;undoStore=null;storageError='';storageReadError=false;clearScope();ui.setup=!state.accounts.length&&!state.roles.length;ui.setupStep=0;render();toast('上一步变更已撤销');}},
     search:()=>{modal('搜索任务或角色',`<input id="global-search" type="search" placeholder="输入名称…" style="width:100%" aria-label="搜索任务或角色"><div id="search-results" class="mt"></div>`);$('#global-search').addEventListener('input',e=>{const q=e.target.value;$('#search-results').innerHTML=q?`<div class="stack">${state.tasks.filter(t=>t.name.includes(q)).slice(0,8).map(t=>button('任务 / '+esc(t.name),'task-detail','',`data-id="${t.id}" type="button"`)).join('')}${state.roles.filter(r=>r.name.includes(q)).slice(0,8).map(r=>button('角色 / '+esc(r.name),'role-detail','',`data-id="${r.id}" type="button"`)).join('')}</div>`:'';});}
   };
   document.addEventListener('toggle',e=>{const el=e.target;if(el.matches?.('.analysis-task-picker'))ui.analysisPicker=el.open;if(el.matches?.('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}},true);
@@ -1750,6 +1796,8 @@
     if(hint)hint.textContent=select?.dataset.manuallyChosen?(select.value?'已手动匹配，请核对角色和数值':'待匹配，请手动选择已有角色'):match.roleId?(match.exact?'姓名准确匹配':'候选匹配，请核对账号和门派'):match.suggestions.length?'建议优先选择：'+match.suggestions.slice(0,3).map(x=>x.name).join('、'):'未匹配，请手动选择';
     refreshScreenshotMatches();
   });
+  document.addEventListener('click',e=>{const summary=e.target.closest('summary');motionDisclosure=summary?.parentElement||null;},true);
+  document.addEventListener('toggle',e=>{const detail=e.target;if(detail!==motionDisclosure)return;motionDisclosure=null;if(!detail.open)return;for(const child of [...detail.children].filter(c=>c.tagName!=='SUMMARY'))animateUI(child,[{opacity:.3,transform:'translateY(-4px)'},{opacity:1,transform:'none'}],220,'wb-disclosure');},true);
   $('#dialog').addEventListener('close',()=>{clearScreenshotQueue();screenshotDraft=null;});
   const flowScrollTimers=new WeakMap();
   document.addEventListener('scroll',e=>{

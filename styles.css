@@ -721,3 +721,19 @@ input[type=checkbox]{min-height:0}
 .brand>div{min-width:0}.sidebar{overflow-x:hidden}.brand{padding-right:0}.brand strong{white-space:nowrap}
 
 .revenue-map-tile{background:var(--tile-bg);border-color:var(--wb-surface)}
+
+/* Harmonized theme surfaces and purposeful microinteractions, 2026-10-23. */
+:root{--wb-motion-fast:160ms;--wb-motion-base:250ms;--wb-motion-ease:cubic-bezier(.16,1,.3,1)}
+button.primary{background:var(--wb-primary);border-color:var(--wb-primary);color:var(--wb-primary-text)}
+button.primary:hover{background:var(--wb-primary-hover);border-color:var(--wb-primary-label)}
+.nav button.active,.tabs button.active,.segmented button.active{background:var(--wb-primary-soft);color:var(--wb-primary-label);border-color:var(--wb-notice-border)}
+.insight-metric strong,.kpi .value{color:var(--wb-text)}.insight-metric strong.negative,.kpi .value.negative{color:var(--wb-danger)}
+.flow-task.is-selected,.flow-batch.is-selected{background:var(--wb-primary-soft);border-color:var(--wb-primary)}
+.flow-task-duration{color:var(--wb-text-secondary)}
+.revenue-map-tile{color:var(--wb-text);background:var(--tile-bg)}
+.revenue-map-tile:hover{background:var(--tile-bg);border-color:var(--tile-accent)}
+button,input,select,textarea{transition:background-color var(--wb-motion-fast) ease-out,border-color var(--wb-motion-fast) ease-out,color var(--wb-motion-fast) ease-out}
+.tc-v2-track i,.progress>div{transition:width var(--wb-motion-base) var(--wb-motion-ease)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+.task-content{min-width:0}
