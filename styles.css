@@ -925,3 +925,14 @@ html[data-theme] .revenue-map-tile .revenue-map-name,html[data-theme] .revenue-m
 .kpi .value.positive{color:var(--wb-positive)}
 .account-resource-grid .wb-resource-label[data-tone="warning"] svg{color:var(--wb-warning)}
 .account-archive-meta .wb-sync-stamp[data-tone="warning"] svg{color:var(--wb-warning)!important}
+
+/* Remaining headings and ledger rows inherit their current height and column sizing. */
+.panel-head h2 svg{display:inline-block;width:16px;height:16px;vertical-align:-2px;margin-right:7px;color:var(--wb-info)}
+.wb-transaction-label svg{display:inline-block;width:15px;height:15px;vertical-align:-3px;margin-right:6px}
+.wb-transaction-label[data-tone="positive"],.wb-flow-in{color:var(--wb-positive)}
+.wb-transaction-label[data-tone="expense"],.wb-flow-out{color:var(--wb-expense)}
+.wb-transaction-label[data-tone="muted"],.wb-flow-neutral{color:var(--wb-text-secondary)}
+#screenshot-status[data-tone="success"]{color:var(--wb-success)}
+#screenshot-status[data-tone="warning"]{color:var(--wb-warning)}
+#screenshot-status[data-tone="danger"]{color:var(--wb-danger)}
+#screenshot-status[data-tone="muted"]{color:var(--wb-text-muted)}
