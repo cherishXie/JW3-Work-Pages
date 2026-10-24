@@ -593,9 +593,21 @@
       if(e.direction==='out'&&e.category==='consumption'&&e.roiCost!==false&&!e.snapshot){e.snapshot={...s.config,saleRate:1,fee:0};e.pricingSource='旧流水迁移时计价，原始币价未知';}
     }return s;
   }
-  function recordResult(r){
-    const goldCost=r.goldCost||0,result=costs(r.gold,r.minutes,r.onlineMinutes,r.snapshot,(r.otherCost||0)+goldCost*r.snapshot.goldPrice/r.snapshot.goldUnit,r.accountMinutes||{});
-    if(r.incompleteMeasurement)for(const k of ['net','timeNet','netGold','hourly','hourlyGold','roi'])result[k]=null;return {...result,incompleteMeasurement:!!r.incompleteMeasurement,goldCost,accountMinutes:r.accountMinutes||{},...(r.billableAccountMinutes?{billableAccountMinutes:r.billableAccountMinutes,coveredAccountMinutes:r.coveredAccountMinutes||{}}:{}),billingWarnings:[...(r.billingWarnings||[]),...(r.pricingSource?[r.pricingSource]:[])]};
+  // Revalue only the point-card discount; recorded prices and billing coverage remain facts.
+  function recordPricing(r,currentConfig){
+    const original=r.snapshot;
+    if(!currentConfig||currentConfig.discount===undefined||currentConfig.discount===original.discount)return original;
+    const discount=number(currentConfig.discount,'点卡折扣',{min:0,max:1}),base=original.cardPrice*original.discount/original.cardMinutes,rate=original.cardPrice*discount/original.cardMinutes;
+    const ids=new Set([...Object.keys(original.accountBillingRates||{}),...Object.keys(r.billableAccountMinutes||{})]);
+    const accountBillingRates=Object.fromEntries([...ids].map(id=>{
+      const minutes=r.accountMinutes?.[id],fraction=minutes>0&&r.billableAccountMinutes?.[id]!==undefined?r.billableAccountMinutes[id]/minutes:base>0?(original.accountBillingRates?.[id]??base)/base:1;
+      return [id,rate*Math.max(0,fraction)];
+    }));
+    return {...original,discount,...(ids.size?{accountBillingRates}:{})};
+  }
+  function recordResult(r,currentConfig){
+    const config=recordPricing(r,currentConfig),goldCost=r.goldCost||0,result=costs(r.gold,r.minutes,r.onlineMinutes,config,(r.otherCost||0)+goldCost*r.snapshot.goldPrice/r.snapshot.goldUnit,r.accountMinutes||{});
+    if(r.incompleteMeasurement)for(const k of ['net','timeNet','netGold','hourly','hourlyGold','roi'])result[k]=null;return {...result,incompleteMeasurement:!!r.incompleteMeasurement,goldCost,accountMinutes:r.accountMinutes||{},...(r.billableAccountMinutes?{billableAccountMinutes:r.billableAccountMinutes,coveredAccountMinutes:r.coveredAccountMinutes||{}}:{}),billingWarnings:[...(r.billingWarnings||[]),...(currentConfig?.discount>0&&r.snapshot.discount===0&&!r.billableAccountMinutes&&r.snapshot.accountBillingRates?['原记录为零折扣且缺少计费分钟，月卡覆盖无法还原，暂按计时单价估算']:[]),...(r.pricingSource?[r.pricingSource]:[])]};
   }
   function selectedRecordRoles(s,r,scope={}){return r.roleIds.filter(id=>{const role=s.roles.find(x=>x.id===id);return role&&(!scope.role||id===scope.role)&&(!scope.account||recordAccount(s,r,id)===scope.account)&&(!scope.group||(r.roleGroups?.[id]??s.accounts.find(a=>a.id===recordAccount(s,r,id))?.group)===scope.group);});}
   function scopedRecord(s,r,scope={}){
@@ -681,7 +693,7 @@
   function summary(s,start,end,scope={},mode='estimated') {
     if(mode==='estimated'){dates(start,end);return confirmedForecast(s,start,end,scope);}
     const actualRows=mode==='actual'?incomeRecords(s):[],ds=dates(start,end),estimateUsage=new Set(),actualTasks=mode==='actual'?[...s.tasks,...[{id:'material_income',name:'独立材料出售'},{id:'operating_cost',name:'未关联任务的经营费用'}].filter(t=>actualRows.some(r=>r.taskId===t.id))]:s.tasks,perTask=actualTasks.filter(t=>t.enabled||mode==='actual').map(t=>{
-      const list=mode==='actual'?actualRows.filter(r=>r.taskId===t.id&&r.date>=start&&r.date<=end).map(r=>scopedRecord(s,r,scope)).filter(Boolean).map(recordResult):ds.map(d=>{if(!t.dungeonId)return plan(s,t,d,scope);const key=id=>[id,cdKey(t),cycle(t,d)].join('|'),filtered={...t,roleIds:t.roleIds.filter(id=>!estimateUsage.has(key(id)))},result=plan(s,filtered,d,scope);for(const role of result.batches.flat())estimateUsage.add(key(role.id));return result;});
+      const list=mode==='actual'?actualRows.filter(r=>r.taskId===t.id&&r.date>=start&&r.date<=end).map(r=>scopedRecord(s,r,scope)).filter(Boolean).map(r=>recordResult(r,s.config)):ds.map(d=>{if(!t.dungeonId)return plan(s,t,d,scope);const key=id=>[id,cdKey(t),cycle(t,d)].join('|'),filtered={...t,roleIds:t.roleIds.filter(id=>!estimateUsage.has(key(id)))},result=plan(s,filtered,d,scope);for(const role of result.batches.flat())estimateUsage.add(key(role.id));return result;});
       return {task:t,...sum(list,s.config),hasData:mode!=='actual'||list.length>0};
     });
     const hasData=mode!=='actual'||actualRows.some(r=>r.date>=start&&r.date<=end&&inScope(s,r,scope));
@@ -911,5 +923,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

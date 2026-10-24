@@ -2,7 +2,7 @@
 (function(root,factory){const api=factory(typeof module!=='undefined'&&module.exports?require('./model.js'):root.Workbench,typeof module!=='undefined'&&module.exports?require('./raid-catalog.js'):root.JX3Raids);if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.WorkbenchActivity=api;})(typeof globalThis!=='undefined'?globalThis:this,function(M,R){
   'use strict';
   function roles(s,scope={}){return s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));}
-  function attribution(s,record,roleId){const scoped=M.scopedRecord(s,record,{role:roleId});return scoped?M.recordResult(scoped):null;}
+  function attribution(s,record,roleId){const scoped=M.scopedRecord(s,record,{role:roleId});return scoped?M.recordResult(scoped,s.config):null;}
   function online(s,record,roleId){
     if(record.roleOnlineMinutes?.[roleId]!==undefined)return record.roleOnlineMinutes[roleId];
     const role=s.roles.find(r=>r.id===roleId),accountId=M.recordAccount(s,record,roleId);if(record.roleIds.length===1)return record.onlineMinutes;
@@ -32,7 +32,7 @@
     });
     const accounts=s.accounts.filter(a=>roleRows.some(r=>r.role.accountId===a.id)||financial.some(r=>M.selectedRecordRoles(s,r,scope).some(id=>M.recordAccount(s,r,id)===a.id))).map(account=>{
       const rows=roleRows.filter(r=>r.role.accountId===account.id||all.some(e=>e.roleId===r.role.id&&e.accountId===account.id)),activity=all.filter(e=>(e.accountId||s.roles.find(r=>r.id===e.roleId)?.accountId)===account.id),actual=activity.filter(e=>e.actual),values=financial.map(r=>M.scopedRecord(s,r,{...scope,account:account.id})).filter(Boolean);
-      return {account,roles:rows,tasks:[...new Set(activity.map(e=>e.name))],cds:new Set(activity.filter(e=>e.dungeonId).map(e=>e.roleId+'|'+e.dungeonId+'|'+e.cycle)).size,actual:actual.length,onlineMinutes:actual.reduce((n,e)=>n+(e.onlineMinutes||0),0),missingTime:actual.filter(e=>e.onlineMinutes===null).length,unallocated:financial.filter(r=>M.selectedRecordRoles(s,r,{...scope,account:account.id}).length&&!M.scopedRecord(s,r,{...scope,account:account.id})).length,result:values.length?M.sum(values.map(M.recordResult),s.config):null};
+      return {account,roles:rows,tasks:[...new Set(activity.map(e=>e.name))],cds:new Set(activity.filter(e=>e.dungeonId).map(e=>e.roleId+'|'+e.dungeonId+'|'+e.cycle)).size,actual:actual.length,onlineMinutes:actual.reduce((n,e)=>n+(e.onlineMinutes||0),0),missingTime:actual.filter(e=>e.onlineMinutes===null).length,unallocated:financial.filter(r=>M.selectedRecordRoles(s,r,{...scope,account:account.id}).length&&!M.scopedRecord(s,r,{...scope,account:account.id})).length,result:values.length?M.sum(values.map(r=>M.recordResult(r,s.config)),s.config):null};
     });
     const recordIds=new Set(all.filter(e=>e.actual).map(e=>e.recordId));
     return {events:all,roles:roleRows,accounts,recordCount:recordIds.size,cdCount:roleRows.reduce((n,r)=>n+r.cds.length,0),actual:M.summary(s,start,end,scope,'actual')};
@@ -64,8 +64,8 @@
     }
     const budget=M.budget(s,remaining);
     const addMoney=(row,result)=>{row.gross+=result.gross;row.net+=result.net;row.gold+=result.gold||0;row.netGold=row.netGold===null||result.netGold===null?null:row.netGold+(result.netGold||0);row.hasIncome=true;};
-    const billing=(record,id,m)=>{const config=record.snapshot,base=config.cardPrice*config.discount/config.cardMinutes,rate=config.accountBillingRates?.[id]??base,am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
-      const billable=record.billableAccountMinutes?(record.billableAccountMinutes[id]||0)*ratio:base>0?m*Math.max(0,Math.min(1,rate/base)):m;
+    const billing=(record,id,m)=>{const config=record.snapshot,base=config.cardPrice*config.discount/config.cardMinutes,pricing=M.recordPricing(record,s.config),rate=pricing.accountBillingRates?.[id]??pricing.cardPrice*pricing.discount/pricing.cardMinutes,am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
+      const billable=record.billableAccountMinutes?(record.billableAccountMinutes[id]||0)*ratio:base>0?m*Math.max(0,Math.min(1,(config.accountBillingRates?.[id]??base)/base)):m;
       const covered=record.coveredAccountMinutes?(record.coveredAccountMinutes[id]||0)*ratio:m-billable;return {billable,covered,card:m*rate};};
     let unknownOnline=0;
     if(mode==='estimated'){
@@ -93,8 +93,8 @@
       for(const event of events(s,start,end,scope).filter(e=>!e.actual&&(e.completionOnly||e.status==='completed'||e.completed>0))){const row=roleRows.get(event.roleId),id=event.accountId||row.role.accountId;row.missingTime++;row.included=true;row.accountIds.add(id);if(accountRows.has(id))accountRows.get(id).missingTime++;}
       for(const record of M.incomeRecords(s).filter(r=>r.date>=start&&r.date<=end)){
         const selected=M.selectedRecordRoles(s,record,scope);if(!selected.length)continue;
-        for(const id of selected){const row=roleRows.get(id);row.included=true;row.accountIds.add(M.recordAccount(s,record,id));const value=M.scopedRecord(s,record,{...scope,role:id});if(value)addMoney(row,M.recordResult(value));else row.unallocated++;}
-        for(const [id,a]of accountRows){if(!selected.some(rid=>M.recordAccount(s,record,rid)===id))continue;const value=M.scopedRecord(s,record,{...scope,account:id});if(value)addMoney(a,M.recordResult(value));else a.unallocated++;}
+        for(const id of selected){const row=roleRows.get(id);row.included=true;row.accountIds.add(M.recordAccount(s,record,id));const value=M.scopedRecord(s,record,{...scope,role:id});if(value)addMoney(row,M.recordResult(value,s.config));else row.unallocated++;}
+        for(const [id,a]of accountRows){if(!selected.some(rid=>M.recordAccount(s,record,rid)===id))continue;const value=M.scopedRecord(s,record,{...scope,account:id});if(value)addMoney(a,M.recordResult(value,s.config));else a.unallocated++;}
       }
     }
 
