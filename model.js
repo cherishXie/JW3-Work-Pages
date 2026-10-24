@@ -773,7 +773,8 @@
   }
   function incomeRecords(s){
     const ownership=(e,r,ids)=>({roleAccounts:Object.fromEntries(ids.map(id=>[id,e.roleAccounts?.[id]||r?.roleAccounts?.[id]||s.roles.find(x=>x.id===id)?.accountId])),roleGroups:Object.fromEntries(ids.map(id=>[id,e.roleGroups?.[id]??r?.roleGroups?.[id]??s.accounts.find(a=>a.id===(r?.roleAccounts?.[id]||s.roles.find(x=>x.id===id)?.accountId))?.group??'']))});
-    const wage=(s.wageReceipts||[]).map(e=>{const r=s.records.find(r=>r.id===e.recordId),ids=e.roleId?[e.roleId]:r.roleIds;return {...e,...ownership(e,r,ids),taskId:r.taskId,roleIds:ids,gold:e.gold,minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},financialEvent:true};});
+    const wage=(s.wageReceipts||[]).map(e=>{const r=s.records.find(r=>r.id===e.recordId),ids=e.roleId?[e.roleId]:r.roleIds;return {...e,...ownership(e,r,ids),taskId:r.taskId,roleIds:ids,gold:e.gold,minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},
+      ...(e.roleId?{}:{planId:r.planId,planBatchIndices:r.planBatchIndices,attendanceWeights:r.attendanceWeights}),financialEvent:true};});
     const sales=(s.materialSales||[]).map(e=>{const m=s.materials.find(m=>m.id===e.materialId),r=s.records.find(r=>r.id===m.recordId),ids=e.roleId?[e.roleId]:r?.roleIds||s.roles.map(r=>r.id);return {...e,...ownership(e,r,ids),taskId:r?.taskId||'material_income',roleIds:ids,unallocated:!e.roleId&&!r,gold:e.quantity*e.unitGold-e.feeGold,minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},financialEvent:true};});
     const expenses=s.ledger.filter(e=>e.direction==='out'&&!e.linkedEventId&&(e.roiCost===true||e.category==='consumption'&&e.roiCost!==false)&&!['transfer','adjustment'].includes(e.category)).map(e=>{const r=s.records.find(r=>r.id===e.recordId),ids=[e.roleId];return {...e,...ownership(e,r,ids),taskId:r?.taskId||'operating_cost',roleIds:ids,gold:0,goldCost:e.gold,snapshot:e.snapshot||{...s.config,saleRate:1,fee:0},minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},financialEvent:true,expense:true};});
     return [...s.records,...completionRecords(s).filter(f=>f.measurements).map(partialMeasurementRecord),...wage,...sales,...expenses];
@@ -902,6 +903,20 @@
       if(r.dungeonId&&(typeof r.dungeonId!=='string'||!/^[-_a-zA-Z0-9]+$/.test(r.dungeonId)||!validDate(r.cycle)))throw new Error('实测副本 CD 标识无效');
       if(r.cdSnapshot){if(r.cdSnapshot.period!=='weekly'||!Array.isArray(r.cdSnapshot.resetDays)||!r.cdSnapshot.resetDays.length||r.cdSnapshot.resetDays.some(d=>!Number.isInteger(d)||d<0||d>6))throw new Error('历史 CD 刷新规则无效');number(r.cdSnapshot.resetHour,'历史刷新小时',{min:0,max:23,integer:true});if(r.cycle!==cycle(r.cdSnapshot,r.startedAt||r.date))throw new Error('实测 CD 与开始时刻或历史刷新规则不一致');}
       if(r.roleAccounts){if(Object.keys(r.roleAccounts).length!==r.roleIds.length||r.roleIds.some(id=>!s.accounts.some(a=>a.id===r.roleAccounts[id])))throw new Error('历史角色账号快照无效');}if(r.roleGroups&&r.roleIds.some(id=>typeof r.roleGroups[id]!=='string'))throw new Error('历史分组快照无效');
+      if(r.roleBillableMinutes||r.roleCoveredMinutes){
+        for(const field of ['roleBillableMinutes','roleCoveredMinutes'])for(const [id,v]of Object.entries(r[field]||{})){
+          if(!r.roleIds.includes(id))throw new Error('逐角色点卡用量引用不存在的成员');
+          number(v,'角色计费与月卡分钟',{min:0});
+        }
+        for(const [account,m]of Object.entries(r.accountMinutes||{})){
+          const roles=r.roleIds.filter(id=>recordAccount(s,r,id)===account);
+          const billed=roles.reduce((n,id)=>n+(r.roleBillableMinutes?.[id]||0),0),
+            covered=roles.reduce((n,id)=>n+(r.roleCoveredMinutes?.[id]||0),0);
+          if(Math.abs(billed-(r.billableAccountMinutes?.[account]||0))>1e-5||
+             Math.abs(covered-(r.coveredAccountMinutes?.[account]||0))>1e-5||
+             Math.abs(m-billed-covered)>1e-5)throw new Error('角色计费与账号总分钟不一致');
+        }
+      }
       for(const [id,value]of Object.entries(r.roleOnlineMinutes||{})){if(!r.roleIds.includes(id))throw new Error('参与耗时引用不存在成员');number(value,'角色在线分钟');}
       if(r.roleOnlineMinutes&&Math.abs(Object.values(r.roleOnlineMinutes).reduce((a,b)=>a+b,0)-r.onlineMinutes)>1e-6)throw new Error('角色在线分钟合计不等于实测总量');
       if(r.roleAllocations){
