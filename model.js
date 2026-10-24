@@ -637,10 +637,18 @@
     const basis=ids.reduce((sum,id)=>sum+reward.get(id),0);
     const financialWeights=ids.map(id=>basis>0?reward.get(id)/basis:(occurrences.get(id)||1)/attendance);
     const usageWeights=ids.map(id=>(occurrences.get(id)||1)/attendance);
+    // Operation minutes represent elapsed batch work: distribute each batch's
+    // duration across its participants, never charge the full group duration to each role.
+    // Setup minutes are common overhead and are split by actual attendances.
+    const workShare=new Map(ids.map(id=>[id,0]));
+    for(const batch of visits)for(const id of batch)workShare.set(id,(workShare.get(id)||0)+1/batch.length);
+    const batchWeights=ids.map(id=>(workShare.get(id)||0)/visits.length);
     function divide(total,weights){
       const shares={};let allocated=0;ids.forEach((id,i)=>{const amount=i===ids.length-1?(total||0)-allocated:(total||0)*weights[i];shares[id]=amount;allocated+=amount;});return shares;
     }
-    const gold=divide(r.gold,financialWeights),minutes=divide(r.minutes,usageWeights),otherCost=divide(r.otherCost,usageWeights);
+    const gold=divide(r.gold,financialWeights),setup=Math.min(r.minutes||0,Math.max(0,task?.prepare||0)),
+      workMinutes=divide((r.minutes||0)-setup,batchWeights),setupMinutes=divide(setup,usageWeights),
+      otherCost=divide(r.otherCost,batchWeights),minutes=Object.fromEntries(ids.map(id=>[id,workMinutes[id]+setupMinutes[id]]));
     const online={};
     // Recorded per-role online time is authoritative; otherwise split each account's
     // known time by visits, leaving unknown account time at the fallback card rate.
