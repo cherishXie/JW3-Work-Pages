@@ -69,7 +69,11 @@
     }
     const budget=M.budget(s,remaining);
     const addMoney=(row,result)=>{row.gross+=result.gross;row.net+=result.net;row.gold+=result.gold||0;row.netGold=row.netGold===null||result.netGold===null?null:row.netGold+(result.netGold||0);row.hasIncome=true;};
-    const billing=(record,id,m)=>{const config=record.snapshot,base=config.cardPrice*config.discount/config.cardMinutes,pricing=M.recordPricing(record,s.config),rate=pricing.accountBillingRates?.[id]??pricing.cardPrice*pricing.discount/pricing.cardMinutes,am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
+    const billing=(record,id,m,roleId=null)=>{const config=record.snapshot,base=config.cardPrice*config.discount/config.cardMinutes,pricing=M.recordPricing(record,s.config),rate=pricing.accountBillingRates?.[id]??pricing.cardPrice*pricing.discount/pricing.cardMinutes,am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
+      if(roleId&&record.roleBillableMinutes?.[roleId]!==undefined){
+        const billable=record.roleBillableMinutes[roleId],covered=record.roleCoveredMinutes?.[roleId]||0,unit=pricing.cardPrice*pricing.discount/pricing.cardMinutes;
+        return {billable,covered,card:billable*unit};
+      }
       const billable=record.billableAccountMinutes?(record.billableAccountMinutes[id]||0)*ratio:base>0?m*Math.max(0,Math.min(1,(config.accountBillingRates?.[id]??base)/base)):m;
       const covered=record.coveredAccountMinutes?(record.coveredAccountMinutes[id]||0)*ratio:m-billable;return {billable,covered,card:m*rate};};
     let unknownOnline=0;
@@ -98,7 +102,7 @@
         const known=selected.map(id=>({id,accountId:M.recordAccount(s,record,id),minutes:online(s,record,id)}));
         for(const entry of known){const row=roleRows.get(entry.id);row.included=true;const account=accountRows.get(entry.accountId),m=entry.minutes;row.accountIds.add(entry.accountId);
           if(m===null){row.missingTime++;if(account)account.missingTime++;continue;}
-          const b=billing(record,entry.accountId,m);row.minutes+=m;row.billable+=b.billable;row.covered+=b.covered;row.card+=b.card;
+          const b=billing(record,entry.accountId,m,entry.id);row.minutes+=m;row.billable+=b.billable;row.covered+=b.covered;row.card+=b.card;
         }
         for(const [id,a]of accountRows){const members=known.filter(x=>x.accountId===id);if(!members.length)continue;const allMembers=record.roleIds.filter(rid=>M.recordAccount(s,record,rid)===id),full=members.length===allMembers.length;
           const m=full&&record.accountMinutes?.[id]!==undefined?record.accountMinutes[id]:members.reduce((n,x)=>n+(x.minutes||0),0),am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
