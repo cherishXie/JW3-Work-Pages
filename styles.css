@@ -920,3 +920,8 @@ html[data-theme] .revenue-map-tile .revenue-map-name,html[data-theme] .revenue-m
 @media(prefers-reduced-motion:reduce){
   .wb-metric-icon,.wb-stat-icon,.tc-v2-status svg{transition:none!important;animation:none!important}
 }
+
+/* Conditional asset labels remain neutral until there is an actual comparison. */
+.kpi .value.positive{color:var(--wb-positive)}
+.account-resource-grid .wb-resource-label[data-tone="warning"] svg{color:var(--wb-warning)}
+.account-archive-meta .wb-sync-stamp[data-tone="warning"] svg{color:var(--wb-warning)!important}
