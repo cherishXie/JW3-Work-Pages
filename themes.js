@@ -37,14 +37,14 @@ SOFTWARE.
   ];
   function palette(id){
     const theme=themes.find(t=>t.id===id)||themes[0],s=scales[theme.mode],n=s[theme.neutral],a=s[theme.accent],at=(name,step)=>s[name][step-1];
-    // Financial treemap discipline: a restrained family matched to each UI theme.
-    // Data fills may use the opposite-mode scale; all remain official Radix colors.
-    const l=scales.light,d=scales.dark,tileColors={
-      'deep-ocean':[l.indigo[8],l.indigo[10],d.indigo[7],l.blue[10],d.blue[7],l.slate[10]],
-      'cloud-blue':[l.blue[10],d.blue[7],d.blue[6],l.indigo[10],d.indigo[7],d.indigo[6]],
-      'jade-green':[l.jade[10],l.teal[10],d.jade[7],d.teal[7],d.jade[6],d.teal[6]],
-      'warm-sand':[l.bronze[10],d.bronze[7],d.bronze[6],d.amber[6],l.amber[10],d.sand[7]],
-      'amethyst-night':[l.violet[8],l.violet[9],l.violet[10],d.violet[7],l.mauve[10],d.mauve[8]]
+    // Coordinated categorical hues distinguish task identity; stable IDs keep colors consistent.
+    // All fills are official Radix values with readable white labels in both modes.
+    const l=scales.light,tileColors={
+      'deep-ocean':[l.indigo[8],l.teal[10],l.violet[8],l.blue[10],l.bronze[10],l.cyan[10]],
+      'cloud-blue':[l.blue[10],l.violet[8],l.teal[10],l.indigo[10],l.bronze[10],l.cyan[10]],
+      'jade-green':[l.jade[10],l.blue[10],l.violet[10],l.teal[10],l.bronze[10],l.indigo[10]],
+      'warm-sand':[l.bronze[10],l.teal[10],l.indigo[10],l.violet[10],l.blue[10],l.slate[10]],
+      'amethyst-night':[l.violet[8],l.teal[10],l.blue[10],l.indigo[10],l.bronze[10],l.cyan[10]]
     }[theme.id];
     const p={bg:n[0],sidebar:n[1],surface:n[1],'surface-2':n[2],hover:n[3],border:n[5],text:n[11],'text-secondary':n[10],'text-muted':n[10],primary:theme.mode==='light'&&['jade','bronze'].includes(theme.accent)?a[10]:a[8],cyan:at('teal',11),purple:at('violet',11),success:at('green',11),warning:at('amber',11),'task-warning-text':at('amber',theme.mode==='light'?12:11),danger:at('red',11),'primary-text':'#ffffff',
       'input-bg':n[2],'control-border':n[6],'primary-soft':a[2],'primary-hover':theme.mode==='dark'?a[8]:['jade','bronze'].includes(theme.accent)?a[10]:a[9],'primary-label':theme.mode==='light'?a[11]:a[10],
@@ -58,6 +58,16 @@ SOFTWARE.
       p['cue-'+role]=at(family,theme.mode==='light'?12:11);p['cue-'+role+'-bg']=at(family,3);
     }
     p['cue-primary']=p['primary-label'];p['cue-primary-bg']=p['primary-soft'];
+    // Canvas, navigation, panels and data surfaces form separate visual layers.
+    Object.assign(p,{'canvas':theme.mode==='light'?n[1]:n[0], 'panel':theme.mode==='light'?n[0]:n[1],
+      'shell':a[1], 'panel-tint':a[1], 'section-band':a[2],
+      'hero-bg':p.primary,'hero-text':'#ffffff','hero-edge':a[7],
+      'series-forecast':at('violet',theme.mode==='light'?9:11),
+      'series-actual':at('teal',theme.mode==='light'?11:11)});
+    for(const [role,family] of Object.entries({income:'teal',cost:'bronze',time:'blue',efficiency:'violet',complete:'green',attention:'amber',danger:'red'})){
+      p['metric-'+role+'-bg']=at(family,3);p['metric-'+role+'-text']=at(family,theme.mode==='light'?12:11);p['metric-'+role+'-edge']=at(family,6);
+    }
+    p['metric-primary-bg']=a[2];p['metric-primary-text']=p['primary-label'];p['metric-primary-edge']=a[5];
     // Task-center surfaces and semantic day states; other pages keep their current tokens.
     Object.assign(p,{'task-canvas':a[0],'task-surface':a[1],'task-edge':a[5],'task-hover':a[3],
       'task-pending-bg':theme.accent==='jade'?at('indigo',3):a[2],'task-pending-text':theme.accent==='jade'?at('indigo',12):a[11],'task-pending-fill':theme.accent==='jade'?at('indigo',9):p.primary,
@@ -67,8 +77,9 @@ SOFTWARE.
       'task-blocked-bg':n[2],'task-blocked-text':n[11],'task-blocked-border':n[6]});
     // Radix whiteA12 / blackA12; prefer consistent white ink whenever it meets 4.5:1.
     const luminance=hex=>{const c=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
+    p['chart-danger-text']=1.05/(luminance(p.danger)+.05)>=4.5?'#ffffff':'#000000';
     for(let i=0;i<6;i++){const l=luminance(p['chart-bg-'+i]);p['chart-text-'+i]=1.05/(l+.05)>=4.5?'#ffffff':'#000000';}
-    return {theme,tokens:p,chartColors:[p['chart-primary'],p['chart-cyan'],p['chart-purple'],at('bronze',9),n[8],at('cyan',9)]};
+    return {theme,tokens:p,chartColors:tileColors};
   }
   function preference(){try{const id=localStorage.getItem(KEY);return themes.some(t=>t.id===id)?id:'deep-ocean';}catch{return 'deep-ocean';}}
   function apply(id,persist=true){const p=palette(id),root=document.documentElement;root.dataset.theme=p.theme.id;root.dataset.colorMode=p.theme.mode;root.style.colorScheme=p.theme.mode;for(const [n,v]of Object.entries(p.tokens))root.style.setProperty('--wb-'+n,v);const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=p.tokens.bg;let saved=true;if(persist)try{localStorage.setItem(KEY,p.theme.id);}catch{saved=false;}return {...p,saved};}
