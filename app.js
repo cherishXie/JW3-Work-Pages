@@ -1424,7 +1424,8 @@
       const weights=Object.fromEntries(ids.map(id=>[id,plan?plan.batches.filter(b=>b.includes(id)).length:1]));
       record.attendanceWeights=weights;
       if(fd.get('timeAllocation')==='attendance'||fd.get('financialAllocation')==='attendance')Object.assign(record,Activity.allocate(state,record,weights,fd.get('financialAllocation')==='attendance'));
-      const billing=M.executionPricing(state,record,plan?.batches);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.billingWarnings=billing.billingWarnings;
+      const billing=M.executionPricing(state,record,plan?.batches);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;
+      record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
       M.freezeRecord(state,record);state.recordingPreferences={financialAllocation:fd.get('financialAllocation'),timeAllocation:fd.get('timeAllocation')};state.records.push(record);if(fd.get('expectedSalary')!==''){state.wageClaims??=[];state.wageClaims.push({id:M.id('wage'),recordId:record.id,expectedGold:M.number(fd.get('expectedSalary'),'应收工资'),updatedAt:new Date().toISOString()});}
       if(fd.get('markComplete')==='true')for(const id of ids){const r=state.roles.find(r=>r.id===id),previous=M.getProgress(state,task,r,executionWhen),target=previous?.target??task.target,done=plan?Math.min(target,(previous?.completed||0)+plan.batches.filter(b=>b.includes(id)).length):target;updateProgress(task,r,fd.get('date'),done>=target?'completed':'progressing',done,target,executionWhen);}
       if(plan){const saved=state.plans.find(p=>p.id===plan.id);Daily.reconcile(state,saved);}ui.generated=null;
