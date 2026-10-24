@@ -73,7 +73,7 @@ SOFTWARE.
       'positive-soft':dark?'#132D21':'#E6F6EB','positive-soft-text':dark?'#3DD68C':'#176C45',
       'negative-soft':dark?'#3B1219':'#FEEBEC','negative-soft-text':dark?'#FF9592':'#A5222A',
       'wealth-soft':dark?'#302008':'#FFF7C2','wealth-soft-text':dark?'#FFCA16':'#7B4D00',
-      'expense-soft':dark?'#331E0B':theme.id==='warm-sand'?'#F6EDEA':'#FF EFD6'.replace(' ',''),
+      'expense-soft':dark?'#331E0B':theme.id==='warm-sand'?'#F6EDEA':'#FFEFD6',
       'expense-soft-text':dark?'#FFA057':theme.id==='warm-sand'?'#7D5E54':'#A83F00',
       'info-soft':dark?'#0D2847':'#E6F4FE','info-soft-text':dark?'#70B8FF':theme.id==='warm-sand'?'#0D3C48':'#113264',
       'efficiency-soft':dark?'#291F43':'#F4F0FE','efficiency-soft-text':dark?'#BAA7FF':'#6550B9',
