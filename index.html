@@ -8,10 +8,16 @@
   <meta name="description" content="剑网三多账号效率工作台 / 可验证 HTML 原型">
   <!-- Public release: published via allowlisted JW3-Work-Pages workflow; user data stays browser-local. -->
   <title>剑网三 / 效率工作台</title>
-  <script src="themes.js?v=fast-navigation-20261023"></script>
-  <link rel="stylesheet" href="styles.css?v=fast-navigation-20261023">
+  <script defer src="boot.js?v=startup-20261024"></script>
+  <script defer src="themes.js?v=startup-20261024"></script>
+  <link rel="stylesheet" href="styles.css?v=startup-20261024">
+  <style>
+  #workbench-boot{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:var(--wb-bg,#111111);color:var(--wb-text,#eeeeee);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif} .boot-content{width:min(340px,calc(100vw - 48px));text-align:center}.boot-mark{width:96px;height:96px;margin:0 auto 24px;color:var(--wb-primary,#3e63dd)}.boot-mark svg{display:block;width:100%;height:100%}.boot-mark path{stroke-dasharray:90;stroke-dashoffset:0;animation:boot-draw 900ms ease-out both}.boot-content h1{margin:0;font-size:24px;font-weight:600}.boot-features{font-size:12px;color:var(--wb-text-muted,#b4b4b4);margin:12px 0 32px;display:flex;justify-content:center;gap:20px}.boot-track{height:3px;background:var(--wb-surface-2,#222222);overflow:hidden;margin-bottom:14px}.boot-track span{display:block;height:100%;width:100%;background:var(--wb-primary,#3e63dd);transform-origin:left;animation:boot-charge 1200ms ease-out both}#boot-status{font-size:14px;margin:0}#boot-elapsed{display:block;margin-top:6px;font-size:12px;color:var(--wb-text-muted,#b4b4b4)}#boot-retry{margin-top:16px}.boot-caption{font-size:12px;color:var(--wb-text-muted,#b4b4b4);margin-top:24px}@keyframes boot-draw{from{stroke-dashoffset:90;opacity:.2}to{stroke-dashoffset:0;opacity:1}}@keyframes boot-charge{from{transform:scaleX(.04)}to{transform:scaleX(1)}}@media(prefers-reduced-motion:reduce){.boot-mark path,.boot-track span{animation:none}}
+  </style>
 </head>
 <body>
+  <section id="workbench-boot" aria-label="工作台启动" aria-busy="true"><div class="boot-content"><div class="boot-mark" aria-hidden="true"><svg viewBox="0 0 96 96" fill="none"><rect x="9" y="9" width="78" height="78" rx="8" stroke="currentColor" stroke-width=".5"/><rect x="19" y="19" width="58" height="58" rx="2" stroke="currentColor" stroke-width=".5"/><path d="M53 24L34 51h17l-5 21 20-29H49z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div><h1>剑网三工作台</h1><div class="boot-features"><span>账号与角色</span><span>任务排程</span><span>收益分析</span></div><div class="boot-track" aria-hidden="true"><span></span></div><p id="boot-status" role="status" aria-live="polite">正在加载工作台</p><small id="boot-elapsed">已等待 0 秒</small><button id="boot-retry" type="button" hidden>重新加载</button><p class="boot-caption">数据保存在此浏览器</p></div></section>
+
   <aside id="sidebar" class="sidebar"></aside>
   <div class="workspace">
     <header id="topbar" class="topbar"></header>
@@ -20,15 +26,15 @@
   </div>
   <dialog id="dialog"><div id="dialog-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="catalog.js"></script>
-  <script src="raid-catalog.js?v=dashboard-controls-20261022-2"></script>
-  <script src="model.js?v=resource-period-20261022-1"></script>
-  <script src="operations.js"></script>
-  <script src="activity.js"></script>
-  <script src="storage.js?v=dashboard-controls-20261022-2"></script>
-  <script src="verification.js"></script>
-  <script src="vendor/jszip.min.js"></script><script src="daily.js?v=unified-queue-20261023-1"></script><script src="execution.js"></script><script src="importer.js"></script>
-<script src="roi.js"></script>
-<script src="vendor/ocr/tesseract.min.js"></script><script src="screenshot.js?v=identity-20261023-1"></script><script src="app.js?v=fast-navigation-20261023"></script>
+  <script defer src="catalog.js"></script>
+  <script defer src="raid-catalog.js?v=dashboard-controls-20261022-2"></script>
+  <script defer src="model.js?v=resource-period-20261022-1"></script>
+  <script defer src="operations.js"></script>
+  <script defer src="activity.js"></script>
+  <script defer src="storage.js?v=dashboard-controls-20261022-2"></script>
+  <script type="application/x-workbench-module" data-workbench-module="verification" src="verification.js"></script>
+  <script type="application/x-workbench-module" data-workbench-module="zip" src="vendor/jszip.min.js"></script><script defer src="daily.js?v=unified-queue-20261023-1"></script><script defer src="execution.js"></script><script defer src="importer.js"></script>
+<script defer src="roi.js"></script>
+<script type="application/x-workbench-module" data-workbench-module="ocr" src="vendor/ocr/tesseract.min.js"></script><script defer src="screenshot.js?v=offline-ocr-20261024"></script><script defer src="app.js?v=startup-20261024"></script>
 </body>
 </html>

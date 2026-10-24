@@ -128,6 +128,27 @@
   if(next.executionDrafts)next.executionDrafts=next.executionDrafts.filter(d=>d.index!==index);
   next.updatedAt=new Date().toISOString();return next;
  }
+ // Validate arbitrary roster edits atomically. Completed and locked batches are immutable.
+ function setBatchRosters(s,p,batches){
+  if(!Array.isArray(batches)||!batches.length||batches.length>100)throw new Error('请保留 1–100 个队伍');
+  if(batches.length<p.batches.length)throw new Error('已有批次请通过删除批次处理');
+  const next=JSON.parse(JSON.stringify(p)),affected=[],protectedRoles=lockedRoleIds(s,p);
+  for(let i=0;i<batches.length;i++){
+   const ids=batches[i];if(!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length)throw new Error('第 '+(i+1)+' 队至少需要一名角色，且不能重复');
+   if(JSON.stringify(ids)!==JSON.stringify(p.batches[i]||[])){if(p.batches[i])assertBatchEditable(s,p,i);if(ids.some(id=>!p.batches[i]?.includes(id)&&protectedRoles.has(id)))throw new Error('角色属于锁定队伍，请先解锁');affected.push(i);}
+  }
+  next.batches=batches.map(ids=>[...ids]);next.teamConfigs=next.batches.map((_,i)=>p.teamConfigs?.[i]||null);next.companionAssignments=next.batches.map((_,i)=>p.companionAssignments?.[i]||[]);
+  for(const i of affected){
+   const members=next.batches[i].map(id=>s.roles.find(r=>r.id===id));if(members.some(r=>!r))throw new Error('角色不存在');
+   const base=M.savedPartyTask(M.taskForVersion(s,s.tasks.find(t=>t.id===p.taskId)),p);
+   if(base.partyRule==='raid10')next.teamConfigs[i]={...(next.teamConfigs[i]||{name:'第 '+(i+1)+' 队',tankMode:base.tankMode||'auto'}),playerSeats:members.length};
+   const task=M.partyTask(base,next.teamConfigs[i]);M.validateDailyGongzhan(task,members);
+   if(['daily5','raid10'].includes(task.partyRule)){const companions=M.companionAssignments(task,members,task.partyRule==='daily5'?5:10);if(!companions)throw new Error('第 '+(i+1)+' 队职责或已有侠客不足');next.companionAssignments[i]=companions;}
+   for(const id of next.routeTaskIds||[next.taskId])checkBatch(s,next,id,i,M.planStart(s,next,id));
+  }
+  for(const id of next.routeTaskIds||[next.taskId])if(next.taskSnapshots?.[id])next.taskSnapshots[id].roleIds=[...new Set([...(next.taskSnapshots[id].roleIds||[]),...next.batches.flat()])];
+  M.validatePlanCapacity(s,next);if(next.executionDrafts)next.executionDrafts=next.executionDrafts.filter(d=>!affected.includes(d.index));next.updatedAt=new Date().toISOString();return next;
+ }
  function registerBatch(s,planId,taskId,index,input={}){
   const copy=JSON.parse(JSON.stringify(s)),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
   const date=input.date||(p.completionFacts||[]).find(f=>f.taskId===taskId&&f.planBatchIndices[0]===index)?.date||p.date;
@@ -310,5 +331,5 @@
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
  }
- return {isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });

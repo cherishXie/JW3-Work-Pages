@@ -170,30 +170,48 @@
   // Resolve from the script's own URL, not the page route (Pages lives under /JW3-Work-Pages/).
   const scriptBase=typeof document!=='undefined'&&document.currentScript?.src||'';
   const readableError=e=>e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():e&&typeof e.message==='string'&&e.message.trim()?e.message:'浏览器未提供详细错误';
+  function bundledOcrOptions(bundle,simd){
+    const bytes=name=>Uint8Array.from(atob(bundle[name]),c=>c.charCodeAt(0));
+    const core=simd?'tesseract-core-simd-lstm':'tesseract-core-lstm',urls=[];
+    const make=(text,suffix='')=>{const url=URL.createObjectURL(new Blob([text],{type:'application/javascript'}));urls.push(url);return url+suffix;};
+    const source=new TextDecoder().decode(bytes(core+'.wasm.js'));
+    const wrapped=source+'\n;var OriginalTesseractCore=TesseractCore;TesseractCore=function(options){return OriginalTesseractCore(Object.assign({},options,{wasmBinary:Uint8Array.from(atob('+JSON.stringify(bundle[core+'.wasm'])+'),function(c){return c.charCodeAt(0)})}));};';
+    const languageSource='\nself.fetch=function(url){if(String(url).includes("chi_sim.traineddata"))return Promise.resolve(new Response(Uint8Array.from(atob('+JSON.stringify(bundle['chi_sim.traineddata.gz'])+'),function(c){return c.charCodeAt(0)})));return Promise.reject(new Error("离线版不请求外部资源"));};\n';
+    return {workerPath:make(wrapped+languageSource+new TextDecoder().decode(bytes('worker.min.js'))),corePath:'embedded.js',language:'chi_sim',release:()=>urls.forEach(url=>URL.revokeObjectURL(url))};
+  }
   async function createOcrWorker(progress){
+    if(!globalThis.Tesseract?.createWorker&&globalThis.WorkbenchBoot?.loadModule)await globalThis.WorkbenchBoot.loadModule('ocr');
     if(!globalThis.Tesseract?.createWorker)throw new Error('本地 OCR 脚本未加载，请刷新工作台后重试');
     const base=new URL('vendor/ocr/',scriptBase||document.baseURI).href;
     const asset=name=>new URL(name,base).href;
     const options={
       workerPath:asset('worker.min.js'),langPath:base.replace(/\/$/,''),
-      workerBlobURL:false,cacheMethod:'none',
+      workerBlobURL:false,cacheMethod:'write',cachePath:'jw3-chi-sim-fast-v1',
       logger:m=>{
-        const stages={'loading tesseract core':'加载识别核心','initializing tesseract':'初始化识别核心','loading language traineddata':'下载中文识别模型','initializing api':'初始化中文识别引擎','recognizing text':'正在识别表格'};
+        const stages={'loading tesseract core':'加载识别核心','initializing tesseract':'初始化识别核心','loading language traineddata':'准备中文识别模型（优先使用本地缓存）','initializing api':'初始化中文识别引擎','recognizing text':'正在识别表格'};
         progress(stages[m.status]||'正在加载本地识别引擎…',{stage:m.status,progress:Number.isFinite(m.progress)?Math.max(0,Math.min(1,m.progress)):null});
       },
       // Tesseract.js 6 can also throw a second uncaught error when a worker job rejects.
       errorHandler:()=>{}
     };
+    const bundle=globalThis.WorkbenchOcrBundle;
+    async function start(simd){
+      const embedded=bundle?bundledOcrOptions(bundle,simd):null;
+      let timeout,failed=false;
+      try{return await new Promise((resolve,reject)=>{const fail=e=>{failed=true;reject(new Error(readableError(e)));};timeout=setTimeout(()=>fail(new Error('识别资源准备超时，请重试或使用完整离线版')),45000);Promise.resolve(globalThis.Tesseract.createWorker(embedded?.language||'chi_sim',1,{...options,...(embedded?{workerPath:embedded.workerPath,corePath:embedded.corePath}: {corePath:simd?base:asset('tesseract-core-lstm.wasm.js')}),errorHandler:fail})).then(worker=>{if(failed)worker.terminate();else resolve(worker);},fail);});}finally{clearTimeout(timeout);embedded?.release();}
+    }
+    progress(bundle?'正在准备已内置的离线识别引擎…':'正在准备本站识别引擎，优先使用本地缓存…');
     let simdError;
     try{
-      return await globalThis.Tesseract.createWorker('chi_sim',1,{...options,corePath:base});
+      return await start(true);
     }catch(e){simdError=readableError(e);}
     // On devices where the SIMD build fails, use the verified non-SIMD LSTM build.
     // A full-file corePath is supported by Tesseract.js and prevents auto SIMD selection.
     progress('SIMD 识别引擎加载失败，正在尝试兼容模式…');
     try{
-      return await globalThis.Tesseract.createWorker('chi_sim',1,{...options,corePath:asset('tesseract-core-lstm.wasm.js')});
+      return await start(false);
     }catch(e){
+      if(bundle)throw new Error('离线识别引擎无法启动；SIMD：'+simdError+'；兼容模式：'+readableError(e)+'。请在支持 WebAssembly 的浏览器中重新打开完整离线版');
       throw new Error('OCR 引擎无法启动；SIMD：'+simdError+'；兼容模式：'+readableError(e)+'。请检查 '+asset('tesseract-core-simd-lstm.wasm.js')+' 和 '+asset('tesseract-core-lstm.wasm.js')+' 是否可访问（HTTP 200），刷新后重试');
     }
   }

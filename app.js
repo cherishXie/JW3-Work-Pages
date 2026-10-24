@@ -1,5 +1,6 @@
 /* Browser-local records. Device launch preparation is isolated in execution.js. */
 (() => {
+  function startWorkbench(){
   'use strict';
   const Theme=WorkbenchThemes, Catalog=JX3Catalog, Raids=JX3Raids, Activity=WorkbenchActivity, Ops=WorkbenchOperations;
   const ROI=WorkbenchROI, Daily=WorkbenchDaily, Importer=WorkbenchImporter, Execution=WorkbenchExecution;
@@ -14,8 +15,10 @@
   const worldPartyNote=(t,n)=>t?.partyRule==='daily5'&&n>=1&&n<=2?`<small class="tc-companions">世界组队 / ${n} 个自有角色，另找 ${5-n} 位玩家；不补侠客</small>`:'';
   const duty=d=>({tank:'坦克',heal:'治疗',dps:'输出'}[d]||'未知');
   const dayLabels=['周日','周一','周二','周三','周四','周五','周六'];
+  globalThis.WorkbenchBoot?.stage('正在读取本地档案');
   let storageError='',storageReadError=false,state,dataStore=Store.empty(),migrated=false;
   try{const loaded=Store.read(localStorage);dataStore=loaded.store;migrated=loaded.migrated;state=dataStore.active?structuredClone(dataStore.active):M.blank();}catch(e){storageReadError=true;state=M.blank();storageError='本地数据读取失败：'+e.message+'。原存储未覆盖，可导出原始数据或重置。';}
+  globalThis.WorkbenchBoot?.stage('正在整理任务与收益记录');
   const rulesUpgraded=!storageError&&(state.partyRulesVersion!==3||state.workflowVersion!==2||state.plans.some(p=>p.requiresReview!==undefined));
   if(!storageError){M.upgradeState(state);M.freezeHistory(state);}
   const defaultsAdded=!storageError&&Ops.ensureDefaults(state);
@@ -57,8 +60,8 @@
       return;
     }
     if(prior.focus!==next.focus&&ui.page==='task'){
-      const focus=$('#tc-v2-focus'),height=focus?.getBoundingClientRect().height,oldHeight=before.focusRect?.height,resize=height&&oldHeight&&Math.abs(height-oldHeight)<240;
-      animateUI(focus,[{opacity:.6,transform:'translateX(8px)',...(resize?{height:oldHeight+'px'}:{})},{opacity:1,transform:'none',...(resize?{height:height+'px'}:{})}],250,'wb-schedule');
+      const focus=$('#tc-v2-focus');
+      animateUI(focus?.querySelector('.tc-v2-focus-heading'),[{opacity:.55},{opacity:1}],160,'wb-schedule');
     }
     if(change){
       const fresh=motionRows();for(const [key,item]of fresh){const el=item.el,old=before.rows.get(key);
@@ -90,9 +93,9 @@
       if(job!==overviewJob||ui.page!=='overview'||viewFingerprint!==fingerprint)return;
       const active=viewCacheActive;viewCacheActive=true;
       try{
-        if(trendIndex<groups.length){const days=groups[trendIndex++];for(const mode of ['estimated','actual'])summaryView(state,days[0],days.at(-1),scope(),mode);enqueue(step);return;}
+        if(trendIndex<groups.length){const days=groups[trendIndex++];for(const mode of ['estimated','actual'])summaryView(state,days[0],days.at(-1),scope(),mode);const label=$('#overview-trend-progress-label'),bar=$('#overview-trend-progress');if(label)label.textContent='正在计算趋势 '+trendIndex+' / '+groups.length;if(bar)bar.value=trendIndex;enqueue(step);return;}
         if(deferred.trend&&!trendDone){const trend=$('#overview-trend-pending');if(trend)trend.outerHTML=trendChart();trendDone=true;applyPrivacy();}
-        if(index<accounts.length){const selection={...scope(),account:accounts[index++].id};summaryView(state,ui.start,ui.end,selection,ui.mode);completionView(state,ui.start,ui.end,selection);enqueue(step);return;}
+        if(index<accounts.length){const selection={...scope(),account:accounts[index++].id};summaryView(state,ui.start,ui.end,selection,ui.mode);completionView(state,ui.start,ui.end,selection);const label=$('#overview-account-progress-label'),bar=$('#overview-account-progress');if(label)label.textContent='正在计算账号 '+index+' / '+accounts.length;if(bar)bar.value=index;enqueue(step);return;}
         const attribution=$('#overview-attribution-pending'),cards=$('#overview-accounts-pending');
         if(attribution)attribution.outerHTML=attributionNotice(deferred.summary);
         if(cards)cards.outerHTML=overviewAccounts();applyPrivacy();
@@ -263,16 +266,18 @@
       wrap.before(detail);detail.append(summary,wrap);
     });
   }
-  function syncFlowRails(){
+  function syncFlowRails(previous=new Map()){
     for(const rail of document.querySelectorAll('[data-flow-rail]')){
       const selected=rail.querySelector('[aria-pressed="true"]');
-      if(selected){rail.scrollLeft=Math.max(0,selected.offsetLeft-(rail.clientWidth-selected.offsetWidth)/2);rail.flowSyncLeft=rail.scrollLeft;}
+      if(previous.has(rail.dataset.flowRail))rail.scrollLeft=previous.get(rail.dataset.flowRail);
+      if(selected){const item=selected.getBoundingClientRect(),box=rail.getBoundingClientRect();if(item.left<box.left)rail.scrollLeft+=item.left-box.left;else if(item.right>box.right)rail.scrollLeft+=item.right-box.right;rail.flowSyncLeft=rail.scrollLeft;}
       const nav=rail.parentElement;nav.firstElementChild.disabled=rail.scrollLeft<=1;nav.lastElementChild.disabled=rail.scrollLeft>=rail.scrollWidth-rail.clientWidth-1;
     }
   }
   function rememberAnalysisDetails(){for(const el of document.querySelectorAll('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}}
   function render(){
     overviewJob++;overviewDeferred=null;prepareViewCache();try{
+    const railPositions=new Map([...document.querySelectorAll('#calendar-task-panel [data-flow-rail]')].map(el=>[el.dataset.flowRail,el.scrollLeft]));
     const beforeMotion=captureMotion(),priorPanel=$('#calendar-task-panel'),panelScope=priorPanel?.dataset.scope,panelScroll=priorPanel?.querySelector('.tc-cal-panel-body')?.scrollTop||0;
     for(const el of document.querySelectorAll('[data-task-fold]'))taskFolds.set(el.dataset.taskFold,el.open);
     rememberRoute();renderSidebar();renderTopbar();rememberTaskView();document.body.classList.toggle('task-context',ui.page==='task'&&!ui.setup);document.body.classList.toggle('analysis-context',['overview','roi'].includes(ui.page));
@@ -287,7 +292,7 @@
     }
     const currentPanel=$('#calendar-task-panel');if(currentPanel&&currentPanel.dataset.scope===panelScope)currentPanel.querySelector('.tc-cal-panel-body').scrollTop=panelScroll;document.body.classList.toggle('task-panel-open',!!currentPanel);
     collapseRecordTables();enhanceTables();fitRevenueMapLabels();applyPrivacy();
-    syncFlowRails();
+    syncFlowRails(railPositions);
     finishRenderMotion(beforeMotion);
     $('#sidebar').inert=ui.setup;$('#topbar').inert=ui.setup;document.body.classList.toggle('setup-open',ui.setup);
     const pageKey=ui.page+(ui.page==='task'?':'+ui.workView:ui.page==='roi'?':'+ui.roiTab+':'+ui.roiSection:'');if(pageKey!==renderedPageKey){renderedPageKey=pageKey;window.scrollTo(0,0);}
@@ -328,11 +333,11 @@
     const deferred=ui.page==='overview'&&!ui.setup&&!overviewAccountsReady(),deferredTrend=ui.page==='overview'&&!ui.setup&&!overviewTrendReady();if(deferred||deferredTrend)overviewDeferred={summary:s,accounts:deferred,trend:deferredTrend};
     const metric=(label,value,detail)=>{const parts=String(value).split(' / ');return `<div class="card insight-metric"><span>${label}</span><strong class="number">${parts[0]}${parts.length>1?'<em>'+parts.slice(1).join(' / ')+'</em>':''}</strong><small>${detail}</small></div>`;};
     return '<div class="insight-workbench">'+pageHead('WORKSPACE / OVERVIEW','工作台总览','',button('继续执行本期任务','open-task-queue','primary','data-range="period"')+button('查看收益分析','nav','small','data-page="roi"')+button(icon('share')+'分享战报','share'))+analysisToolbar()+
-      `<div class="insight-hero"><div class="insight-metrics">${metric('经济净收益',s.hasData?amount(s.net,s.netGold):'—',kind())}${metric('毛收益',s.hasData?amount(s.gross,s.gold):'—','金币按币价估值')}${metric('综合成本',s.hasData?money(s.cost):'—','手续费 / 点卡 / 经营成本')}${metric('操作时间',s.hasData?num(s.minutes/60,1)+' 小时':'—','账号在线 '+num(s.onlineMinutes/60,1)+' 小时')}${metric('净时薪',s.hasData&&s.hourly!==null?amount(s.hourly,s.hourlyGold):'—','净收益 ÷ 操作小时')}${metric('全部账号兑现净额',cash.hasData?money(cash.net):'—','全部账号现金 / 不随账号筛选')}</div><section class="card insight-trend">${head('收益与投入趋势','实测与已确认排程对照',chartControls())}${deferredTrend?'<div id="overview-trend-pending" class="trend-placeholder" aria-label="收益与投入趋势" aria-busy="true"></div>':trendChart()}<div class="chart-foot"><span>实测与预测对比 / ${ui.chartMetric==='net'?chartCurrency():'小时'}</span><span>— 为缺少实测；零值表示已记录为零</span></div></section></div>`+
+      `<div class="insight-hero"><div class="insight-metrics">${metric('经济净收益',s.hasData?amount(s.net,s.netGold):'—',kind())}${metric('毛收益',s.hasData?amount(s.gross,s.gold):'—','金币按币价估值')}${metric('综合成本',s.hasData?money(s.cost):'—','手续费 / 点卡 / 经营成本')}${metric('操作时间',s.hasData?num(s.minutes/60,1)+' 小时':'—','账号在线 '+num(s.onlineMinutes/60,1)+' 小时')}${metric('净时薪',s.hasData&&s.hourly!==null?amount(s.hourly,s.hourlyGold):'—','净收益 ÷ 操作小时')}${metric('全部账号兑现净额',cash.hasData?money(cash.net):'—','全部账号现金 / 不随账号筛选')}</div><section class="card insight-trend">${head('收益与投入趋势','实测与已确认排程对照',chartControls())}${deferredTrend?'<div id="overview-trend-pending" class="trend-placeholder" aria-label="收益与投入趋势" aria-busy="true"><span id="overview-trend-progress-label" role="status">正在计算收益与投入趋势</span><progress id="overview-trend-progress" max="'+overviewTrendGroups().length+'" value="0" aria-label="趋势计算进度"></progress></div>':trendChart()}<div class="chart-foot"><span>实测与预测对比 / ${ui.chartMetric==='net'?chartCurrency():'小时'}</span><span>— 为缺少实测；零值表示已记录为零</span></div></section></div>`+
       `<div class="overview-command-main mt">${overviewActions(s)}</div>`+(deferred?'<div id="overview-attribution-pending" aria-busy="true"></div>':attributionNotice(s))+
       (s.forecastWarnings?.length?`<details class="card pad mt"><summary>预测核对提醒 / ${s.forecastWarnings.length} 项</summary><p class="panel-sub mt">${s.forecastWarnings.map(esc).join('<br>')}</p></details>`:'')+(s.billingWarnings?.length?notice(s.billingWarnings.map(esc).join('<br>')):'')+
       `<div class="insight-analysis"><section class="card insight-distribution">${head('任务收益分布','仅正毛收益参与面积；净收益与亏损单独核算',badge())}${composition(s)}${overviewBreakdown(s)}<div class="flex wrap pad">${button('分析任务效率与亏损','open-roi-section','small','data-value="tasks"')}</div></section>${overviewSnapshot(s,complete,roles)}</div>`+
-      resourceOverviewCard()+(deferred?'<section id="overview-accounts-pending" class="insight-accounts" aria-busy="true" aria-label="账号概览"><h2>账号概览</h2><div class="insight-account-grid">'+Array.from({length:Math.min(6,overviewScopedAccounts().length)},()=>'<div class="card account-placeholder" aria-hidden="true"><i></i><i></i><i></i></div>').join('')+'</div></section>':overviewAccounts())+`<p class="insight-note">金币收益为估值，兑现现金单独核算；账号收益只含明确归属部分。${button('查看计算口径','guide','ghost small')}</p></div>`;
+      resourceOverviewCard()+(deferred?'<section id="overview-accounts-pending" class="insight-accounts" aria-busy="true" aria-label="账号概览"><h2>账号概览</h2><small id="overview-account-progress-label" role="status">正在计算账号收益与进度</small><progress id="overview-account-progress" max="'+overviewScopedAccounts().length+'" value="0" aria-label="账号计算进度"></progress><div class="insight-account-grid">'+Array.from({length:Math.min(6,overviewScopedAccounts().length)},()=>'<div class="card account-placeholder" aria-hidden="true"><i></i><i></i><i></i></div>').join('')+'</div></section>':overviewAccounts())+`<p class="insight-note">金币收益为估值，兑现现金单独核算；账号收益只含明确归属部分。${button('查看计算口径','guide','ghost small')}</p></div>`;
   }
   function overviewBreakdown(s){
     const rows=s.tasks.filter(r=>r.hasData),total=rows.reduce((n,r)=>n+Math.max(0,r.gross),0);
@@ -836,7 +841,7 @@
   }
   function batchEditControls(p,index,draft=false){
     const locked=p.lockedBatches?.includes(index),editable=!p.cancelled&&(p.routeTaskIds||[p.taskId]).every(id=>Daily.remaining(state,p,id).includes(index)),data=`data-index="${index}" ${draft?'data-draft="true"':`data-plan="${p.id}"`}`;
-    return button('修改角色','edit-batch-roles','small',data+(locked||!editable?' disabled title="请先解锁队伍，且所有串本均须尚未执行"':''))+button('移除角色','remove-batch-role','small',data+(locked||!editable?' disabled title="请先解锁队伍，且所有串本均须尚未执行"':''))+button(locked?'解锁队伍':'锁定队伍','lock-batch','small',data+` aria-pressed="${!!locked}" ${!locked&&!editable?'disabled':''}`)+(locked?'<span class="pill">已锁定</span>':'');
+    return button('编辑成员','edit-batch-roles','small',data+(locked||!editable?' disabled title="请先解锁队伍，且所有串本均须尚未执行"':''))+button('移除角色','remove-batch-role','small',data+(locked||!editable?' disabled title="请先解锁队伍，且所有串本均须尚未执行"':''))+button(locked?'解锁队伍':'锁定队伍','lock-batch','small',data+` aria-pressed="${!!locked}" ${!locked&&!editable?'disabled':''}`)+(locked?'<span class="pill">已锁定</span>':'');
   }
   function refreshGeneratedPlan(p){const state=planningState();
     const g=ui.generated,old=g.result,when=g.startedAt||g.date,batches=p.batches.map(b=>b.map(id=>state.roles.find(r=>r.id===id))),tasks=(p.routeTaskIds||[p.taskId]).map(id=>M.taskForVersion(state,state.tasks.find(t=>t.id===id)));
@@ -856,17 +861,42 @@
     const preview=()=>{try{const next=apply($('#f-removeRoleId').value);$('#remove-role-preview').textContent='✓ 移出后 '+next.batches[index].length+' 名角色，'+(next.companionAssignments?.[index]?.length||0)+' 名侠客；已通过队伍检查。';}catch(e){$('#remove-role-preview').textContent=e.message;}};
     $('#f-removeRoleId').addEventListener('change',preview);preview();
   }
-  function batchRolesForm(p,index,draft=false){
-    Daily.assertBatchEditable(state,p,index);
-    const label=id=>{const r=state.roles.find(r=>r.id===id);return (r?.name||id)+' / '+(state.accounts.find(a=>a.id===r?.accountId)?.name||'未知账号')+' / '+(r?.stance||'心法待补');};
-    modal('修改角色 / 第 '+(index+1)+' 批',`<p class="tc-quick-note">换入其他未锁定批次的角色时，两人交换队伍。锁定批次的角色不可选；保存前检查两队的账号、职责、侠客、资格与 CD。串本共用队伍同步修改。</p><div class="tc-members mb">${batchMemberNames(p.batches[index])}</div><div class="form-grid">${select('fromRoleId','换出角色',p.batches[index].map(id=>[id,label(id)]),p.batches[index][0])}${select('toRoleId','换入角色',[['','请选择角色']],'')}<div id="batch-role-preview" class="form-preview full" aria-live="polite"></div></div>`,fd=>{
-      const current=draft?generatedPlan():state.plans.find(x=>x.id===p.id),next=Daily.replaceBatchRole(state,current,index,fd.get('fromRoleId'),fd.get('toRoleId'));
-      if(draft){refreshGeneratedPlan(next);render();toast('队伍角色已修改，请确认保存排程');}
-      else commit(()=>{Object.assign(current,next);ui.generated=null;},'队伍角色已修改，排程已保存；可撤销');
-    },'保存角色修改');
-    const preview=()=>{const from=$('#f-fromRoleId').value,to=$('#f-toRoleId').value,box=$('#batch-role-preview');try{if(!to)throw new Error('请选择换入角色');Daily.replaceBatchRole(state,p,index,from,to);const other=p.batches.findIndex((b,i)=>i!==index&&b.includes(to));box.textContent='✓ 校验通过'+(other>=0?'，将与第 '+(other+1)+' 批交换角色':'，替换当前角色');box.classList.remove('error');}catch(e){box.textContent=e.message;box.classList.add('error');}};
-    const options=()=>{const from=$('#f-fromRoleId').value,locked=Daily.lockedRoleIds(state,p);$('#f-toRoleId').innerHTML='<option value="">请选择角色</option>'+M.eligible(state,state.tasks.find(t=>t.id===p.taskId)).filter(r=>!locked.has(r.id)&&!p.batches[index].includes(r.id)).map(r=>{let reason='';try{Daily.replaceBatchRole(state,p,index,from,r.id);}catch(e){reason=e.message;}const other=p.batches.findIndex((b,i)=>i!==index&&b.includes(r.id));return `<option value="${esc(r.id)}" ${reason?'disabled':''}>${esc(label(r.id)+(reason?' — '+reason:other>=0?' / 与第 '+(other+1)+' 批交换':''))}</option>`;}).join('');preview();};
-    $('#f-fromRoleId').addEventListener('change',options);$('#f-toRoleId').addEventListener('change',preview);options();
+  function batchRolesForm(p,index,draft=false){teamRosterEditor(p,index,draft);}
+  function customTeamPlan(taskId){
+    const s=planningState(),t=s.tasks.find(t=>t.id===taskId);if(!t)throw new Error('请先选择任务');
+    const ids=t.partyRule==='raid10'?[...new Set([t.id,...ui.routeTaskIds])]:[t.id];
+    const p={id:ui.replacingPlanId||'draft-plan',taskId:t.id,date:ui.taskDate,routeTaskIds:ids.length>1?ids:undefined,batches:[],companionAssignments:[],rulesSnapshot:{fillCompanionSlots:t.partyRule==='raid10',raidMode:ui.raidMode},taskSnapshots:Object.fromEntries(ids.map(id=>[id,structuredClone(s.tasks.find(t=>t.id===id))]))};
+    teamRosterEditor(p,0,true,true);
+  }
+  function teamRosterEditor(p,index=0,draft=false,creating=false){
+    const working=draft?planningState():state,t=working.tasks.find(t=>t.id===p.taskId),ids=p.routeTaskIds||[p.taskId],when=M.planStart(working,p),locked=Daily.lockedRoleIds(working,p);
+    if(p.batches[index])Daily.assertBatchEditable(working,p,index);
+    let teams=p.batches.length?p.batches.map(b=>[...b]):[[]],active=index,search='';
+    const available=working.roles.filter(r=>ids.every(id=>M.eligible(working,working.tasks.find(t=>t.id===id)).some(x=>x.id===r.id)));
+    const mutable=i=>{if(!p.batches[i])return true;try{Daily.assertBatchEditable(working,p,i);return true;}catch{return false;}};
+    const candidate=()=>Daily.setBatchRosters(working,p,teams);
+    const save=()=>{
+      const next=candidate();
+      if(draft){
+        if(creating){ui.planTask=t.id;ui.generated={taskId:t.id,date:p.date,startedAt:p.startedAt||null,raidMode:ui.raidMode,fillCompanionSlots:t.partyRule==='raid10',routeTaskIds:p.routeTaskIds,taskSnapshots:p.taskSnapshots,result:{batches:[],parties:[],reasons:[]}};}
+        refreshGeneratedPlan(next);render();toast('自定义队伍已更新，请确认保存排程');
+      }else commit(()=>{const current=state.plans.find(x=>x.id===p.id);if(!current||JSON.stringify(current)!==JSON.stringify(p))throw new Error('排程已变化，请重新打开成员面板');Object.assign(current,Daily.setBatchRosters(state,current,teams));ui.generated=null;},'队伍人数与成员已更新；可撤销');
+    };
+    modal(creating?'自定义队伍':'编辑队伍成员',`<p class="panel-sub">拖拽角色到队伍，或先选择队伍再勾选角色。人数随成员同步；保存前检查账号、职责、区服和 CD。</p><div class="roster-editor"><div class="roster-pool"><label for="roster-search">查找角色<input id="roster-search" type="search" placeholder="角色、账号、心法"></label><div id="roster-pool-list"></div></div><div class="roster-board"><div class="flex between wrap"><h3>队伍</h3><button type="button" id="roster-add-team">添加队伍</button></div><div id="roster-team-list"></div></div></div><div id="roster-validation" class="form-preview mt" role="status" aria-live="polite"></div>`,save,creating?'生成自定义候选':'应用队伍修改');
+    $('#dialog').classList.add('roster-dialog');
+    function paint(){
+      $('#roster-team-list').innerHTML=teams.map((team,i)=>`<section class="roster-team ${i===active?'is-active':''}" data-roster-team="${i}"><button type="button" data-roster-active="${i}" aria-pressed="${i===active}"><strong>第 ${i+1} 队</strong><span>${team.length} 名角色${!mutable(i)?' / 已锁定或已执行':''}</span></button>${!team.length&&i>=p.batches.length&&teams.length>1?`<button type="button" data-roster-delete="${i}">删除空队</button>`:''}<div class="roster-drop" data-roster-drop="${i}">${team.map(id=>{const r=working.roles.find(r=>r.id===id);return `<div class="roster-member" draggable="${mutable(i)}" data-roster-id="${esc(id)}"><span><b>${esc(r.name)}</b><small>${esc(working.accounts.find(a=>a.id===r.accountId)?.name)} / ${esc(r.stance||duty(Catalog.profile(r).duty))}</small></span><button type="button" data-roster-remove="${esc(id)}" data-roster-from="${i}" ${!mutable(i)?'disabled':''} aria-label="移出${esc(r.name)}">×</button></div>`;}).join('')||'<span class="muted">拖拽角色到这里，或勾选左侧角色</span>'}</div></section>`).join('');
+      $('#roster-pool-list').innerHTML=available.filter(r=>(r.name+' '+working.accounts.find(a=>a.id===r.accountId)?.name+' '+r.stance).toLowerCase().includes(search.toLowerCase())).map(r=>{const at=teams.findIndex(team=>team.includes(r.id)),disabled=!mutable(active)||at>=0&&!mutable(at)||at<0&&locked.has(r.id);return `<label class="roster-pool-role" draggable="${!disabled}" data-roster-id="${esc(r.id)}"><input type="checkbox" data-roster-pick="${esc(r.id)}" ${teams[active].includes(r.id)?'checked':''} ${disabled?'disabled':''}><span><b>${esc(r.name)}</b><small>${esc(working.accounts.find(a=>a.id===r.accountId)?.name)} / ${esc(r.stance||duty(Catalog.profile(r).duty))}</small><small>${at>=0?'第 '+(at+1)+' 队':'未安排'}</small></span></label>`;}).join('');
+      const box=$('#roster-validation');try{const next=candidate(),players=next.batches.map(b=>b.map(id=>working.roles.find(r=>r.id===id))),result=M.calculateBatches(M.taskForVersion(working,t),players,M.pricingConfig(working,when));box.textContent='✓ 队伍检查通过 / '+teams.length+' 批 / '+teams.flat().length+' 角色次 / 预计 '+num(result.gold)+' G / '+num(result.minutes,1)+' 操作分钟';box.classList.remove('error');}catch(e){box.textContent=e.message;box.classList.add('error');}
+    }
+    function move(id,target){if(!mutable(target))return;const from=teams.findIndex(team=>team.includes(id));if(from>=0&&!mutable(from)||from<0&&locked.has(id))return;teams=teams.map(team=>team.filter(x=>x!==id));teams[target].push(id);active=target;paint();}
+    const form=$('#modal-form');form.addEventListener('click',e=>{const activeButton=e.target.closest('[data-roster-active]'),remove=e.target.closest('[data-roster-remove]');if(activeButton){active=Number(activeButton.dataset.rosterActive);paint();}if(remove){const i=Number(remove.dataset.rosterFrom);if(mutable(i)){teams[i]=teams[i].filter(id=>id!==remove.dataset.rosterRemove);paint();}}const dropEmpty=e.target.closest('[data-roster-delete]');if(dropEmpty){const i=Number(dropEmpty.dataset.rosterDelete);if(i>=p.batches.length&&!teams[i].length&&teams.length>1){teams.splice(i,1);active=Math.min(active,teams.length-1);paint();}}if(e.target.closest('#roster-add-team')){if(teams.length>=100)return;teams.push([]);active=teams.length-1;paint();}});
+    form.addEventListener('change',e=>{const pick=e.target.closest('[data-roster-pick]');if(!pick)return;if(pick.checked)move(pick.dataset.rosterPick,active);else{teams[active]=teams[active].filter(id=>id!==pick.dataset.rosterPick);paint();}});
+    form.addEventListener('input',e=>{if(e.target.id==='roster-search'){search=e.target.value;paint();}});
+    form.addEventListener('dragstart',e=>{const source=e.target.closest('[data-roster-id]');if(!source||source.getAttribute('draggable')!=='true')return;e.dataTransfer.setData('text/plain',source.dataset.rosterId);e.dataTransfer.effectAllowed='move';});
+    form.addEventListener('dragover',e=>{if(e.target.closest('[data-roster-drop]')){e.preventDefault();e.dataTransfer.dropEffect='move';}});
+    form.addEventListener('drop',e=>{const target=e.target.closest('[data-roster-drop]');if(target){e.preventDefault();const id=e.dataTransfer.getData('text/plain');if(available.some(r=>r.id===id))move(id,Number(target.dataset.rosterDrop));}});
+    paint();
   }
   function partyBalanceNote(t,players){
     if(t?.partyRule!=='daily5')return '';const a=M.partyStats(players);
@@ -874,7 +904,7 @@
   }
   function planningActions(t,teamMode){
     if(!t)return '';const g=ui.generated?.taskId===t.id&&ui.generated.date===ui.taskDate?ui.generated:null,locked=g?.lockedBatches?.length||0;
-    return `<div class="tc-plan-actions" role="region" aria-label="排程操作"><div class="tc-plan-action-context"><b>${esc(t.name)}</b><small>${g?'已生成 '+g.result.batches.length+' 批 / 尚未确认':'配置好成员与队伍后生成'}${locked?' / '+locked+' 队已锁定':''}</small></div><div class="flex wrap">${button(icon('bolt')+(g?'重新生成':teamMode?'生成候选队伍':'生成分批建议'),'generate-plan',g?'':'primary',`data-id="${t.id}" ${locked?'disabled title="请先解锁当前方案中的队伍"':''}`)}${g?.result.batches.length?button('确认方案并保存排程','confirm-plan','primary'):''}</div></div>`;
+    return `<div class="tc-plan-actions" role="region" aria-label="排程操作"><div class="tc-plan-action-context"><b>${esc(t.name)}</b><small>${g?'已生成 '+g.result.batches.length+' 批 / 尚未确认':'配置好成员与队伍后生成'}${locked?' / '+locked+' 队已锁定':''}</small></div><div class="flex wrap">${button('自定义队伍','custom-team-plan','',`data-id="${t.id}" ${locked?'disabled':''}`)}${button(icon('bolt')+(g?'重新生成':teamMode?'生成候选队伍':'生成分批建议'),'generate-plan',g?'':'primary',`data-id="${t.id}" ${locked?'disabled title="请先解锁当前方案中的队伍"':''}`)}${g?.result.batches.length?button('确认方案并保存排程','confirm-plan','primary'):''}</div></div>`;
   }
   function planPage(){const state=planningState();
     const teamMode=ui.planTab==='teams',tasks=state.tasks.filter(t=>t.enabled&&(teamMode?t.partyRule==='raid10':t.partyRule!=='raid10'));
@@ -955,7 +985,7 @@
   function pluginArchive(){return state.sourceArchives?.filter(x=>x.format==='mingyi-sqlite-v1').sort((a,b)=>b.date.localeCompare(a.date)||b.updatedAt.localeCompare(a.updatedAt))[0];}
   async function loadPluginSnapshot(){
     const a=pluginArchive();if(!a||pluginCache.has(a.id))return;
-    try{const zip=await JSZip.loadAsync(a.plugin.zipBase64,{base64:true}),entry=zip.file('snapshot.json');if(!entry)throw new Error('缺少快照数据');const p=JSON.parse(await entry.async('string'));if(p.schema!==1||!Array.isArray(p.roles)||!Array.isArray(p.bags))throw new Error('快照格式不支持');pluginCache.set(a.id,p);pluginError='';}
+    try{if(typeof JSZip==='undefined')await globalThis.WorkbenchBoot?.loadModule('zip');const zip=await JSZip.loadAsync(a.plugin.zipBase64,{base64:true}),entry=zip.file('snapshot.json');if(!entry)throw new Error('缺少快照数据');const p=JSON.parse(await entry.async('string'));if(p.schema!==1||!Array.isArray(p.roles)||!Array.isArray(p.bags))throw new Error('快照格式不支持');pluginCache.set(a.id,p);pluginError='';}
     catch(e){pluginError=e.message;}
     if(ui.page==='assets'&&ui.assetTab==='plugin')render();
   }
@@ -1124,7 +1154,7 @@
   }
   let submitModal=null;
   function modal(title,body,handler=null,label='保存'){
-    $('#dialog').classList.remove('screenshot-wide','report-dialog','calendar-dialog','task-composer');
+    $('#dialog').classList.remove('screenshot-wide','report-dialog','calendar-dialog','task-composer','roster-dialog');
     submitModal=handler;
     $('#dialog-content').innerHTML=`<form id="modal-form"><div class="dialog-head"><h2>${title}</h2>${button(icon('close'),'close','ghost','type="button" aria-label="关闭对话框"')}</div><div class="dialog-body">${body}</div><div class="dialog-foot"><div id="form-error" class="error" role="alert" tabindex="-1" hidden></div>${button(handler?'取消':'关闭','close','','type="button"')}${handler?`<button type="submit" class="primary">${label}</button>`:''}</div></form>`;
     const wasOpen=$('#dialog').open;if(!wasOpen)$('#dialog').showModal();
@@ -1520,7 +1550,7 @@
     const filename=(page,i)=>'JX3_战报_'+range.start+'_'+range.end+'_'+String(i+1).padStart(2,'0')+'_'+page.title+(page.parts>1?'_'+page.part:'')+'.png';
     async function save(all){
       if(busy||!pages.length)return;busy=true;const targets=all?pages.map((page,i)=>({page,i})):[{page:pages[active],i:active}],o=options(),controls=[...form.querySelectorAll('input,select,button')].filter(el=>el.dataset.action!=='close');controls.forEach(el=>el.disabled=true);
-      try{if(all&&typeof JSZip==='undefined')throw new Error('打包组件未加载，请逐张下载图片');const zip=all?new JSZip():null,work=document.createElement('canvas');work.width=1080;work.height=1440;
+      try{if(all&&typeof JSZip==='undefined')await globalThis.WorkbenchBoot?.loadModule('zip');if(all&&typeof JSZip==='undefined')throw new Error('打包组件未加载，请逐张下载图片');const zip=all?new JSZip():null,work=document.createElement('canvas');work.width=1080;work.height=1440;
         for(let n=0;n<targets.length;n++){if(cancelled)return;const {page,i}=targets[n];status.textContent='正在生成 '+(n+1)+' / '+targets.length+' 张图片…';await new Promise(resolve=>requestAnimationFrame(resolve));paint(work,page,o,i);const blob=await png(work);if(cancelled)return;if(zip)zip.file(filename(page,i),blob);else download(filename(page,i),blob);}
         if(zip){status.textContent='正在打包 PNG 图片…';const blob=await zip.generateAsync({type:'blob',compression:'STORE'});if(!cancelled)download('JX3_多图战报_'+range.start+'_'+range.end+'.zip',blob);}work.width=work.height=0;if(!cancelled)status.textContent=all?'已导出 '+targets.length+' 张 PNG 图片。':'当前图片已下载。';
       }catch(e){if(!cancelled)status.textContent='导出失败：'+e.message;}finally{busy=false;controls.forEach(el=>el.disabled=false);}
@@ -1571,7 +1601,7 @@
       <label class="field mt">添加图片（可分多次选择）<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="screenshot-queue" class="mt" aria-live="polite"></div>
       <div class="form-grid mt"><label class="field">表格数据顶部（图片高度 %）<input id="screenshot-top" type="number" value="23" min="0" max="90"></label><label class="field">表格数据底部（图片高度 %）<input id="screenshot-bottom" type="number" value="92" min="10" max="100"></label></div>
       <p class="panel-sub">使用同一组裁剪比例逐张识别。最多 12 张，每张不超过 12 MB，总计不超过 60 MB；本批相同截图自动去重；已导入截图仍可重新识别并核对。</p>
-      ${button('开始本地识别','screenshot-recognize','primary mt')}<div id="screenshot-progress" class="screenshot-progress mt" hidden><div class="screenshot-progress-heading"><span class="spinner" aria-hidden="true"></span><strong id="screenshot-progress-label" role="status" aria-live="polite"></strong><span id="screenshot-elapsed"></span></div><progress id="screenshot-progress-bar" max="100" aria-label="截图识别进度"></progress><small>首次加载需要下载识别资源，请稍候；图片始终在本地识别。</small></div><p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
+      ${button('开始本地识别','screenshot-recognize','primary mt')}<div id="screenshot-progress" class="screenshot-progress mt" hidden><div class="screenshot-progress-heading"><span class="spinner" aria-hidden="true"></span><strong id="screenshot-progress-label" role="status" aria-live="polite"></strong><span id="screenshot-elapsed"></span></div><progress id="screenshot-progress-bar" max="100" aria-label="截图识别进度"></progress><small>识别核心与中文模型随站点提供，模型会缓存到此浏览器；离线版已内置全部资源。图片始终在本地识别。</small></div><p id="screenshot-status" role="status" aria-live="polite"></p><div id="screenshot-result"></div>`);
     $('#screenshot-file').addEventListener('change',screenshotQueueAdd);
     renderScreenshotQueue();
   }
@@ -1808,7 +1838,7 @@
     'overview-mode':b=>{ui.mode=b.dataset.value;render();},
     'overview-account':b=>{ui.account=b.dataset.id;ui.role='';ui.page='roles';render();},
     'chart-metric':b=>{ui.chartMetric=b.dataset.value;render();},
-    'run-verification':()=>{toast('正在运行独立计算用例…');setTimeout(()=>{verificationResults=Verification.run();render();},50);},
+    'run-verification':async()=>{toast('正在运行独立计算用例…');try{await globalThis.WorkbenchBoot?.loadModule('verification');verificationResults=Verification.run();render();}catch(e){toast(e.message);}},
     'settings-tab':b=>{ui.page='settings';ui.settingsTab=b.dataset.value;if(ui.settingsTab==='data')ui.dataTab='exchange';render();},
     'role-tasks':b=>{$('#dialog').close();ui.page='task';ui.workView='progress';ui.role=b.dataset.role;ui.account='';ui.group='';ui.taskFilter='';ui.progressStatus='all';render();},
     'role-assets':b=>{$('#dialog').close();ui.page='assets';ui.assetTab='period';ui.resourceBatch='';ui.role=b.dataset.role;ui.account='';ui.group='';render();},
@@ -1863,6 +1893,7 @@
     'task-recycle':()=>taskRecycleForm(),
     'restore-task':b=>{commit(()=>{Daily.restoreDeleted(state,b.dataset.id);ui.generated=null;ui.queueStatus='all';},'已恢复，排程、完成记录和收益已同步');taskRecycleForm();},
     'remove-batch-role':b=>removeBatchRoleForm(b.dataset.draft?generatedPlan():state.plans.find(p=>p.id===b.dataset.plan),Number(b.dataset.index),!!b.dataset.draft),
+    'custom-team-plan':b=>customTeamPlan(b.dataset.id),
     'edit-batch-roles':b=>batchRolesForm(b.dataset.draft?generatedPlan():state.plans.find(p=>p.id===b.dataset.plan),Number(b.dataset.index),!!b.dataset.draft),
     'lock-batch':b=>{const draft=!!b.dataset.draft,p=draft?generatedPlan():state.plans.find(p=>p.id===b.dataset.plan),i=Number(b.dataset.index),locked=!p.lockedBatches?.includes(i);if(draft){Daily.setBatchLocked(state,p,i,locked);ui.generated.lockedBatches=p.lockedBatches;render();}else commit(()=>Daily.setBatchLocked(state,p,i,locked),locked?'队伍已锁定，可继续登记执行':'队伍已解锁，可以修改角色');},
     'adjust-batch':b=>remainingForm(state.plans.find(p=>p.id===b.dataset.plan),b.dataset.task,[Number(b.dataset.index)]),
@@ -2052,5 +2083,11 @@
   try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=structuredClone(state);Store.write(localStorage,dataStore);}}catch(e){storageError='浏览器存储不可用：'+e.message;}
   let savedStorageRaw;try{savedStorageRaw=localStorage.getItem(KEY);}catch{}
   setInterval(()=>{for(const el of document.querySelectorAll('[data-account-time]')){const a=state.accounts.find(a=>a.id===el.dataset.accountTime);if(a)el.textContent=Ops.duration(Ops.remaining(a),a.billingType==='monthly');}},1000);
+  globalThis.WorkbenchBoot?.stage('正在生成工作台视图');
   render();
+  requestAnimationFrame(()=>globalThis.WorkbenchBoot?.finish());
+  }
+  // Paint the startup screen before synchronous archive migration and first calculations.
+  const launch=()=>requestAnimationFrame(()=>setTimeout(startWorkbench,0));
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',launch,{once:true});else launch();
 })();
