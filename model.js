@@ -531,29 +531,32 @@
   // Price actual online intervals, including a monthly expiry within a batch.
   // Date-only plans explicitly assume noon Beijing time; precise starts override it.
   function pricePrediction(s,t,result,when,timeline=result.batches){
-    const start=instant(when),duration=t.minutes/t.efficiency,billableAccountMinutes={},coveredAccountMinutes={},warnings=[];
+    const start=instant(when),duration=t.minutes/t.efficiency,billableAccountMinutes={},coveredAccountMinutes={},roleBillableMinutes={},roleCoveredMinutes={},warnings=[];
     let cursor=start+(timeline.length?t.prepare||0:0)*60000;
     for(const batch of timeline){if(result.batches.includes(batch))for(const r of batch){const a=s.accounts.find(a=>a.id===r.accountId),minutes=duration+(t.onlineExtra||0),expiry=a?.monthlyExpiresAt?Date.parse(a.monthlyExpiresAt):null;
       const covered=a?.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-cursor)/60000)):0;
       billableAccountMinutes[r.accountId]=(billableAccountMinutes[r.accountId]||0)+minutes-covered;
       coveredAccountMinutes[r.accountId]=(coveredAccountMinutes[r.accountId]||0)+covered;
+      roleBillableMinutes[r.id]=(roleBillableMinutes[r.id]||0)+minutes-covered;
+      roleCoveredMinutes[r.id]=(roleCoveredMinutes[r.id]||0)+covered;
       if(a?.billingType==='monthly'&&expiry===null)warnings.push(a.name+'：月卡到期未知，全部在线分钟暂按计时套餐估算');
     }cursor+=duration*60000;}
     const rate=s.config.cardPrice*s.config.discount/s.config.cardMinutes,config={...s.config,accountBillingRates:Object.fromEntries(Object.entries(result.accountMinutes).map(([id,m])=>[id,m?rate*(billableAccountMinutes[id]||0)/m:0]))};
-    return {...result,...costs(result.gold,result.minutes,result.onlineMinutes,config,result.other,result.accountMinutes),billingConfig:config,billableAccountMinutes,coveredAccountMinutes,billingWarnings:[...new Set(warnings)]};
+    return {...result,...costs(result.gold,result.minutes,result.onlineMinutes,config,result.other,result.accountMinutes),billingConfig:config,billableAccountMinutes,coveredAccountMinutes,roleBillableMinutes,roleCoveredMinutes,billingWarnings:[...new Set(warnings)]};
   }
   function executionPricing(s,record,batches=null){
-    const timeline=batches||[record.roleIds],start=instant(record.startedAt||record.date),billableAccountMinutes={},coveredAccountMinutes={},warnings=[];
+    const timeline=batches||[record.roleIds],start=instant(record.startedAt||record.date),billableAccountMinutes={},coveredAccountMinutes={},roleBillableMinutes={},roleCoveredMinutes={},warnings=[];
     const visits={};for(const batch of timeline)for(const id of batch){const r=s.roles.find(r=>r.id===id);visits[r.accountId]=(visits[r.accountId]||0)+1;}
     const fallback=pricingConfig(s,record.startedAt||record.date);
     for(const [i,batch]of timeline.entries())for(const id of batch){const r=s.roles.find(r=>r.id===id),a=s.accounts.find(a=>a.id===r.accountId),minutes=(record.accountMinutes[r.accountId]||0)/visits[r.accountId],at=start+i*record.minutes/timeline.length*60000,expiry=a.monthlyExpiresAt?Date.parse(a.monthlyExpiresAt):null;
       const covered=a.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-at)/60000)):0;
       billableAccountMinutes[a.id]=(billableAccountMinutes[a.id]||0)+minutes-covered;coveredAccountMinutes[a.id]=(coveredAccountMinutes[a.id]||0)+covered;
+      roleBillableMinutes[id]=(roleBillableMinutes[id]||0)+minutes-covered;roleCoveredMinutes[id]=(roleCoveredMinutes[id]||0)+covered;
       if(a.billingType==='monthly'&&expiry===null)warnings.push(a.name+'：月卡到期未知，使用计时参考单价');
     }
     const rate=s.config.cardPrice*s.config.discount/s.config.cardMinutes;
     const config={...s.config,accountBillingRates:Object.fromEntries(s.accounts.map(a=>{const minutes=record.accountMinutes[a.id]||0;return [a.id,minutes?rate*(billableAccountMinutes[a.id]||0)/minutes:fallback.accountBillingRates[a.id]];}))};
-    return {config,billableAccountMinutes,coveredAccountMinutes,billingWarnings:[...new Set(warnings)]};
+    return {config,billableAccountMinutes,coveredAccountMinutes,roleBillableMinutes,roleCoveredMinutes,billingWarnings:[...new Set(warnings)]};
   }
   function plan(s,t,date,scope={},remaining=false) {t=taskForVersion(s,t);
     if(!t.enabled||!scheduled(t,date))return {...costs(0,0,0,s.config),batches:[],accountMinutes:{},executions:0,reasons:[]};
@@ -671,8 +674,21 @@
       const siblings=r.roleIds.filter(roleId=>recordAccount(s,r,roleId)===accountId),onlineForAccount=siblings.reduce((n,k)=>n+(allocations[k]?.onlineMinutes||0),0);
       const known=r.accountMinutes?.[accountId];if(known!==undefined&&onlineForAccount>0)accountMinutes[accountId]=(accountMinutes[accountId]||0)+known*(a.onlineMinutes||0)/onlineForAccount;
     }
-    const billableAccountMinutes={},coveredAccountMinutes={};for(const [id,m]of Object.entries(accountMinutes)){const fraction=m/(r.accountMinutes?.[id]||m||1);billableAccountMinutes[id]=(r.billableAccountMinutes?.[id]||0)*fraction;coveredAccountMinutes[id]=(r.coveredAccountMinutes?.[id]||0)*fraction;}
-    return {...r,...amounts,roleIds:ids,accountMinutes,...(r.billableAccountMinutes?{billableAccountMinutes,coveredAccountMinutes}:{})};
+    const billableAccountMinutes={},coveredAccountMinutes={};
+    if(r.roleBillableMinutes&&r.roleCoveredMinutes){
+      for(const id of ids){const account=recordAccount(s,r,id);
+        billableAccountMinutes[account]=(billableAccountMinutes[account]||0)+(r.roleBillableMinutes[id]||0);
+        coveredAccountMinutes[account]=(coveredAccountMinutes[account]||0)+(r.roleCoveredMinutes[id]||0);
+      }
+    }else for(const [id,m]of Object.entries(accountMinutes)){
+      const fraction=m/(r.accountMinutes?.[id]||m||1);
+      billableAccountMinutes[id]=(r.billableAccountMinutes?.[id]||0)*fraction;
+      coveredAccountMinutes[id]=(r.coveredAccountMinutes?.[id]||0)*fraction;
+    }
+    return {...r,...amounts,roleIds:ids,accountMinutes,
+      ...(r.billableAccountMinutes?{billableAccountMinutes,coveredAccountMinutes}:{}),
+      roleBillableMinutes:r.roleBillableMinutes?Object.fromEntries(ids.map(id=>[id,r.roleBillableMinutes[id]||0])):undefined,
+      roleCoveredMinutes:r.roleCoveredMinutes?Object.fromEntries(ids.map(id=>[id,r.roleCoveredMinutes[id]||0])):undefined};
   }
   function inScope(s,r,scope={}){return !!scopedRecord(s,r,scope);}
   function planStart(s,p,taskId=p.taskId){
@@ -740,7 +756,8 @@
             roleGroups:Object.fromEntries(roster.map(id=>[id,s.accounts.find(a=>a.id===accounts[id])?.group||''])),
             gold:forecast.gold,minutes:forecast.minutes,onlineMinutes:forecast.onlineMinutes,otherCost:forecast.other,
             accountMinutes:forecast.accountMinutes,billableAccountMinutes:forecast.billableAccountMinutes,
-            coveredAccountMinutes:forecast.coveredAccountMinutes,snapshot:forecast.billingConfig};
+            coveredAccountMinutes:forecast.coveredAccountMinutes,roleBillableMinutes:forecast.roleBillableMinutes,
+            roleCoveredMinutes:forecast.roleCoveredMinutes,snapshot:forecast.billingConfig};
           const allocated=scopedRecord(s,entry,scope),selectedVisits=fullBatches.reduce((n,batch)=>n+batch.filter(r=>selectedRecordRoles(s,{...entry,roleIds:batch},scope).includes(r.id)).length,0),allVisits=fullBatches.reduce((n,batch)=>n+batch.length,0);
           result=allocated?{...recordResult(allocated,s.config),executions:allVisits?forecast.executions*selectedVisits/allVisits:0}:{
             ...costs(0,0,0,s.config),accountMinutes:{},executions:0};
