@@ -7,7 +7,7 @@
     if(record.roleOnlineMinutes?.[roleId]!==undefined)return record.roleOnlineMinutes[roleId];
     const role=s.roles.find(r=>r.id===roleId),accountId=M.recordAccount(s,record,roleId);if(record.roleIds.length===1)return record.onlineMinutes;
     if(role&&record.roleIds.filter(id=>M.recordAccount(s,record,id)===accountId).length===1&&record.accountMinutes?.[accountId]!==undefined)return record.accountMinutes[accountId];
-    return M.roleShares(s,record)[roleId]?.onlineMinutes??null;
+    return null;
   }
   function events(s,start,end,scope={}){
     const selected=new Set(roles(s,scope).map(r=>r.id)),out=[];
@@ -46,15 +46,10 @@
     });
   }
   function allocate(s,record,weights,financial=false){
-    M.freezeRecord(s,record);
-    const shares=M.roleShares(s,{...record,attendanceWeights:weights,roleAllocations:undefined});
-    const roleOnlineMinutes={},accountMinutes={};
-    for(const id of record.roleIds){const minutes=shares[id]?.onlineMinutes||0,accountId=M.recordAccount(s,record,id);
-      roleOnlineMinutes[id]=minutes;accountMinutes[accountId]=(accountMinutes[accountId]||0)+minutes;}
-    return {roleAccounts:record.roleAccounts,roleGroups:record.roleGroups,accountMinutes,roleOnlineMinutes,
-      ...(financial?{roleAllocations:shares,allocationMethod:'task-rule'}:{})};
+    M.freezeRecord(s,record);const total=record.roleIds.reduce((n,id)=>n+(weights[id]||1),0),accountMinutes={},roleOnlineMinutes={},roleAllocations={};
+    for(const id of record.roleIds){const weight=(weights[id]||1)/total,accountId=M.recordAccount(s,record,id),onlineMinutes=record.onlineMinutes*weight;roleOnlineMinutes[id]=onlineMinutes;accountMinutes[accountId]=(accountMinutes[accountId]||0)+onlineMinutes;if(financial)roleAllocations[id]={gold:record.gold*weight,minutes:record.minutes*weight,onlineMinutes,otherCost:(record.otherCost||0)*weight};}
+    return {roleAccounts:record.roleAccounts,roleGroups:record.roleGroups,accountMinutes,roleOnlineMinutes,...(financial?{roleAllocations,allocationMethod:'attendance'}:{})};
   }
-
   // Display-only forecast allocation; never writes a financial attribution.
   function onlineAnalysis(s,start,end,scope={},mode='estimated'){
     const forecast=M.confirmedForecast(s,start,end),remaining={start,end,onlineMinutes:0,accountMinutes:{},billableAccountMinutes:{},coveredAccountMinutes:{}};
@@ -69,31 +64,16 @@
     }
     const budget=M.budget(s,remaining);
     const addMoney=(row,result)=>{row.gross+=result.gross;row.net+=result.net;row.gold+=result.gold||0;row.netGold=row.netGold===null||result.netGold===null?null:row.netGold+(result.netGold||0);row.hasIncome=true;};
-    const billing=(record,id,m,roleId=null)=>{const config=record.snapshot,base=config.cardPrice*config.discount/config.cardMinutes,pricing=M.recordPricing(record,s.config),rate=pricing.accountBillingRates?.[id]??pricing.cardPrice*pricing.discount/pricing.cardMinutes,am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
-      if(roleId&&record.roleBillableMinutes?.[roleId]!==undefined){
-        const billable=record.roleBillableMinutes[roleId],covered=record.roleCoveredMinutes?.[roleId]||0,unit=pricing.cardPrice*pricing.discount/pricing.cardMinutes;
-        return {billable,covered,card:billable*unit};
-      }
+    const billing=(record,id,m)=>{const config=record.snapshot,base=config.cardPrice*config.discount/config.cardMinutes,pricing=M.recordPricing(record,s.config),rate=pricing.accountBillingRates?.[id]??pricing.cardPrice*pricing.discount/pricing.cardMinutes,am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;
       const billable=record.billableAccountMinutes?(record.billableAccountMinutes[id]||0)*ratio:base>0?m*Math.max(0,Math.min(1,(config.accountBillingRates?.[id]??base)/base)):m;
       const covered=record.coveredAccountMinutes?(record.coveredAccountMinutes[id]||0)*ratio:m-billable;return {billable,covered,card:m*rate};};
     let unknownOnline=0;
     if(mode==='estimated'){
-      for(const entry of forecast.participation){
-        const visits=entry.batches.flatMap((batch,i)=>batch.map(member=>({...member,batchIndex:i}))),v=entry.result,plan=s.plans.find(p=>p.id===entry.planId);
-        const roster=[...new Set(visits.map(x=>x.roleId))],accountByRole=Object.fromEntries(visits.map(x=>[x.roleId,x.accountId]));
-        const projected={planId:entry.planId,taskId:entry.taskId,planBatchIndices:entry.batchIndices,roleIds:roster,roleAccounts:accountByRole,
-          gold:v.gold,minutes:v.minutes,onlineMinutes:v.onlineMinutes,otherCost:v.other,accountMinutes:v.accountMinutes,snapshot:v.billingConfig};
-        const shares=M.roleShares(s,projected),perRoleUsage=new Map(roster.map(id=>[id,{minutes:0,billable:0,covered:0,card:0}]));
-        for(const member of visits){const current=perRoleUsage.get(member.roleId),usage=visitUsage(entry,member,member.batchIndex);
-          if(!current)continue;for(const key of ['minutes','billable','covered','card'])current[key]+=usage[key];}
-        for(const id of roster){const accountId=accountByRole[id];if(!matches(id,accountId))continue;
-          const row=roleRows.get(id),account=accountRows.get(accountId),usage=perRoleUsage.get(id),allocation=shares[id];
-          if(!row||!account||!allocation)continue;
-          const gross=allocation.gold*s.config.goldPrice/s.config.goldUnit*s.config.saleRate,
-            fee=gross*s.config.fee,net=gross-fee-usage.card-allocation.otherCost,
-            money={gross,gold:allocation.gold,net,netGold:s.config.goldPrice>0?net*s.config.goldUnit/s.config.goldPrice:null};
-          for(const target of [row,account]){for(const key of ['minutes','billable','covered','card'])target[key]+=usage[key];addMoney(target,money);}
-          row.accountIds.add(accountId);
+      for(const entry of forecast.participation){const visits=entry.batches.flatMap((batch,i)=>batch.map(member=>({...member,batchIndex:i}))),v=entry.result,count=visits.length;
+        for(const member of visits){if(!matches(member.roleId,member.accountId))continue;const row=roleRows.get(member.roleId),a=accountRows.get(member.accountId),m=entry.onlinePerVisit;
+          const {billable,covered,card}=visitUsage(entry,member,member.batchIndex);
+          const net=(v.gross-v.fee-v.other)/count-card,money={gross:v.gross/count,gold:v.gold/count,net,netGold:s.config.goldPrice>0?net*s.config.goldUnit/s.config.goldPrice:null};
+          for(const target of [row,a]){target.minutes+=m;target.billable+=billable;target.covered+=covered;target.card+=card;addMoney(target,money);}row.accountIds.add(member.accountId);
         }
       }
     }else{
@@ -102,7 +82,7 @@
         const known=selected.map(id=>({id,accountId:M.recordAccount(s,record,id),minutes:online(s,record,id)}));
         for(const entry of known){const row=roleRows.get(entry.id);row.included=true;const account=accountRows.get(entry.accountId),m=entry.minutes;row.accountIds.add(entry.accountId);
           if(m===null){row.missingTime++;if(account)account.missingTime++;continue;}
-          const b=billing(record,entry.accountId,m,entry.id);row.minutes+=m;row.billable+=b.billable;row.covered+=b.covered;row.card+=b.card;
+          const b=billing(record,entry.accountId,m);row.minutes+=m;row.billable+=b.billable;row.covered+=b.covered;row.card+=b.card;
         }
         for(const [id,a]of accountRows){const members=known.filter(x=>x.accountId===id);if(!members.length)continue;const allMembers=record.roleIds.filter(rid=>M.recordAccount(s,record,rid)===id),full=members.length===allMembers.length;
           const m=full&&record.accountMinutes?.[id]!==undefined?record.accountMinutes[id]:members.reduce((n,x)=>n+(x.minutes||0),0),am=record.accountMinutes?.[id]||m,ratio=am?m/am:0;

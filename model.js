@@ -531,32 +531,29 @@
   // Price actual online intervals, including a monthly expiry within a batch.
   // Date-only plans explicitly assume noon Beijing time; precise starts override it.
   function pricePrediction(s,t,result,when,timeline=result.batches){
-    const start=instant(when),duration=t.minutes/t.efficiency,billableAccountMinutes={},coveredAccountMinutes={},roleBillableMinutes={},roleCoveredMinutes={},warnings=[];
+    const start=instant(when),duration=t.minutes/t.efficiency,billableAccountMinutes={},coveredAccountMinutes={},warnings=[];
     let cursor=start+(timeline.length?t.prepare||0:0)*60000;
     for(const batch of timeline){if(result.batches.includes(batch))for(const r of batch){const a=s.accounts.find(a=>a.id===r.accountId),minutes=duration+(t.onlineExtra||0),expiry=a?.monthlyExpiresAt?Date.parse(a.monthlyExpiresAt):null;
       const covered=a?.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-cursor)/60000)):0;
       billableAccountMinutes[r.accountId]=(billableAccountMinutes[r.accountId]||0)+minutes-covered;
       coveredAccountMinutes[r.accountId]=(coveredAccountMinutes[r.accountId]||0)+covered;
-      roleBillableMinutes[r.id]=(roleBillableMinutes[r.id]||0)+minutes-covered;
-      roleCoveredMinutes[r.id]=(roleCoveredMinutes[r.id]||0)+covered;
       if(a?.billingType==='monthly'&&expiry===null)warnings.push(a.name+'：月卡到期未知，全部在线分钟暂按计时套餐估算');
     }cursor+=duration*60000;}
     const rate=s.config.cardPrice*s.config.discount/s.config.cardMinutes,config={...s.config,accountBillingRates:Object.fromEntries(Object.entries(result.accountMinutes).map(([id,m])=>[id,m?rate*(billableAccountMinutes[id]||0)/m:0]))};
-    return {...result,...costs(result.gold,result.minutes,result.onlineMinutes,config,result.other,result.accountMinutes),billingConfig:config,billableAccountMinutes,coveredAccountMinutes,roleBillableMinutes,roleCoveredMinutes,billingWarnings:[...new Set(warnings)]};
+    return {...result,...costs(result.gold,result.minutes,result.onlineMinutes,config,result.other,result.accountMinutes),billingConfig:config,billableAccountMinutes,coveredAccountMinutes,billingWarnings:[...new Set(warnings)]};
   }
   function executionPricing(s,record,batches=null){
-    const timeline=batches||[record.roleIds],start=instant(record.startedAt||record.date),billableAccountMinutes={},coveredAccountMinutes={},roleBillableMinutes={},roleCoveredMinutes={},warnings=[];
+    const timeline=batches||[record.roleIds],start=instant(record.startedAt||record.date),billableAccountMinutes={},coveredAccountMinutes={},warnings=[];
     const visits={};for(const batch of timeline)for(const id of batch){const r=s.roles.find(r=>r.id===id);visits[r.accountId]=(visits[r.accountId]||0)+1;}
     const fallback=pricingConfig(s,record.startedAt||record.date);
     for(const [i,batch]of timeline.entries())for(const id of batch){const r=s.roles.find(r=>r.id===id),a=s.accounts.find(a=>a.id===r.accountId),minutes=(record.accountMinutes[r.accountId]||0)/visits[r.accountId],at=start+i*record.minutes/timeline.length*60000,expiry=a.monthlyExpiresAt?Date.parse(a.monthlyExpiresAt):null;
       const covered=a.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-at)/60000)):0;
       billableAccountMinutes[a.id]=(billableAccountMinutes[a.id]||0)+minutes-covered;coveredAccountMinutes[a.id]=(coveredAccountMinutes[a.id]||0)+covered;
-      roleBillableMinutes[id]=(roleBillableMinutes[id]||0)+minutes-covered;roleCoveredMinutes[id]=(roleCoveredMinutes[id]||0)+covered;
       if(a.billingType==='monthly'&&expiry===null)warnings.push(a.name+'：月卡到期未知，使用计时参考单价');
     }
     const rate=s.config.cardPrice*s.config.discount/s.config.cardMinutes;
     const config={...s.config,accountBillingRates:Object.fromEntries(s.accounts.map(a=>{const minutes=record.accountMinutes[a.id]||0;return [a.id,minutes?rate*(billableAccountMinutes[a.id]||0)/minutes:fallback.accountBillingRates[a.id]];}))};
-    return {config,billableAccountMinutes,coveredAccountMinutes,roleBillableMinutes,roleCoveredMinutes,billingWarnings:[...new Set(warnings)]};
+    return {config,billableAccountMinutes,coveredAccountMinutes,billingWarnings:[...new Set(warnings)]};
   }
   function plan(s,t,date,scope={},remaining=false) {t=taskForVersion(s,t);
     if(!t.enabled||!scheduled(t,date))return {...costs(0,0,0,s.config),batches:[],accountMinutes:{},executions:0,reasons:[]};
@@ -613,92 +610,14 @@
     if(r.incompleteMeasurement)for(const k of ['net','timeNet','netGold','hourly','hourlyGold','roi'])result[k]=null;return {...result,incompleteMeasurement:!!r.incompleteMeasurement,goldCost,accountMinutes:r.accountMinutes||{},...(r.billableAccountMinutes?{billableAccountMinutes:r.billableAccountMinutes,coveredAccountMinutes:r.coveredAccountMinutes||{}}:{}),billingWarnings:[...(r.billingWarnings||[]),...(currentConfig?.discount>0&&r.snapshot.discount===0&&!r.billableAccountMinutes&&r.snapshot.accountBillingRates?['原记录为零折扣且缺少计费分钟，月卡覆盖无法还原，暂按计时单价估算']:[]),...(r.pricingSource?[r.pricingSource]:[])]};
   }
   function selectedRecordRoles(s,r,scope={}){return r.roleIds.filter(id=>{const role=s.roles.find(x=>x.id===id);return role&&(!scope.role||id===scope.role)&&(!scope.account||recordAccount(s,r,id)===scope.account)&&(!scope.group||(r.roleGroups?.[id]??s.accounts.find(a=>a.id===recordAccount(s,r,id))?.group)===scope.group);});}
-  // Read-through allocation from the actual roster. Never rewrite an existing record:
-  // totals, observed rewards, historical pricing and account snapshots remain authoritative.
-  function roleShares(s,r){
-    const ids=[...new Set(r.roleIds||[])],out={};if(!ids.length)return out;
-    const plan=(s.plans||[]).find(p=>p.id===r.planId),task=plan?.taskSnapshots?.[r.taskId]||s.tasks.find(t=>t.id===r.taskId);
-    // Preserve deliberately customized financial allocations. Old "attendance" allocations
-    // are automatically upgraded on read when an exact batch roster is available.
-    const indices=r.planBatchIndices||[],planned=plan&&indices.length?indices.map(i=>plan.batches[i]?.filter(id=>ids.includes(id))).filter(b=>b?.length):[];
-    const haveRoster=planned.length>0;
-    if(r.roleAllocations&&r.allocationMethod!=='attendance')return r.roleAllocations;
-    if(r.roleAllocations&&!haveRoster&&(!r.attendanceWeights||!task))return r.roleAllocations;
-    const visits=haveRoster?planned:(()=>{const weights=r.attendanceWeights||{},count=Math.max(1,...ids.map(id=>Math.round(weights[id]||1))),batches=[];for(let i=0;i<count;i++){const batch=ids.filter(id=>i<Math.max(1,Math.round(weights[id]||1)));if(batch.length)batches.push(batch);}return batches;})();
-    const reward=new Map(ids.map(id=>[id,0])),occurrences=new Map(ids.map(id=>[id,0]));
-    const perGold=task?.components?.length?task.components.reduce((n,c)=>n+c.quantity*c.price,0):task?.gold||0;
-    for(const batch of visits){
-      const members=batch.map(id=>s.roles.find(role=>role.id===id)).filter(Boolean),n=batch.length,automatic=task?dungeonRewards(task,members,r.snapshot||s.config):null;
-      const shared=automatic?automatic.shared:(task?.sharedMode==='person'?n*(task.shared||0):task?.shared||0)+(task?.type==='team'&&!task?.rewardPerRole?perGold:0);
-      const direct=automatic?automatic.direct:(task?.type==='team'&&!task?.rewardPerRole?0:perGold);
-      for(const id of batch){occurrences.set(id,(occurrences.get(id)||0)+1);reward.set(id,(reward.get(id)||0)+direct+shared/n);}
-    }
-    const attendance=ids.reduce((sum,id)=>sum+occurrences.get(id),0)||ids.length;
-    const basis=ids.reduce((sum,id)=>sum+reward.get(id),0);
-    const financialWeights=ids.map(id=>basis>0?reward.get(id)/basis:(occurrences.get(id)||1)/attendance);
-    const usageWeights=ids.map(id=>(occurrences.get(id)||1)/attendance);
-    // Operation minutes represent elapsed batch work: distribute each batch's
-    // duration across its participants, never charge the full group duration to each role.
-    // Setup minutes are common overhead and are split by actual attendances.
-    const workShare=new Map(ids.map(id=>[id,0]));
-    for(const batch of visits)for(const id of batch)workShare.set(id,(workShare.get(id)||0)+1/batch.length);
-    const batchWeights=ids.map(id=>(workShare.get(id)||0)/visits.length);
-    function divide(total,weights){
-      const shares={};let allocated=0;ids.forEach((id,i)=>{const amount=i===ids.length-1?(total||0)-allocated:(total||0)*weights[i];shares[id]=amount;allocated+=amount;});return shares;
-    }
-    const gold=divide(r.gold,financialWeights),setup=Math.min(r.minutes||0,Math.max(0,task?.prepare||0)),
-      workMinutes=divide((r.minutes||0)-setup,batchWeights),setupMinutes=divide(setup,usageWeights),
-      otherCost=divide(r.otherCost,batchWeights),minutes=Object.fromEntries(ids.map(id=>[id,workMinutes[id]+setupMinutes[id]]));
-    const online={};
-    // Recorded per-role online time is authoritative; otherwise split each account's
-    // known time by visits, leaving unknown account time at the fallback card rate.
-    if(r.roleOnlineMinutes&&ids.every(id=>Number.isFinite(r.roleOnlineMinutes[id]))){
-      for(const id of ids)online[id]=r.roleOnlineMinutes[id];
-    }else{
-      const assigned=new Set();let known=0;
-      for(const [account,m]of Object.entries(r.accountMinutes||{})){
-        const members=ids.filter(id=>recordAccount(s,r,id)===account),weight=members.reduce((v,id)=>v+(occurrences.get(id)||1),0);
-        if(!weight)continue;
-        let subtotal=0;members.forEach((id,i)=>{const value=i===members.length-1?m-subtotal:m*(occurrences.get(id)||1)/weight;online[id]=value;subtotal+=value;assigned.add(id);});
-        known+=m;
-      }
-      const unknownIds=ids.filter(id=>!assigned.has(id)),remaining=Math.max(0,(r.onlineMinutes||0)-known);
-      const remainingWeight=unknownIds.reduce((n,id)=>n+(occurrences.get(id)||1),0);
-      unknownIds.forEach((id,i)=>{online[id]=i===unknownIds.length-1?remaining-unknownIds.slice(0,i).reduce((n,k)=>n+online[k],0):remaining*(occurrences.get(id)||1)/remainingWeight;});
-      // If an old record has partially allocated account time all owned by one account,
-      // do not drop its residual online usage from the role-level report.
-      if(!unknownIds.length&&remaining>1e-6){const extra=divide(remaining,usageWeights);for(const id of ids)online[id]=(online[id]||0)+extra[id];}
-    }
-    for(const id of ids)out[id]={gold:gold[id],minutes:minutes[id],onlineMinutes:online[id]||0,otherCost:otherCost[id]};
-    return out;
-  }
   function scopedRecord(s,r,scope={}){
     if(r.unallocated&&(scope.role||scope.account||scope.group))return null;const ids=selectedRecordRoles(s,r,scope);if(!ids.length&&!r.unallocated)return null;
     if(ids.length===r.roleIds.length)return r;
-    const allocations=roleShares(s,r);if(ids.some(id=>!allocations[id]))return null;
+    if(!r.roleAllocations||ids.some(id=>!r.roleAllocations[id]))return null;
     const amounts={gold:0,minutes:0,onlineMinutes:0,otherCost:0},accountMinutes={};
-    for(const id of ids){const a=allocations[id],accountId=recordAccount(s,r,id);for(const k of Object.keys(amounts))amounts[k]+=a[k]||0;
-      // Only distribute minutes that were actually assigned to the account.
-      const siblings=r.roleIds.filter(roleId=>recordAccount(s,r,roleId)===accountId),onlineForAccount=siblings.reduce((n,k)=>n+(allocations[k]?.onlineMinutes||0),0);
-      const known=r.accountMinutes?.[accountId];if(known!==undefined&&onlineForAccount>0)accountMinutes[accountId]=(accountMinutes[accountId]||0)+known*(a.onlineMinutes||0)/onlineForAccount;
-    }
-    const billableAccountMinutes={},coveredAccountMinutes={};
-    if(r.roleBillableMinutes&&r.roleCoveredMinutes){
-      for(const id of ids){const account=recordAccount(s,r,id);
-        billableAccountMinutes[account]=(billableAccountMinutes[account]||0)+(r.roleBillableMinutes[id]||0);
-        coveredAccountMinutes[account]=(coveredAccountMinutes[account]||0)+(r.roleCoveredMinutes[id]||0);
-      }
-    }else for(const [id,m]of Object.entries(accountMinutes)){
-      const fraction=m/(r.accountMinutes?.[id]||m||1);
-      billableAccountMinutes[id]=(r.billableAccountMinutes?.[id]||0)*fraction;
-      coveredAccountMinutes[id]=(r.coveredAccountMinutes?.[id]||0)*fraction;
-    }
-    const exact=!!r.roleBillableMinutes&&!!r.billableAccountMinutes,baseRate=(r.snapshot?.cardPrice||0)*(r.snapshot?.discount||0)/(r.snapshot?.cardMinutes||1);
-    const snapshot=exact?{...r.snapshot,accountBillingRates:Object.fromEntries(Object.entries(accountMinutes).map(([account,m])=>[account,m?baseRate*(billableAccountMinutes[account]||0)/m:0]))}:r.snapshot;
-    return {...r,...amounts,roleIds:ids,accountMinutes,snapshot,
-      ...(r.billableAccountMinutes?{billableAccountMinutes,coveredAccountMinutes}:{}),
-      roleBillableMinutes:r.roleBillableMinutes?Object.fromEntries(ids.map(id=>[id,r.roleBillableMinutes[id]||0])):undefined,
-      roleCoveredMinutes:r.roleCoveredMinutes?Object.fromEntries(ids.map(id=>[id,r.roleCoveredMinutes[id]||0])):undefined};
+    for(const id of ids){const a=r.roleAllocations[id],accountId=recordAccount(s,r,id);for(const k of Object.keys(amounts))amounts[k]+=a[k]||0;accountMinutes[accountId]=(accountMinutes[accountId]||0)+(a.onlineMinutes||0);}
+    const billableAccountMinutes={},coveredAccountMinutes={};for(const [id,m]of Object.entries(accountMinutes)){const fraction=m/(r.accountMinutes?.[id]||m||1);billableAccountMinutes[id]=(r.billableAccountMinutes?.[id]||0)*fraction;coveredAccountMinutes[id]=(r.coveredAccountMinutes?.[id]||0)*fraction;}
+    return {...r,...amounts,roleIds:ids,accountMinutes,...(r.billableAccountMinutes?{billableAccountMinutes,coveredAccountMinutes}:{})};
   }
   function inScope(s,r,scope={}){return !!scopedRecord(s,r,scope);}
   function planStart(s,p,taskId=p.taskId){
@@ -752,26 +671,11 @@
             for(const r of allowed)usage.set(key(r.id),(usage.get(key(r.id))||0)+1);
             fullBatches.push(allowed);fullBatchIndices.push(i);
             const scoped=completed?new Set(selectedRecordRoles(s,event||{roleIds:ids},scope)):selected;
-            if(allowed.some(r=>scoped.has(r.id)))batches.push(allowed);
+            if(allowed.every(r=>scoped.has(r.id)))batches.push(allowed);else warnings.push(t.name+'：筛选未包含完整确认批次，未分摊共享收益');
           }catch(e){if(taskDate>=start&&taskDate<=end)warnings.push(t.name+'：'+e.message+'，该批次未计入预测');}
         }
-        // Price the full confirmed batches first, then distribute each batch's direct
-        // and shared reward to its participating roles. Never drop a multi-account batch.
-        const fullTask={...t,enabled:true,prepare:t.prepare||0,otherCost:t.otherCost||0};
-        const forecast=pricePrediction(s,t,calculateBatches(fullTask,fullBatches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);
-        let result=forecast;
-        if(scope.role||scope.account||scope.group){
-          const roster=[...new Set(fullBatches.flat().map(r=>r.id))],accounts=Object.fromEntries(fullBatches.flat().map(r=>[r.id,r.accountId]));
-          const entry={planId:p.id,taskId,planBatchIndices:fullBatchIndices,roleIds:roster,roleAccounts:accounts,
-            roleGroups:Object.fromEntries(roster.map(id=>[id,s.accounts.find(a=>a.id===accounts[id])?.group||''])),
-            gold:forecast.gold,minutes:forecast.minutes,onlineMinutes:forecast.onlineMinutes,otherCost:forecast.other,
-            accountMinutes:forecast.accountMinutes,billableAccountMinutes:forecast.billableAccountMinutes,
-            coveredAccountMinutes:forecast.coveredAccountMinutes,roleBillableMinutes:forecast.roleBillableMinutes,
-            roleCoveredMinutes:forecast.roleCoveredMinutes,snapshot:forecast.billingConfig};
-          const allocated=scopedRecord(s,entry,scope),selectedVisits=fullBatches.reduce((n,batch)=>n+batch.filter(r=>selectedRecordRoles(s,{...entry,roleIds:batch},scope).includes(r.id)).length,0),allVisits=fullBatches.reduce((n,batch)=>n+batch.length,0);
-          result=allocated?{...recordResult(allocated,s.config),executions:allVisits?forecast.executions*selectedVisits/allVisits:0}:{
-            ...costs(0,0,0,s.config),accountMinutes:{},executions:0};
-        }
+        const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
+        const result=pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);
         if(taskDate>=start&&taskDate<=end){rows.get(taskId).push(result);if(!scope.role&&!scope.account&&!scope.group&&fullBatches.length)participation.push({planId:p.id,taskId,date:taskDate,startedAt:new Date(when).toISOString(),prepare:t.prepare||0,batchMinutes:t.minutes/t.efficiency,batchIndices:fullBatchIndices,onlinePerVisit:t.minutes/t.efficiency+t.onlineExtra,batches:fullBatches.map(batch=>batch.map(r=>({roleId:r.id,accountId:r.accountId}))),result});}
       }
     }
@@ -781,8 +685,7 @@
   }
   function incomeRecords(s){
     const ownership=(e,r,ids)=>({roleAccounts:Object.fromEntries(ids.map(id=>[id,e.roleAccounts?.[id]||r?.roleAccounts?.[id]||s.roles.find(x=>x.id===id)?.accountId])),roleGroups:Object.fromEntries(ids.map(id=>[id,e.roleGroups?.[id]??r?.roleGroups?.[id]??s.accounts.find(a=>a.id===(r?.roleAccounts?.[id]||s.roles.find(x=>x.id===id)?.accountId))?.group??'']))});
-    const wage=(s.wageReceipts||[]).map(e=>{const r=s.records.find(r=>r.id===e.recordId),ids=e.roleId?[e.roleId]:r.roleIds;return {...e,...ownership(e,r,ids),taskId:r.taskId,roleIds:ids,gold:e.gold,minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},
-      ...(e.roleId?{}:{planId:r.planId,planBatchIndices:r.planBatchIndices,attendanceWeights:r.attendanceWeights}),financialEvent:true};});
+    const wage=(s.wageReceipts||[]).map(e=>{const r=s.records.find(r=>r.id===e.recordId),ids=e.roleId?[e.roleId]:r.roleIds;return {...e,...ownership(e,r,ids),taskId:r.taskId,roleIds:ids,gold:e.gold,minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},financialEvent:true};});
     const sales=(s.materialSales||[]).map(e=>{const m=s.materials.find(m=>m.id===e.materialId),r=s.records.find(r=>r.id===m.recordId),ids=e.roleId?[e.roleId]:r?.roleIds||s.roles.map(r=>r.id);return {...e,...ownership(e,r,ids),taskId:r?.taskId||'material_income',roleIds:ids,unallocated:!e.roleId&&!r,gold:e.quantity*e.unitGold-e.feeGold,minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},financialEvent:true};});
     const expenses=s.ledger.filter(e=>e.direction==='out'&&!e.linkedEventId&&(e.roiCost===true||e.category==='consumption'&&e.roiCost!==false)&&!['transfer','adjustment'].includes(e.category)).map(e=>{const r=s.records.find(r=>r.id===e.recordId),ids=[e.roleId];return {...e,...ownership(e,r,ids),taskId:r?.taskId||'operating_cost',roleIds:ids,gold:0,goldCost:e.gold,snapshot:e.snapshot||{...s.config,saleRate:1,fee:0},minutes:0,onlineMinutes:0,otherCost:0,accountMinutes:{},financialEvent:true,expense:true};});
     return [...s.records,...completionRecords(s).filter(f=>f.measurements).map(partialMeasurementRecord),...wage,...sales,...expenses];
@@ -853,8 +756,8 @@
     const events=[],seen=new Set();
     for(const e of s.ledger||[]){const key=e.linkedEventId||e.eventKey||e.id;if(seen.has(key+'|'+e.roleId+'|'+e.direction))continue;seen.add(key+'|'+e.roleId+'|'+e.direction);events.push({...e,amount:e.direction==='in'?e.gold:-e.gold});}
     const add=(e,roleId,gold)=>{if(roleId&&!events.some(x=>x.linkedEventId===e.id||x.recordId===e.id&&x.direction==='in'))events.push({id:e.id,roleId,date:e.date,capturedAt:e.receivedAt,amount:gold,category:'reward',source:'已确认执行',recordId:e.id});};
-    for(const r of s.records||[])if(r.measurementStatus==='confirmed'){for(const [id,a]of Object.entries(roleShares(s,r)))add(r,id,a.gold);}
-    for(const f of completionRecords(s))if(f.measurements?.gold!=null){const provisional={...f,gold:f.measurements.gold,minutes:f.measurements.minutes||0,onlineMinutes:f.measurements.onlineMinutes||0};for(const [id,a]of Object.entries(roleShares(s,provisional)))add(f,id,a.gold);}
+    for(const r of s.records||[])if(r.measurementStatus==='confirmed'){if(r.roleAllocations)for(const [id,a]of Object.entries(r.roleAllocations))add(r,id,a.gold);else if(r.roleIds.length===1)add(r,r.roleIds[0],r.gold);}
+    for(const f of completionRecords(s))if(f.measurements?.gold!=null){if(f.measurements.financialAllocation==='attendance')for(const id of f.roleIds)add(f,id,f.measurements.gold/f.roleIds.length);else if(f.roleIds.length===1)add(f,f.roleIds[0],f.measurements.gold);}
     for(const e of s.wageReceipts||[])if(e.roleId&&!events.some(x=>x.linkedEventId===e.id))add(e,e.roleId,e.gold);
     for(const e of s.materialSales||[])if(e.roleId&&!events.some(x=>x.linkedEventId===e.id))add(e,e.roleId,e.quantity*e.unitGold-e.feeGold);
     return events;
@@ -911,20 +814,6 @@
       if(r.dungeonId&&(typeof r.dungeonId!=='string'||!/^[-_a-zA-Z0-9]+$/.test(r.dungeonId)||!validDate(r.cycle)))throw new Error('实测副本 CD 标识无效');
       if(r.cdSnapshot){if(r.cdSnapshot.period!=='weekly'||!Array.isArray(r.cdSnapshot.resetDays)||!r.cdSnapshot.resetDays.length||r.cdSnapshot.resetDays.some(d=>!Number.isInteger(d)||d<0||d>6))throw new Error('历史 CD 刷新规则无效');number(r.cdSnapshot.resetHour,'历史刷新小时',{min:0,max:23,integer:true});if(r.cycle!==cycle(r.cdSnapshot,r.startedAt||r.date))throw new Error('实测 CD 与开始时刻或历史刷新规则不一致');}
       if(r.roleAccounts){if(Object.keys(r.roleAccounts).length!==r.roleIds.length||r.roleIds.some(id=>!s.accounts.some(a=>a.id===r.roleAccounts[id])))throw new Error('历史角色账号快照无效');}if(r.roleGroups&&r.roleIds.some(id=>typeof r.roleGroups[id]!=='string'))throw new Error('历史分组快照无效');
-      if(r.roleBillableMinutes||r.roleCoveredMinutes){
-        for(const field of ['roleBillableMinutes','roleCoveredMinutes'])for(const [id,v]of Object.entries(r[field]||{})){
-          if(!r.roleIds.includes(id))throw new Error('逐角色点卡用量引用不存在的成员');
-          number(v,'角色计费与月卡分钟',{min:0});
-        }
-        for(const [account,m]of Object.entries(r.accountMinutes||{})){
-          const roles=r.roleIds.filter(id=>recordAccount(s,r,id)===account);
-          const billed=roles.reduce((n,id)=>n+(r.roleBillableMinutes?.[id]||0),0),
-            covered=roles.reduce((n,id)=>n+(r.roleCoveredMinutes?.[id]||0),0);
-          if(Math.abs(billed-(r.billableAccountMinutes?.[account]||0))>1e-5||
-             Math.abs(covered-(r.coveredAccountMinutes?.[account]||0))>1e-5||
-             Math.abs(m-billed-covered)>1e-5)throw new Error('角色计费与账号总分钟不一致');
-        }
-      }
       for(const [id,value]of Object.entries(r.roleOnlineMinutes||{})){if(!r.roleIds.includes(id))throw new Error('参与耗时引用不存在成员');number(value,'角色在线分钟');}
       if(r.roleOnlineMinutes&&Math.abs(Object.values(r.roleOnlineMinutes).reduce((a,b)=>a+b,0)-r.onlineMinutes)>1e-6)throw new Error('角色在线分钟合计不等于实测总量');
       if(r.roleAllocations){
@@ -1034,5 +923,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {roleShares,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

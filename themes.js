@@ -35,19 +35,6 @@ SOFTWARE.
     {id:'warm-sand',name:'暖砂金',mode:'light',neutral:'sand',accent:'bronze',description:'浅色'},
     {id:'amethyst-night',name:'暮紫夜',mode:'dark',neutral:'mauve',accent:'violet',description:'深色'}
   ];
-  // Presentation-only palette. Never used to infer or change any business values.
-  const visualByTheme={
-    'deep-ocean':{positive:'#3DD68C',negative:'#FF9592',wealth:'#FFCA16',expense:'#FFA057',info:'#70B8FF',efficiency:'#BAA7FF',actual:'#0BD8B6',forecast:'#BAA7FF',
-      line:['#9EB1FF','#0BD8B6','#FFCA16','#BAA7FF','#70B8FF','#D4B3A5'],fill:['#304384','#145750','#5C3D05','#473876','#104D87','#493E3A']},
-    'cloud-blue':{positive:'#218358',negative:'#CE2C31',wealth:'#AB6400',expense:'#CC4E00',info:'#0D74CE',efficiency:'#6550B9',actual:'#208368',forecast:'#6550B9',
-      line:['#3A5BC7','#208368','#CC4E00','#6550B9','#107D98','#7D5E54'],fill:['#304384','#1B5745','#66350C','#473876','#045468','#493E3A']},
-    'jade-green':{positive:'#218358',negative:'#CE2C31',wealth:'#AB6400',expense:'#CC4E00',info:'#0D74CE',efficiency:'#6550B9',actual:'#208368',forecast:'#6550B9',
-      line:['#208368','#0D74CE','#7D5E54','#6550B9','#CC4E00','#107D98'],fill:['#1B5745','#104D87','#493E3A','#473876','#66350C','#045468']},
-    'warm-sand':{positive:'#218358',negative:'#CE2C31',wealth:'#AB6400',expense:'#A18072',info:'#107D98',efficiency:'#6550B9',actual:'#208368',forecast:'#6550B9',
-      line:['#7D5E54','#208368','#3A5BC7','#AB6400','#6550B9','#107D98'],fill:['#493E3A','#1B5745','#304384','#5C3D05','#473876','#045468']},
-    'amethyst-night':{positive:'#3DD68C',negative:'#FF9592',wealth:'#FFCA16',expense:'#FFA057',info:'#70B8FF',efficiency:'#BAA7FF',actual:'#0BD8B6',forecast:'#BAA7FF',
-      line:['#BAA7FF','#9EB1FF','#0BD8B6','#D4B3A5','#4CCCE6','#FFCA16'],fill:['#473876','#304384','#145750','#493E3A','#045468','#5C3D05']}
-  };
   function palette(id){
     const theme=themes.find(t=>t.id===id)||themes[0],s=scales[theme.mode],n=s[theme.neutral],a=s[theme.accent],at=(name,step)=>s[name][step-1];
     // Financial treemap discipline: a restrained family matched to each UI theme.
@@ -65,32 +52,10 @@ SOFTWARE.
       'chart-bg-0':tileColors[0],'chart-bg-1':tileColors[1],'chart-bg-2':tileColors[2],'chart-bg-3':tileColors[3],'chart-bg-4':tileColors[4],'chart-bg-5':tileColors[5],track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
-    const v=visualByTheme[theme.id],dark=theme.mode==='dark';
-    Object.assign(p,{
-      accent:p.primary,'accent-soft':p['primary-soft'],'accent-soft-text':p['primary-label'],
-      positive:v.positive,negative:v.negative,wealth:v.wealth,expense:v.expense,info:v.info,efficiency:v.efficiency,
-      actual:v.actual,forecast:v.forecast,
-      'positive-soft':dark?'#132D21':'#E6F6EB','positive-soft-text':dark?'#3DD68C':'#176C45',
-      'negative-soft':dark?'#3B1219':'#FEEBEC','negative-soft-text':dark?'#FF9592':'#A5222A',
-      'wealth-soft':dark?'#302008':'#FFF7C2','wealth-soft-text':dark?'#FFCA16':'#7B4D00',
-      'expense-soft':dark?'#331E0B':theme.id==='warm-sand'?'#F6EDEA':'#FFEFD6',
-      'expense-soft-text':dark?'#FFA057':theme.id==='warm-sand'?'#7D5E54':'#A83F00',
-      'info-soft':dark?'#0D2847':'#E6F4FE','info-soft-text':dark?'#70B8FF':theme.id==='warm-sand'?'#0D3C48':'#113264',
-      'efficiency-soft':dark?'#291F43':'#F4F0FE','efficiency-soft-text':dark?'#BAA7FF':'#6550B9',
-      'success-soft-text':dark?'#3DD68C':'#176C45','warning-soft-text':dark?'#FFCA16':'#7B4D00',
-      'danger-bg':dark?'#3B1219':'#FEEBEC','danger-soft-text':dark?'#FF9592':'#A5222A',
-      'muted-soft':n[2],'muted-soft-text':n[10]
-    });
-    for(let i=0;i<6;i++){
-      p['chart-category-'+i+'-line']=v.line[i];
-      p['chart-category-'+i+'-fill']=v.fill[i];
-      p['chart-bg-'+i]=v.fill[i]; // Compatibility: overview tiles and canvas war report
-      p['chart-text-'+i]='#ffffff';
-    }
     // Radix whiteA12 / blackA12; prefer consistent white ink whenever it meets 4.5:1.
     const luminance=hex=>{const c=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
     for(let i=0;i<6;i++){const l=luminance(p['chart-bg-'+i]);p['chart-text-'+i]=1.05/(l+.05)>=4.5?'#ffffff':'#000000';}
-    return {theme,tokens:p,chartColors:v.line.slice(),categoryLine:v.line.slice(),categoryFill:v.fill.slice()};
+    return {theme,tokens:p,chartColors:[p['chart-primary'],p['chart-cyan'],p['chart-purple'],at('bronze',9),n[8],at('cyan',9)]};
   }
   function preference(){try{const id=localStorage.getItem(KEY);return themes.some(t=>t.id===id)?id:'deep-ocean';}catch{return 'deep-ocean';}}
   function apply(id,persist=true){const p=palette(id),root=document.documentElement;root.dataset.theme=p.theme.id;root.dataset.colorMode=p.theme.mode;root.style.colorScheme=p.theme.mode;for(const [n,v]of Object.entries(p.tokens))root.style.setProperty('--wb-'+n,v);const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=p.tokens.bg;let saved=true;if(persist)try{localStorage.setItem(KEY,p.theme.id);}catch{saved=false;}return {...p,saved};}

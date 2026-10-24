@@ -135,6 +135,8 @@
   const next=JSON.parse(JSON.stringify(p)),affected=[],protectedRoles=lockedRoleIds(s,p);
   for(let i=0;i<batches.length;i++){
    const ids=batches[i];if(!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length)throw new Error('第 '+(i+1)+' 队至少需要一名角色，且不能重复');
+   const members=ids.map(id=>s.roles.find(r=>r.id===id));if(members.some(r=>!r))throw new Error('角色不存在');
+   const accounts=new Map();for(const role of members){const other=accounts.get(role.accountId);if(other)throw new Error('第 '+(i+1)+' 队同账号冲突：'+other.name+' 与 '+role.name+' 不能同时登录，请分到不同队伍');accounts.set(role.accountId,role);}
    if(JSON.stringify(ids)!==JSON.stringify(p.batches[i]||[])){if(p.batches[i])assertBatchEditable(s,p,i);if(ids.some(id=>!p.batches[i]?.includes(id)&&protectedRoles.has(id)))throw new Error('角色属于锁定队伍，请先解锁');affected.push(i);}
   }
   next.batches=batches.map(ids=>[...ids]);next.teamConfigs=next.batches.map((_,i)=>p.teamConfigs?.[i]||null);next.companionAssignments=next.batches.map((_,i)=>p.companionAssignments?.[i]||[]);
@@ -175,14 +177,7 @@
    const pref={timeAllocation:input.timeAllocation||copy.recordingPreferences?.timeAllocation||'attendance',financialAllocation:input.financialAllocation||copy.recordingPreferences?.financialAllocation||'none'},n=fact.roleIds.length;
    record={...fact,id:M.id('record'),completionOnly:false,completionId:fact.id,gold:M.number(input.gold,'实际金币'),minutes:M.number(input.minutes,'实际操作分钟'),onlineMinutes:M.number(input.onlineMinutes,'账号在线分钟'),otherCost:M.number(input.otherCost??0,'其他成本'),accountMinutes:{},measurementStatus:'confirmed',source:'手工实测',note:input.note||fact.note||'',attendanceWeights:Object.fromEntries(fact.roleIds.map(id=>[id,1]))};delete record.billingAccounts;
    if(pref.timeAllocation==='attendance'||pref.financialAllocation==='attendance'){record.roleOnlineMinutes={};if(pref.financialAllocation==='attendance'){record.roleAllocations={};record.allocationMethod='attendance';}for(const id of fact.roleIds){const account=fact.roleAccounts[id],online=record.onlineMinutes/n;record.roleOnlineMinutes[id]=online;record.accountMinutes[account]=(record.accountMinutes[account]||0)+online;if(record.roleAllocations)record.roleAllocations[id]={gold:record.gold/n,minutes:record.minutes/n,onlineMinutes:online,otherCost:record.otherCost/n};}}
-   // Each completed batch has a concrete roster: persist its direct/shared
-   // reward allocation and online time regardless of the legacy UI preference.
-   const shares=M.roleShares(copy,record);record.roleAllocations=shares;record.allocationMethod='task-rule';
-   record.roleOnlineMinutes=Object.fromEntries(fact.roleIds.map(id=>[id,shares[id]?.onlineMinutes||0]));
-   record.accountMinutes={};for(const id of fact.roleIds){const account=fact.roleAccounts[id];
-     record.accountMinutes[account]=(record.accountMinutes[account]||0)+(record.roleOnlineMinutes[id]||0);}
-   const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;
-   record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
+   const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
   }
   p.executionDrafts=(p.executionDrafts||[]).filter(d=>d.taskId!==taskId||d.index!==index);
