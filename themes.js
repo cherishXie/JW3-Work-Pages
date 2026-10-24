@@ -54,7 +54,7 @@ SOFTWARE.
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
     // Task-center surfaces and semantic day states; other pages keep their current tokens.
     Object.assign(p,{'task-canvas':a[0],'task-surface':a[1],'task-edge':a[5],'task-hover':a[3],
-      'task-pending-bg':a[2],'task-pending-text':a[11],'task-pending-fill':p.primary,
+      'task-pending-bg':theme.accent==='jade'?at('indigo',3):a[2],'task-pending-text':theme.accent==='jade'?at('indigo',12):a[11],'task-pending-fill':theme.accent==='jade'?at('indigo',9):p.primary,
       'task-progress-bg':at('cyan',3),'task-progress-text':at('cyan',12),'task-progress-fill':at('cyan',theme.mode==='light'?11:9),
       'task-done-bg':at('green',3),'task-done-text':at('green',12),'task-done-fill':at('green',theme.mode==='light'?11:9),
       'task-overdue-bg':at('amber',3),'task-overdue-text':at('amber',12),'task-overdue-fill':at('amber',theme.mode==='light'?11:9),
