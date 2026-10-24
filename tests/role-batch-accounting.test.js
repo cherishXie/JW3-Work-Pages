@@ -90,3 +90,45 @@ test('incomplete observations preserve unknown ROI and never invent real income'
   near(role.gold,120,'known gold');
   assert.equal(role.net,null);
 });
+
+test('automatic dungeon reward: each role receives direct gold plus its batch share',()=>{
+  const s=fixture(),t=s.tasks[0];
+  t.partyRule='daily5';t.dungeonRewardMode='auto';t.bossCount=2;t.gold=100;t.components=[];
+  const group1=['r1','r2'].map(id=>s.roles.find(r=>r.id===id));
+  const group2=['r1','r3'].map(id=>s.roles.find(r=>r.id===id));
+  const first=M.dungeonRewards(t,group1,s.config),second=M.dungeonRewards(t,group2,s.config);
+  const total=2*first.direct+first.shared+2*second.direct+second.shared;
+  const record={taskId:'t1',planId:'planA',planBatchIndices:[0,1],roleIds:['r1','r2','r3'],
+    gold:total,minutes:22,onlineMinutes:48,otherCost:0,accountMinutes:{a1:24,a2:12,a3:12},snapshot:s.config};
+  const allocation=M.roleShares(s,record);
+  near(allocation.r1.gold,first.direct+first.shared/2+second.direct+second.shared/2,'repeated role');
+  near(allocation.r2.gold,first.direct+first.shared/2,'first batch role');
+  near(allocation.r3.gold,second.direct+second.shared/2,'second batch role');
+  near(Object.values(allocation).reduce((n,r)=>n+r.gold,0),total,'dungeon reward conservation');
+});
+test('actual execution: per-role monthly charge equals exact charged minutes',()=>{
+  const s=fixture();s.roles[2].accountId='a1';
+  s.plans[0].batches=[['r1','r2'],['r3','r2']];
+  s.accounts[0].billingType='monthly';s.accounts[0].monthlyExpiresAt='2026-10-24T04:15:00.000Z';
+  const record={id:'monthlyActual',taskId:'t1',planId:'planA',planBatchIndices:[0,1],date:DATE,
+    startedAt:'2026-10-24T04:00:00.000Z',roleIds:['r1','r2','r3'],gold:520,minutes:20,
+    onlineMinutes:48,otherCost:0,batches:2,accountMinutes:{a1:24,a2:24},snapshot:M.pricingConfig(s,DATE),
+    measurementStatus:'confirmed'};
+  M.freezeRecord(s,record);
+  const billing=M.executionPricing(s,record,s.plans[0].batches);
+  Object.assign(record,{snapshot:billing.config,billableAccountMinutes:billing.billableAccountMinutes,
+    coveredAccountMinutes:billing.coveredAccountMinutes,roleBillableMinutes:billing.roleBillableMinutes,
+    roleCoveredMinutes:billing.roleCoveredMinutes});
+  s.records=[record];M.validateState(s);
+  near(record.roleBillableMinutes.r1,0,'first role fully covered');
+  near(record.roleBillableMinutes.r3,7,'later role billed seven minutes');
+  const overall=M.summary(s,DATE,DATE,{},'actual'),
+    roles=s.roles.map(r=>M.summary(s,DATE,DATE,{role:r.id},'actual'));
+  near(roles[0].card,0,'first monthly role card');
+  near(roles[2].card,7*s.config.cardPrice/s.config.cardMinutes,'later monthly role card');
+  near(roles.reduce((n,r)=>n+r.card,0),overall.card,'actual account charge is conserved');
+  const analysis=Activity.onlineAnalysis(s,DATE,DATE,{},'actual');
+  const first=analysis.roles.find(r=>r.role.id==='r1'),last=analysis.roles.find(r=>r.role.id==='r3');
+  near(first.card,0,'actual usage first monthly role');
+  near(last.card,roles[2].card,'actual usage later monthly role');
+});
