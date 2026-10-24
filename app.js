@@ -1662,7 +1662,8 @@
       const digest=images.length===1?images[0].digest:await shotDigest(new TextEncoder().encode(images.map(i=>i.digest).sort().join('|')));
       const name=images.length===1?images[0].name:'角色截图批次（'+images.length+' 张）';
       screenshotDraft={rows:merged.rows,digest,name,files:fileRecords,rawRows:merged.rawRows,duplicates:merged.duplicates};
-      const repeated=images.filter(image=>image.imported);
+      if(status.isConnected){status.dataset.tone=failed.length?'warning':'success';status.textContent=failed.length?'部分截图识别失败，请核对下方记录':'识别完成，请核对匹配结果后确认更新';}
+       const repeated=images.filter(image=>image.imported);
       const originals=images.map(image=>({name:image.name,url:URL.createObjectURL(image.file)}));
       const notes=[skipped.length?'跳过重复截图：'+skipped.join('、'):'',failed.length?'识别失败（未纳入本批）：'+failed.join('；'):'',repeated.length?'已识别 '+repeated.length+' 张历史导入过的截图：'+repeated.map(image=>image.name).join('、'):''].filter(Boolean);
       modal('核对截图识别结果',`<p class="panel-sub">成功识别 <b>${images.length}</b> 张，原始 <b>${merged.rawRows}</b> 行，合并重复 <b>${merged.duplicates}</b> 行，共 <b>${merged.rows.length}</b> 个角色；其中 <b>${merged.conflicts}</b> 个有数据冲突。</p>
@@ -1701,7 +1702,7 @@
     }catch(e){
       const detail=e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():'浏览器没有返回具体错误信息';
       console.error('[OCR] 批量本地识别失败',e);
-      if(status.isConnected)status.dataset.tone='danger';status.textContent='识别失败：'+detail+'。已有数据未修改。';
+      if(status.isConnected){status.dataset.tone='danger';status.textContent='识别失败：'+detail+'。已有数据未修改。';}
     }finally{
       if(worker)try{await worker.terminate();}catch(e){console.warn('[OCR] 关闭识别引擎失败',e);}
       clearInterval(timer);
