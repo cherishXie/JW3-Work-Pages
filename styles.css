@@ -936,3 +936,9 @@ html[data-theme] .revenue-map-tile .revenue-map-name,html[data-theme] .revenue-m
 #screenshot-status[data-tone="warning"]{color:var(--wb-warning)}
 #screenshot-status[data-tone="danger"]{color:var(--wb-danger)}
 #screenshot-status[data-tone="muted"]{color:var(--wb-text-muted)}
+
+/* Fix oversized inline SVG in the existing "最近一期金币变化" card only. */
+.overview-resource-change h2{display:flex;align-items:center;gap:7px;min-width:0}
+.overview-resource-change h2>svg{display:block!important;width:17px!important;height:17px!important;min-width:17px;max-width:17px;flex:0 0 17px;color:var(--wb-wealth);vertical-align:middle}
+.overview-resource-change .wb-signed{display:inline-flex;align-items:center;gap:6px;line-height:1.3}
+.overview-resource-change .wb-signed>svg{display:block!important;width:16px!important;height:16px!important;min-width:16px;max-width:16px;flex:0 0 16px;vertical-align:middle}
