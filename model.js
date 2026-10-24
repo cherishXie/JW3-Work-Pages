@@ -602,12 +602,24 @@
     const rate=s.config.cardPrice*s.config.discount/s.config.cardMinutes,config={...s.config,accountBillingRates:Object.fromEntries(Object.entries(result.accountMinutes).map(([id,m])=>[id,m?rate*(billableAccountMinutes[id]||0)/m:0]))};
     return {...result,...batchRoleAllocation(t,result.batches,s.config),...costs(result.gold,result.minutes,result.onlineMinutes,config,result.other,result.accountMinutes),billingConfig:config,billableAccountMinutes,coveredAccountMinutes,roleBillableMinutes,roleCoveredMinutes,roleAccounts:Object.fromEntries(result.batches.flat().map(r=>[r.id,r.accountId])),billingWarnings:[...new Set(warnings)]};
   }
+  function timerActiveSegments(start,end,pauses=[]){
+    if(!Array.isArray(pauses))throw new Error('暂停计时记录无效');
+    const finish=end==null?null:Date.parse(end);let cursor=Date.parse(start);const segments=[];
+    for(const [i,p]of pauses.entries()){
+      const a=Date.parse(p?.startedAt),b=p?.endedAt==null?null:Date.parse(p.endedAt);
+      if(!Number.isFinite(cursor)||!Number.isFinite(a)||a<cursor||b!==null&&(!Number.isFinite(b)||b<a)||b===null&&i!==pauses.length-1||finish!==null&&(a>finish||b!==null&&b>finish))throw new Error('暂停时段必须按时间排序，且位于本次开始与结束之间');
+      if(finish!==null)segments.push([cursor,a]);cursor=b??finish??a;
+    }
+    if(finish!==null&&Number.isFinite(cursor)&&finish>=cursor)segments.push([cursor,finish]);
+    return segments;
+  }
   function executionPricing(s,record,batches=null){
     const timeline=batches||[record.roleIds],start=instant(record.startedAt||record.date),billableAccountMinutes={},coveredAccountMinutes={},roleBillableMinutes={},roleCoveredMinutes={},warnings=[];
     const visits={};for(const batch of timeline)for(const id of batch){const r=s.roles.find(r=>r.id===id);visits[r.accountId]=(visits[r.accountId]||0)+1;}
     const fallback=pricingConfig(s,record.startedAt||record.date);
     for(const [i,batch]of timeline.entries())for(const id of batch){const r=s.roles.find(r=>r.id===id),a=s.accounts.find(a=>a.id===r.accountId),minutes=(record.accountMinutes[r.accountId]||0)/visits[r.accountId],at=start+i*record.minutes/timeline.length*60000,expiry=a.monthlyExpiresAt?Date.parse(a.monthlyExpiresAt):null;
-      const covered=a.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-at)/60000)):0;
+      let covered=a.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-at)/60000)):0;
+      if(a.billingType==='monthly'&&expiry!==null&&record.timerPauses?.length&&timeline.length===1&&record.startedAt&&record.endedAt){const spans=timerActiveSegments(record.startedAt,record.endedAt,record.timerPauses),active=spans.reduce((n,[a,b])=>n+b-a,0),monthly=spans.reduce((n,[a,b])=>n+Math.max(0,Math.min(b,expiry)-a),0);covered=active?minutes*monthly/active:0;}
       billableAccountMinutes[a.id]=(billableAccountMinutes[a.id]||0)+minutes-covered;coveredAccountMinutes[a.id]=(coveredAccountMinutes[a.id]||0)+covered;roleBillableMinutes[id]=(roleBillableMinutes[id]||0)+minutes-covered;roleCoveredMinutes[id]=(roleCoveredMinutes[id]||0)+covered;
       if(a.billingType==='monthly'&&expiry===null)warnings.push(a.name+'：月卡到期未知，使用计时参考单价');
     }
@@ -870,6 +882,7 @@
     for(const r of s.roles)if(r.openingGoldDate!=null&&!validDate(r.openingGoldDate))throw new Error('期初金币日期无效');
     for(const r of s.records){if(!s.tasks.some(t=>t.id===r.taskId))throw new Error('实测任务不存在');for(const k of ['gold','minutes','onlineMinutes','batches'])number(r[k],k);number(r.batches,'实测批次',{min:1,integer:true});validateConfig(r.snapshot);if(!validDate(r.date))throw new Error('实测日期无效');if(!Array.isArray(r.roleIds)||r.roleIds.some(id=>!s.roles.some(x=>x.id===id)))throw new Error('实测成员引用不存在的角色');for(const [account,minutes] of Object.entries(r.accountMinutes||{})){if(!s.accounts.some(a=>a.id===account))throw new Error('实测用量引用不存在账号');number(minutes,'账号在线分钟');}if(Object.values(r.accountMinutes||{}).reduce((n,m)=>n+m,0)>r.onlineMinutes+1e-6)throw new Error('逐账号用量超过实测总在线分钟');}
     for(const r of s.records){
+      if(r.timerPauses)timerActiveSegments(r.startedAt,r.endedAt,r.timerPauses);
       if(r.billableAccountMinutes){for(const [id,m]of Object.entries(r.billableAccountMinutes)){if(!s.accounts.some(a=>a.id===id))throw new Error('计费分钟账号不存在');number(m,'计费分钟');number(r.coveredAccountMinutes?.[id]??0,'月卡覆盖分钟');if(Math.abs(m+(r.coveredAccountMinutes?.[id]||0)-(r.accountMinutes?.[id]||0))>1e-6)throw new Error('计费分钟与账号出勤不一致');}}
       if(new Set(r.roleIds).size!==r.roleIds.length)throw new Error('实测成员重复');
       if(r.startedAt!==undefined&&r.startedAt!==null&&(!Number.isFinite(new Date(r.startedAt).getTime())||dateKey(new Date(r.startedAt))!==r.date))throw new Error('实测开始时刻与日期不一致');
@@ -888,10 +901,11 @@
     }
     for(const p of s.plans){
       if(p.taskSnapshots!=null){if(typeof p.taskSnapshots!=='object'||Array.isArray(p.taskSnapshots))throw new Error('排程模板快照格式无效');for(const [id,t]of Object.entries(p.taskSnapshots)){if(!t||t.id!==id||!s.tasks.some(x=>x.id===id))throw new Error('排程模板快照引用无效');validateTask(t,s);}}
+      for(const f of p.completionFacts||[])if(f.timerPauses)timerActiveSegments(f.startedAt,f.endedAt,f.timerPauses);
       for(const f of p.completionFacts||[])if(f.endedAt!=null&&(!f.startedAt||!Number.isFinite(Date.parse(f.endedAt))||Date.parse(f.endedAt)<Date.parse(f.startedAt)))throw new Error('完成登记结束时间无效');
       if(p.executionDrafts!==undefined){
         if(!Array.isArray(p.executionDrafts))throw new Error('执行草稿必须为数组');
-        const keys=new Set();for(const d of p.executionDrafts){const key=d.taskId+'|'+d.index;if(!(p.routeTaskIds||[p.taskId]).includes(d.taskId)||!Number.isInteger(d.index)||!p.batches[d.index]||keys.has(key)||!d.values||typeof d.values!=='object'||Array.isArray(d.values)||!Array.isArray(d.roleIds))throw new Error('执行草稿引用无效');keys.add(key);for(const k of ['gold','minutes','onlineMinutes','otherCost'])if(d.values[k]!==''&&d.values[k]!=null)number(d.values[k],k);}
+        const keys=new Set();for(const d of p.executionDrafts){const key=d.taskId+'|'+d.index;if(!(p.routeTaskIds||[p.taskId]).includes(d.taskId)||!Number.isInteger(d.index)||!p.batches[d.index]||keys.has(key)||!d.values||typeof d.values!=='object'||Array.isArray(d.values)||!Array.isArray(d.roleIds))throw new Error('执行草稿引用无效');keys.add(key);for(const k of ['gold','minutes','onlineMinutes','otherCost'])if(d.values[k]!==''&&d.values[k]!=null)number(d.values[k],k);if(d.values.timerPauses){const v=d.values,start=v.startedAt||(v.startTime?(v.date||p.date)+'T'+v.startTime+'+08:00':null),end=v.endedAt||(v.endTime?(v.endDate||v.date||p.date)+'T'+v.endTime+'+08:00':null);timerActiveSegments(start,end,v.timerPauses);}}
       }
     }
     for(const p of s.plans)for(const f of p.completionFacts||[])if(f.measurements){for(const k of ['gold','minutes','onlineMinutes','otherCost'])if(f.measurements[k]!=null)number(f.measurements[k],'已确认 '+k);if(!['none','attendance','task'].includes(f.measurements.financialAllocation||'none'))throw new Error('完成登记收益归属无效');}
@@ -988,5 +1002,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

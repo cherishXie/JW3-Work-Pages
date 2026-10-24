@@ -60,7 +60,8 @@
   if(start&&(!Number.isFinite(Date.parse(start))||M.dateKey(new Date(start))!==date))throw new Error('开始时间必须属于执行日期（北京时间）');
   if(end&&(!start||!Number.isFinite(Date.parse(end))||Date.parse(end)<Date.parse(start)))throw new Error('结束时间必须有效且不早于开始时间；跨天请调整结束日期');
   const result={startedAt:start?new Date(start).toISOString():null,endedAt:end?new Date(end).toISOString():null};
-  if(start&&end){result.minutes=(Date.parse(end)-Date.parse(start))/60000;result.onlineMinutes=result.minutes*accountCount;}
+  const spans=M.timerActiveSegments(start,end,input.timerPauses??[]);
+  if(start&&end){result.minutes=spans.reduce((n,[a,b])=>n+b-a,0)/60000;result.onlineMinutes=result.minutes*accountCount;}
   return result;
  }
  function saveExecutionDraft(s,planId,taskId,index,input={}){
@@ -81,9 +82,43 @@
   const draft=p.executionDrafts?.find(d=>d.taskId===taskId&&d.index===index&&JSON.stringify(d.roleIds)===JSON.stringify(p.batches[index]))?.values||{};
   const values={...defaults,...draft},day=M.dateKey(now),time=new Date(now.getTime()+8*3600000).toISOString().slice(11,19);
   if(fact?.startedAt){values.date=fact.date;values.startTime=new Date(Date.parse(fact.startedAt)+8*3600000).toISOString().slice(11,19);values.startedAt=fact.startedAt;}
+  if(values.timerPauses?.at(-1)?.endedAt===null)return saveExecutionDraft(s,planId,taskId,index,values);
   if(values.startTime||values.startedAt){values.date=values.date||fact?.date||p.date;values.endDate=day;values.endTime=time;delete values.endedAt;}
   else{values.date=day;values.startTime=time;values.endDate=day;values.endTime='';delete values.endedAt;}
   return saveExecutionDraft(s,planId,taskId,index,values);
+ }
+ // Timer transitions only update a pending raid's draft. Pauses survive reloads
+ // and do not create execution income, completion facts or another CD.
+ function transitionRaidTimer(s,planId,taskId,index,action,input={},now=new Date()){
+  now=new Date(Math.floor(now.getTime()/1000)*1000);
+  const copy=structuredClone(s),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
+  const task=p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId);
+  if(task?.partyRule!=='raid10'||!['start','pause','resume'].includes(action))throw new Error('请选择十人副本的计时操作');
+  if((p.completionFacts||[]).some(f=>f.taskId===taskId&&f.planBatchIndices.includes(index)))throw new Error('本批已登记完成，不能继续计时');
+  const saved=p.executionDrafts?.find(d=>d.taskId===taskId&&d.index===index&&JSON.stringify(d.roleIds)===JSON.stringify(p.batches[index]))?.values||{};
+  const values={...saved,...input,timerPauses:structuredClone(saved.timerPauses||[])},paused=values.timerPauses.at(-1)?.endedAt===null,at=now.toISOString(),day=M.dateKey(now),time=new Date(now.getTime()+8*3600000).toISOString().slice(11,19);
+  const start=executionTiming(values.date||p.date,values).startedAt;
+  if(start)values.startedAt=start;
+  if(action==='start'){
+   if(start)throw new Error('计时已开始，请使用暂停或继续计时');
+   if(M.cycle(task,M.planStart(copy,p,taskId))!==M.cycle(task,at))throw new Error('已跨副本刷新周期，请先调整排程日期');
+   values.date=day;values.startTime=time;values.startedAt=at;values.endDate=day;values.endTime='';delete values.endedAt;
+  }else{
+   if(!start)throw new Error('请先开始计时');
+   if(Date.parse(at)<Date.parse(start))throw new Error('当前时刻早于本次开始时间');
+   if(action==='pause'){
+    if(paused)throw new Error('计时已暂停');
+    values.timerPauses.push({startedAt:at,endedAt:null});values.endDate=day;values.endTime=time;delete values.endedAt;
+   }else{
+    if(!paused)throw new Error('计时未暂停');
+    if(M.cycle(task,start)!==M.cycle(task,at))throw new Error('已跨副本刷新周期，不能沿用旧进度续打；请先结算旧批次，再安排新周期任务');
+    if(Date.parse(at)<Date.parse(values.timerPauses.at(-1).startedAt))throw new Error('继续时间不能早于暂停时间');
+    values.timerPauses.at(-1).endedAt=at;values.endDate=day;values.endTime='';delete values.endedAt;
+   }
+  }
+  const timing=executionTiming(values.date,{...values,endDate:day,endTime:time},p.batches[index].length);
+  values.minutes=timing.minutes;values.onlineMinutes=timing.onlineMinutes;
+  const draft=saveExecutionDraft(copy,planId,taskId,index,values);M.validateState(copy);Object.assign(s,copy);return draft;
  }
  // Return an entirely validated candidate. No state is written on a failed swap.
  function replaceBatchRole(s,p,index,fromRoleId,toRoleId){
@@ -198,6 +233,7 @@
   if(timing.startedAt&&fact.startedAt&&fact.startedAt!==timing.startedAt)throw new Error('补录须沿用完成登记的开始时刻；需要改期请先撤销完成');
   if(timing.startedAt&&!fact.startedAt){if(M.cycle(fact.cycleSnapshot||fact.cdSnapshot||copy.tasks.find(t=>t.id===taskId),timing.startedAt)!==fact.cycle)throw new Error('开始时间属于另一刷新周期，请先撤销完成并改期');fact.startedAt=timing.startedAt;}
   if(timing.endedAt)fact.endedAt=timing.endedAt;
+  if(input.timerPauses)fact.timerPauses=structuredClone(input.timerPauses);
   const executionTask=M.raidExecutionTask(fact.allocationTask||p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId),input.completedBossCount??fact.completedBossCount);
   if(executionTask.partyRule==='raid10'){fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount??1;fact.allocationTask=structuredClone(executionTask);}
   const previousMeasurements=fact.measurements||{},financialAllocation=input.financialAllocation||previousMeasurements.financialAllocation||'task',timeAllocation=input.timeAllocation||previousMeasurements.timeAllocation||'task';
@@ -286,7 +322,7 @@
    M.freezeRecord(copy,r);
    const previous=JSON.parse(JSON.stringify(r));
    if(['startTime','endTime','startedAt','endedAt','endDate'].some(k=>input[k]!==undefined)){
-    const timing=executionTiming(r.date,{...input,startedAt:input.startedAt??(input.startTime!==undefined?null:r.startedAt),endedAt:input.endedAt??(input.endTime!==undefined?null:r.endedAt)});
+    const timing=executionTiming(r.date,{...input,timerPauses:r.timerPauses,startedAt:input.startedAt??(input.startTime!==undefined?null:r.startedAt),endedAt:input.endedAt??(input.endTime!==undefined?null:r.endedAt)});
     const task=copy.tasks.find(t=>t.id===r.taskId);if(M.cycle(r.cdSnapshot||fact?.cycleSnapshot||task,timing.startedAt||r.date)!==(r.cycle||M.cycle(r.cdSnapshot||fact?.cycleSnapshot||task,previous.startedAt||r.date)))throw new Error('开始时间属于另一刷新周期，请先撤销完成并改期');
     r.startedAt=timing.startedAt;r.endedAt=timing.endedAt;if(fact){fact.startedAt=r.startedAt;fact.endedAt=r.endedAt;}
    }
@@ -309,6 +345,10 @@
      if(r.allocationBasis&&task.dungeonRewardMode==='auto')for(const a of Object.values(r.allocationBasis)){a.sharedGold=oldCount?a.sharedGold*task.completedBossCount/oldCount:M.dungeonRewards(task,r.roleIds.map(id=>copy.roles.find(x=>x.id===id)),r.snapshot).shared/r.roleIds.length;a.directGold=M.dungeonRewards(task,[],r.snapshot).direct;a.gold=a.directGold+a.sharedGold;}
      if(fact){fact.completedBossCount=r.completedBossCount;fact.allocationTask=structuredClone(task);}
     }
+   }
+   if(r.timerPauses?.length&&fact?.billingAccounts){
+    const historical={...copy,config:r.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(role=>({...role,accountId:r.roleAccounts[role.id]||role.accountId}))},billing=M.executionPricing(historical,r,r.allocationBatches||[r.roleIds]);
+    r.snapshot=billing.config;r.billableAccountMinutes=billing.billableAccountMinutes;r.coveredAccountMinutes=billing.coveredAccountMinutes;r.roleBillableMinutes=billing.roleBillableMinutes;r.roleCoveredMinutes=billing.roleCoveredMinutes;
    }
    if(r.allocationMethod==='task'){Object.assign(r,M.allocatedRecord(copy,r));}
    if(input.gold!==undefined&&input.gold!=='')r.measurementStatus='confirmed';
@@ -382,5 +422,5 @@
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
  }
- return {rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });
