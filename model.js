@@ -726,11 +726,25 @@
             for(const r of allowed)usage.set(key(r.id),(usage.get(key(r.id))||0)+1);
             fullBatches.push(allowed);fullBatchIndices.push(i);
             const scoped=completed?new Set(selectedRecordRoles(s,event||{roleIds:ids},scope)):selected;
-            if(allowed.every(r=>scoped.has(r.id)))batches.push(allowed);else warnings.push(t.name+'：筛选未包含完整确认批次，未分摊共享收益');
+            if(allowed.some(r=>scoped.has(r.id)))batches.push(allowed);
           }catch(e){if(taskDate>=start&&taskDate<=end)warnings.push(t.name+'：'+e.message+'，该批次未计入预测');}
         }
-        const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
-        const result=pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);
+        // Price the full confirmed batches first, then distribute each batch's direct
+        // and shared reward to its participating roles. Never drop a multi-account batch.
+        const fullTask={...t,enabled:true,prepare:t.prepare||0,otherCost:t.otherCost||0};
+        const forecast=pricePrediction(s,t,calculateBatches(fullTask,fullBatches,pricingConfig(s,new Date(when))),new Date(when),fullBatches);
+        let result=forecast;
+        if(scope.role||scope.account||scope.group){
+          const roster=[...new Set(fullBatches.flat().map(r=>r.id))],accounts=Object.fromEntries(fullBatches.flat().map(r=>[r.id,r.accountId]));
+          const entry={planId:p.id,taskId,planBatchIndices:fullBatchIndices,roleIds:roster,roleAccounts:accounts,
+            roleGroups:Object.fromEntries(roster.map(id=>[id,s.accounts.find(a=>a.id===accounts[id])?.group||''])),
+            gold:forecast.gold,minutes:forecast.minutes,onlineMinutes:forecast.onlineMinutes,otherCost:forecast.other,
+            accountMinutes:forecast.accountMinutes,billableAccountMinutes:forecast.billableAccountMinutes,
+            coveredAccountMinutes:forecast.coveredAccountMinutes,snapshot:forecast.billingConfig};
+          const allocated=scopedRecord(s,entry,scope),selectedVisits=fullBatches.reduce((n,batch)=>n+batch.filter(r=>selectedRecordRoles(s,{...entry,roleIds:batch},scope).includes(r.id)).length,0),allVisits=fullBatches.reduce((n,batch)=>n+batch.length,0);
+          result=allocated?{...recordResult(allocated,s.config),executions:allVisits?forecast.executions*selectedVisits/allVisits:0}:{
+            ...costs(0,0,0,s.config),accountMinutes:{},executions:0};
+        }
         if(taskDate>=start&&taskDate<=end){rows.get(taskId).push(result);if(!scope.role&&!scope.account&&!scope.group&&fullBatches.length)participation.push({planId:p.id,taskId,date:taskDate,startedAt:new Date(when).toISOString(),prepare:t.prepare||0,batchMinutes:t.minutes/t.efficiency,batchIndices:fullBatchIndices,onlinePerVisit:t.minutes/t.efficiency+t.onlineExtra,batches:fullBatches.map(batch=>batch.map(r=>({roleId:r.id,accountId:r.accountId}))),result});}
       }
     }
