@@ -1,9 +1,9 @@
 /* Shared, dependency-free business rules. Browser and Node use the same functions. */
 (function (root, factory) {
-  const api = factory(typeof module !== 'undefined' && module.exports ? require('./catalog.js') : root.JX3Catalog);
+  const api = factory(typeof module !== 'undefined' && module.exports ? require('./catalog.js') : root.JX3Catalog,typeof module !== 'undefined' && module.exports ? require('./raid-catalog.js') : root.JX3Raids);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Workbench = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (Catalog) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Catalog,Raids) {
   'use strict';
   const VERSION = 1;
   const id = (prefix = 'id') => prefix + '_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
@@ -24,15 +24,19 @@
     return addDays(d,-delta);
   }
   const dungeonRewardDefaults={dailyBossEquipment:1,dailyEquipmentGold:25,dailyBossGold:10,raidBossEquipment:2,raidEquipmentGold:100,raidBossGold:100,gongzhanExtraEquipment:1,raidClearBoxes:2,raidWeeklyBoxes:1,raidBoxEquipmentGold:100};
+  function raidClearBossCount(t){
+    const total=t.bossCount??1,reference=Raids?.clearRewardRules?.[t.dungeonId]?.clearBossCount;
+    return t.raidClearBossCount??Math.min(total,reference??total);
+  }
   function raidExecutionTask(t,completedBossCount){
     if(t.partyRule!=='raid10'||completedBossCount==null||completedBossCount==='')return {...t};
     const total=t.bossCount??1,count=number(completedBossCount,'已击败首领数量',{min:0,max:total,integer:true});
-    return {...t,completedBossCount:count};
+    return {...t,completedBossCount:count,raidClearBossCount:raidClearBossCount(t)};
   }
   function dungeonRewards(t,players,c={}){
     if(!['daily5','raid10'].includes(t.partyRule)||t.dungeonRewardMode!=='auto')return null;
     const r={...dungeonRewardDefaults,...c},raid=t.partyRule==='raid10',bosses=raid?(t.completedBossCount??t.bossCount??1):(t.bossCount??3),extra=players.some(p=>p.gongzhanBuff===true)?r.gongzhanExtraEquipment:0;
-    return {direct:raid?(bosses===(t.bossCount??1)?(r.raidClearBoxes+(t.raidWeekly? r.raidWeeklyBoxes:0))*r.raidBoxEquipmentGold:0):t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,
+    return {direct:raid?(bosses>=raidClearBossCount(t)?(r.raidClearBoxes+(t.raidWeekly? r.raidWeeklyBoxes:0))*r.raidBoxEquipmentGold:0):t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,
       shared:bosses*((raid?r.raidBossEquipment:r.dailyBossEquipment)+extra)*(raid?r.raidEquipmentGold:r.dailyEquipmentGold)+bosses*(raid?r.raidBossGold:r.dailyBossGold)};
   }
   function dungeonGold(t,batches,c){return batches.reduce((sum,players)=>{const r=dungeonRewards(t,players,c);return sum+(r?players.length*r.direct+r.shared:0);},0);}
@@ -69,7 +73,7 @@
     if(!t.name?.trim())throw new Error('请填写任务名称');
     if(!['role','team'].includes(t.type)||!['daily','weekly'].includes(t.period))throw new Error('不支持的任务类型或周期');
     for(const key of ['gold','shared','minutes','prepare','onlineExtra','otherCost','minScore','minLevel'])number(t[key]??0,key);
-    if(t.dungeonRewardMode!==undefined&&!['auto','manual'].includes(t.dungeonRewardMode))throw new Error('副本收益模式无效');if(t.raidWeekly!==undefined&&typeof t.raidWeekly!=='boolean')throw new Error('周常任务选项无效');if(t.bossCount!=null)number(t.bossCount,'首领数量',{min:1,integer:true});if(t.partyRule==='raid10'&&t.presetKey&&!t.gameVersion?.trim())throw new Error('默认十人本必须绑定资料片版本');
+    if(t.dungeonRewardMode!==undefined&&!['auto','manual'].includes(t.dungeonRewardMode))throw new Error('副本收益模式无效');if(t.raidWeekly!==undefined&&typeof t.raidWeekly!=='boolean')throw new Error('周常任务选项无效');if(t.bossCount!=null)number(t.bossCount,'首领数量',{min:1,integer:true});if(t.raidClearBossCount!=null)number(t.raidClearBossCount,'通关宝箱所需首领数',{min:1,max:t.bossCount??1,integer:true});if(t.partyRule==='raid10'&&t.presetKey&&!t.gameVersion?.trim())throw new Error('默认十人本必须绑定资料片版本');
     for(const key of ['target','runs'])number(t[key]??1,key,{integer:true});
     number(t.maxParallel,'任务并行上限',{min:1,integer:true});number(t.efficiency,'并行效率',{min:.01,max:1});number(t.resetHour,'刷新小时',{max:23,integer:true});number(t.resetDay,'刷新星期',{max:6,integer:true});
     number(t.teamSize,'自有角色席位',{min:1,integer:true});number(t.tank,'坦克要求',{integer:true});number(t.heal,'治疗要求',{integer:true});number(t.externalSeats??0,'外部占位',{integer:true});
@@ -984,5 +988,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
