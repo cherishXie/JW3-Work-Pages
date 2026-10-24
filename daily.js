@@ -181,7 +181,8 @@
    record.roleOnlineMinutes=Object.fromEntries(fact.roleIds.map(id=>[id,shares[id]?.onlineMinutes||0]));
    record.accountMinutes={};for(const id of fact.roleIds){const account=fact.roleAccounts[id];
      record.accountMinutes[account]=(record.accountMinutes[account]||0)+(record.roleOnlineMinutes[id]||0);}
-   const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.billingWarnings=billing.billingWarnings;
+   const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;
+   record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
   }
   p.executionDrafts=(p.executionDrafts||[]).filter(d=>d.taskId!==taskId||d.index!==index);
