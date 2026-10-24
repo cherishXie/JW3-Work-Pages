@@ -35,10 +35,10 @@
   const motionPreference=window.matchMedia('(prefers-reduced-motion: reduce)');
   const motionActive=new Set(),motionByElement=new WeakMap();
   let motionState=null,motionCommit=null,motionDisclosure=null;
-  function animateUI(el,frames,duration=250,id='wb-enter'){
+  function animateUI(el,frames,duration=250,id='wb-enter',easing='cubic-bezier(0.16, 1, 0.3, 1)'){
     if(!el||!el.isConnected||motionPreference.matches||typeof el.animate!=='function')return null;
     const running=motionByElement.get(el);if(running){const current=getComputedStyle(el),start={...frames[0]};for(const key of ['opacity','transform','height','backgroundColor'])if(key in start)start[key]=current[key];frames=[start,...frames.slice(1)];running.cancel();}
-    const animation=el.animate(frames,{duration,easing:'cubic-bezier(0.16, 1, 0.3, 1)'});animation.id=id;
+    const animation=el.animate(frames,{duration,easing});animation.id=id;
     motionByElement.set(el,animation);motionActive.add(animation);
     const cleanup=()=>{motionActive.delete(animation);if(motionByElement.get(el)===animation)motionByElement.delete(el);};
     animation.addEventListener('finish',cleanup,{once:true});animation.addEventListener('cancel',cleanup,{once:true});return animation;
@@ -273,7 +273,7 @@
   function rememberAnalysisDetails(){for(const el of document.querySelectorAll('details[data-raw-key]')){if(el.open)analysisDetails.add(el.dataset.rawKey);else analysisDetails.delete(el.dataset.rawKey);}}
   function render(){
     overviewJob++;overviewDeferred=null;prepareViewCache();try{
-    const beforeMotion=captureMotion();
+    const beforeMotion=captureMotion(),priorPanel=$('#calendar-task-panel'),panelScope=priorPanel?.dataset.scope,panelScroll=priorPanel?.querySelector('.tc-cal-panel-body')?.scrollTop||0;
     for(const el of document.querySelectorAll('[data-task-fold]'))taskFolds.set(el.dataset.taskFold,el.open);
     rememberRoute();renderSidebar();renderTopbar();rememberTaskView();document.body.classList.toggle('task-context',ui.page==='task'&&!ui.setup);document.body.classList.toggle('analysis-context',['overview','roi'].includes(ui.page));
     const pages={overview,task:taskPage,roi:roiPage,plan:taskPage,history:historyPage,roles:rolesPage,assets:assetsPage,settings:workspaceSettings,taskmanage:settingsPage,data:workspaceSettings};
@@ -285,6 +285,7 @@
       for(const attr of [...focusNow.attributes])beforeMotion.focus.setAttribute(attr.name,attr.value);
       beforeMotion.focus.replaceChildren(...focusNow.childNodes);focusNow.replaceWith(beforeMotion.focus);
     }
+    const currentPanel=$('#calendar-task-panel');if(currentPanel&&currentPanel.dataset.scope===panelScope)currentPanel.querySelector('.tc-cal-panel-body').scrollTop=panelScroll;document.body.classList.toggle('task-panel-open',!!currentPanel);
     collapseRecordTables();enhanceTables();fitRevenueMapLabels();applyPrivacy();
     syncFlowRails();
     finishRenderMotion(beforeMotion);
@@ -451,7 +452,7 @@
   function resetQueueFocus(){ui.focusPlanId='';ui.focusBatchKey='';}
   function taskRangePicker(){
     const {start,end}=queueBounds(),all=ui.queueRange==='all',active=v=>v==='all'?all:!all&&(v==='day'?start===today&&end===today:v==='week'?start===M.weekStart(today)&&end===M.addDays(start,6):start===M.addDays(M.weekStart(today),-7)&&end===M.addDays(start,6));
-    return `<div class="tc-range-picker" role="group" aria-label="任务日期范围"><div class="tc-range-inputs"><label>开始日期<input id="task-range-start" type="date" aria-label="任务开始日期" value="${all?'':start}"></label><span>至</span><label>结束日期<input id="task-range-end" type="date" aria-label="任务结束日期" value="${all?'':end}"></label></div><div class="segmented tc-range-presets" aria-label="任务日期快捷选择">${[['day','今天'],['week','本周'],['last-week','上周'],['all','全部日期']].map(([v,l])=>button(l,'task-range-preset',active(v)?'active small':'small',`data-value="${v}" aria-pressed="${active(v)}"`)).join('')}</div></div>`;
+    return `<div class="tc-range-picker" role="group" aria-label="任务日期范围"><div class="tc-range-inputs"><label>开始日期<input id="task-range-start" type="date" aria-label="任务开始日期" value="${all?'':start}"></label><span>至</span><label>结束日期<input id="task-range-end" type="date" aria-label="任务结束日期" value="${all?'':end}"></label></div>${button('应用日期','calendar-apply-range','small')}<div class="segmented tc-range-presets" aria-label="任务日期快捷选择">${[['day','今天'],['week','本周'],['last-week','上周'],['all','全部日期']].map(([v,l])=>button(l,'task-range-preset',active(v)?'active small':'small',`data-value="${v}" aria-pressed="${active(v)}"`)).join('')}</div></div>`;
   }
   function calendarPlans(){const ids=new Set(activeRoles().map(r=>r.id));return state.plans.filter(p=>p.batches?.some(b=>b.some(id=>ids.has(id))));}
   function calendarIndex(){
@@ -473,20 +474,40 @@
     let grid='';
     if(ui.calendarView==='year')grid='<div class="tc-cal-year">'+Array.from({length:12},(_,i)=>{const month=date.slice(0,4)+'-'+String(i+1).padStart(2,'0')+'-01',first=M.weekStart(month),last=M.addDays(calendarMove(month,1),-1),count=M.dates(month,last).reduce((n,d)=>n+(index.get(d)?.size||0),0);return `<section class="tc-cal-mini"><header>${button((i+1)+' 月','calendar-month','ghost small',`data-date="${month}"`)}<small>${count} 项安排</small></header>${weekdays}<div class="tc-cal-grid">${Array.from({length:42},(_,j)=>{const d=M.addDays(first,j);return d.slice(0,7)===month.slice(0,7)?calendarDay(d,index,true):'<span></span>';}).join('')}</div></section>`;}).join('')+'</div>';
     else {const first=ui.calendarView==='week'?start:M.weekStart(start),count=ui.calendarView==='week'?7:Math.ceil((M.dates(first,end).length)/7)*7;grid=weekdays+`<div class="tc-cal-grid ${ui.calendarView==='week'?'is-week':''}">${Array.from({length:count},(_,i)=>calendarDay(M.addDays(first,i),index,false,date.slice(0,7))).join('')}</div>`;}
-    return `<section class="card tc-calendar" aria-label="任务日历"><header class="tc-cal-toolbar"><div class="flex"><h2>${title}</h2><div class="flex">${button('‹','calendar-step','small','data-offset="-1" aria-label="上一日历周期"')}${button('今天','calendar-today','small')}${button('›','calendar-step','small','data-offset="1" aria-label="下一日历周期"')}</div></div>${tabs([['week','周'],['month','月'],['year','年']],ui.calendarView,'calendar-view')}</header><div class="tc-cal-selection"><div class="segmented">${[['day','单日'],['range','日期范围']].map(([v,l])=>button(l,'calendar-select',ui.calendarSelect===v?'active small':'small',`data-value="${v}" aria-pressed="${ui.calendarSelect===v}"`)).join('')}</div><span class="muted" role="status">${ui.calendarAnchor?'请选择结束日期':queueRangeLabel()}</span>${button('查看任务','calendar-open','small')}<details class="tc-cal-custom" data-task-fold="calendar-range" ${taskFold('calendar-range')}><summary>自定义日期</summary>${taskRangePicker()}</details></div><div class="tc-cal-body">${grid}</div><footer class="tc-cal-footer"><small>显示已保存排程与实际执行日；跨日执行的同一任务可出现在多个日期。</small>${button('创建排程','calendar-create','primary small')}</footer></section>`;
+    return `<section class="card tc-calendar" aria-label="任务日历"><header class="tc-cal-toolbar"><div class="flex"><h2>${title}</h2><div class="flex">${button('‹','calendar-step','small','data-offset="-1" aria-label="上一日历周期"')}${button('今天','calendar-today','small')}${button('›','calendar-step','small','data-offset="1" aria-label="下一日历周期"')}</div></div>${tabs([['week','周'],['month','月'],['year','年']],ui.calendarView,'calendar-view')}</header><div class="tc-cal-selection"><div class="segmented">${[['day','单日'],['range','日期范围']].map(([v,l])=>button(l,'calendar-select',ui.calendarSelect===v?'active small':'small',`data-value="${v}" aria-pressed="${ui.calendarSelect===v}"`)).join('')}</div><span class="muted" role="status">${ui.calendarSelect==='range'?(ui.calendarAnchor?ui.calendarAnchor+' 起，选择结束日期':'选择开始日期'):queueRangeLabel()}</span>${ui.calendarSelect==='range'?button('取消选择','calendar-cancel-range','small'):button('任务详情','calendar-open','small')}${ui.calendarSelect!=='range'&&ui.queueRange!=='all'&&queueBounds().start!==queueBounds().end?button('清除范围','calendar-reset','small'):''}<details class="tc-cal-custom" data-task-fold="calendar-range" ${taskFold('calendar-range')}><summary>自定义日期</summary>${taskRangePicker()}</details></div><div class="tc-cal-body">${grid}</div><footer class="tc-cal-footer"><small>显示已保存排程与实际执行日；跨日执行的同一任务可出现在多个日期。</small>${button('创建排程','calendar-create','primary small')}</footer></section>`;
   }
-  function calendarChoose(start,end){M.dates(start,end);ui.taskRangeStart=start;ui.taskRangeEnd=end;ui.queueRange='custom';ui.taskDate=start;ui.calendarAnchor='';resetQueueFocus();render();openCalendarTasks();}
-  function openCalendarTasks(){
-    const {start,end}=queueBounds(),plans=calendarPlans().filter(p=>ui.queueRange==='all'||planInRange(p,start,end));
-    modal('任务概览',`<div class="tc-cal-dialog-heading"><h3>${queueRangeLabel()}</h3><span>${plans.length} 项任务</span></div><div class="tc-cal-task-cards">${plans.map(p=>{const rows=scopedPlanRows(p),total=rows.filter(x=>!x.closed).length,done=rows.filter(x=>!x.closed&&!x.pending).length;return `<article class="card tc-cal-task-card"><div class="flex between wrap"><span class="pill">${p.cancelled?'已取消':done===total?'已完成':'待执行'}</span><small>${esc(p.date)} 安排</small></div><h3>${esc(flowPlanName(p))}</h3><div class="tc-cal-progress"><span>完成 ${done} / ${total} 批</span><progress max="${Math.max(1,total)}" value="${done}"></progress></div><div class="flex between wrap"><small>${new Set(rows.flatMap(x=>x.members)).size} 个角色</small>${button('查看批次','calendar-execute','primary small',`data-id="${esc(p.id)}"`)}</div></article>`;}).join('')||empty('暂无已安排任务','此范围尚无已保存排程或实际执行记录。')}</div><div class="flex mt">${button('安排任务','calendar-create','primary')}${button('新建任务模板','new-task','small')}</div>`);
-    $('#dialog').classList.add('calendar-dialog');
-    $('#dialog').addEventListener('close',()=>{if(ui.workView==='queue')document.querySelector('[data-action="calendar-day"][data-date="'+start+'"]')?.focus({preventScroll:true});},{once:true});
+  function calendarChoose(start,end){
+    if(!start||!end||start>end)throw new Error('请填写有效日期，结束不能早于开始');
+    M.dates(start,end);const opening=!ui.calendarExecution;ui.taskRangeStart=start;ui.taskRangeEnd=end;ui.queueRange='custom';ui.taskDate=start;ui.calendarAnchor='';ui.calendarSelect='day';ui.calendarExecution=true;resetQueueFocus();render();openCalendarTasks(false,opening);
+  }
+  function openCalendarTasks(update=true,opening=!ui.calendarExecution){
+    if(update){ui.calendarExecution=true;render();}
+    for(const ghost of document.querySelectorAll('.tc-cal-panel.is-leaving'))ghost.remove();
+    const panel=$('#calendar-task-panel');if(!panel)return;
+    panel.querySelector('h2')?.focus({preventScroll:true});
+    const small=window.matchMedia('(max-width:900px)').matches;
+    animateUI(opening?panel:panel.querySelector('.tc-cal-panel-body'),opening?[{opacity:0,transform:small?'translateY(32px) scale(.96)':'translateX(40px) scale(.96)'},{opacity:1,transform:'none'}]:[{opacity:.55,transform:'translateY(8px)'},{opacity:1,transform:'none'}],opening?420:220,opening?'wb-calendar-detail':'wb-calendar-scope',opening?'cubic-bezier(.22,1.12,.36,1)':'cubic-bezier(.16,1,.3,1)');
+  }
+  function closeCalendarTasks(){
+    const panel=$('#calendar-task-panel');
+    if(panel&&!motionPreference.matches&&typeof panel.animate==='function'){
+      const ghost=panel.cloneNode(true);ghost.removeAttribute('id');ghost.removeAttribute('role');ghost.setAttribute('aria-hidden','true');ghost.inert=true;ghost.classList.add('is-leaving');
+      for(const el of ghost.querySelectorAll('[id]'))el.removeAttribute('id');for(const el of ghost.querySelectorAll('[data-action],[data-flow-rail]')){el.removeAttribute('data-action');el.removeAttribute('data-flow-rail');}
+      document.body.append(ghost);ghost.querySelector('.tc-cal-panel-body').scrollTop=panel.querySelector('.tc-cal-panel-body').scrollTop;
+      const animation=animateUI(ghost,[{opacity:1,transform:'none'},{opacity:0,transform:window.matchMedia('(max-width:900px)').matches?'translateY(24px) scale(.975)':'translateX(28px) scale(.975)'}],220,'wb-calendar-close');
+      if(animation)animation.finished.catch(()=>{}).finally(()=>ghost.remove());else ghost.remove();
+    }
+    ui.calendarExecution=false;ui.calendarAnchor='';ui.calendarSelect='day';render();document.querySelector('[data-action="calendar-day"][data-date="'+ui.taskDate+'"]')?.focus({preventScroll:true});
+  }
+  function calendarTaskPanel(content){
+    const {start,end}=queueBounds(),single=ui.queueRange!=='all'&&start===end;
+    return `<aside id="calendar-task-panel" class="tc-cal-panel" role="dialog" aria-modal="false" aria-labelledby="calendar-panel-title" data-scope="${ui.queueRange==='all'?'all':start+'/'+end}"><header class="tc-cal-panel-head"><div><h2 id="calendar-panel-title" tabindex="-1">任务详情</h2><p>${queueRangeLabel()}</p></div><div class="flex">${single?button('‹','calendar-panel-date','small','data-offset="-1" aria-label="查看前一天任务"')+button('›','calendar-panel-date','small','data-offset="1" aria-label="查看后一天任务"'):button('清除范围','calendar-reset','small')}${button(icon('close'),'calendar-collapse','ghost small','aria-label="返回日历"')}</div></header><div class="tc-cal-panel-body task-content">${content}</div></aside>`;
   }
   function taskPage(){
     if(!state.roles.length)return pageHead('TASK CENTER','任务中心','先建立角色档案，再选择常用任务。')+empty('尚未建立账号与角色','任务模板已预置。完成档案配置后即可分配任务、安排与执行。',button('开始配置','setup','primary'));
     ui.search='';ui.taskFilter='';ui.queueStatus='all';ui.progressStatus='all';
     const queue=ui.workView==='queue'&&ui.calendarExecution?executionQueue(true):null,progress=ui.workView==='progress'?progressPanel(true):null;
-    return `<div class="task-center"><div class="tc-heading"><div><h1>任务中心</h1><span class="muted"></span></div></div><section class="card tc-command" aria-label="任务控制中心"><div class="tc-command-top">${tabs([['queue','执行任务'],['planning','安排任务'],['progress','任务查漏']],ui.workView,'work-view')}<div class="flex wrap">${button(icon('settings')+'管理任务','nav','tc-manage','data-page="taskmanage"')}<details class="module-tools"><summary>历史与工具</summary><div>${button('任务历史 / 副本 CD','open-task-history','small')}${button('MuMu 设置','mumu-settings','small')}${button('回收站','task-recycle','small')}</div></details></div></div><div class="tc-command-filters" ${ui.workView==='queue'?'hidden':''}>${ui.workView==='planning'?`<label class="plan-type-field">任务类型<select id="plan-type" aria-label="任务类型"><option value="batches" ${ui.planTab==='batches'?'selected':''}>日常任务（含大战）</option><option value="teams" ${ui.planTab==='teams'?'selected':''}>副本任务（十人本）</option></select></label>`:''}${ui.workView==='queue'?'':`<div class="tc-date flex wrap">${button('‹','task-date-step','small','data-offset="-1" aria-label="上一日期"')}<label><span class="sr-only">任务日期</span><input id="task-date" aria-label="任务日期" type="date" value="${ui.taskDate}"></label>${button('›','task-date-step','small','data-offset="1" aria-label="下一日期"')}${button('今天','task-today','small')}</div>`}</div>${queue?.controls||progress?.controls||''}</section>${ui.workView==='queue'?taskCalendar():''}<div class="task-content">${ui.workView==='planning'?planPage():ui.workView==='progress'?progress.content:(ui.calendarExecution?'<div class="tc-cal-execution-heading flex between wrap"><h2>所选范围的执行任务</h2>'+button('收起执行详情','calendar-collapse','small')+'</div>'+queue.content:'')}</div></div>`;
+    return `<div class="task-center"><div class="tc-heading"><div><h1>任务中心</h1><span class="muted"></span></div></div><section class="card tc-command" aria-label="任务控制中心"><div class="tc-command-top">${tabs([['queue','执行任务'],['planning','安排任务'],['progress','任务查漏']],ui.workView,'work-view')}<div class="flex wrap">${button(icon('settings')+'管理任务','nav','tc-manage','data-page="taskmanage"')}<details class="module-tools"><summary>历史与工具</summary><div>${button('任务历史 / 副本 CD','open-task-history','small')}${button('MuMu 设置','mumu-settings','small')}${button('回收站','task-recycle','small')}</div></details></div></div><div class="tc-command-filters" ${ui.workView==='queue'?'hidden':''}>${ui.workView==='planning'?`<label class="plan-type-field">任务类型<select id="plan-type" aria-label="任务类型"><option value="batches" ${ui.planTab==='batches'?'selected':''}>日常任务（含大战）</option><option value="teams" ${ui.planTab==='teams'?'selected':''}>副本任务（十人本）</option></select></label>`:''}${ui.workView==='queue'?'':`<div class="tc-date flex wrap">${button('‹','task-date-step','small','data-offset="-1" aria-label="上一日期"')}<label><span class="sr-only">任务日期</span><input id="task-date" aria-label="任务日期" type="date" value="${ui.taskDate}"></label>${button('›','task-date-step','small','data-offset="1" aria-label="下一日期"')}${button('今天','task-today','small')}</div>`}</div>${queue?.controls||progress?.controls||''}</section>${ui.workView==='queue'?taskCalendar():''}<div class="task-content">${ui.workView==='planning'?planPage():ui.workView==='progress'?progress.content:(ui.calendarExecution?calendarTaskPanel(queue.content):'')}</div></div>`;
   }
   function planFinished(p){return (p.routeTaskIds||[p.taskId]).every(id=>!Daily.remaining(state,p,id).length);}
   const recentCompletedBatch=(a,b)=>Daily.completedTime(state,b.p,b.id,b.i)-Daily.completedTime(state,a.p,a.id,a.i);
@@ -1806,18 +1827,21 @@
     'new-role':()=>roleForm(),'edit-role':b=>roleForm(state.roles.find(r=>r.id===b.dataset.id)),'role-detail':b=>roleDetail(state.roles.find(r=>r.id===b.dataset.id)),
     'account-filter':b=>{ui.account=b.dataset.id;ui.role='';ui.generated=null;render();},
     'show-overdue':()=>{ui.workView='queue';ui.calendarExecution=true;ui.queueRange='all';ui.queueStatus='overdue';render();},
-    'calendar-view':b=>{ui.calendarView=b.dataset.value;ui.calendarAnchor='';render();animateUI($('.tc-cal-body'),[{opacity:.5,transform:'translateY(6px)'},{opacity:1,transform:'none'}],250,'wb-calendar');},
+    'calendar-view':b=>{ui.calendarView=b.dataset.value;ui.calendarAnchor='';ui.calendarSelect='day';render();animateUI($('.tc-cal-body'),[{opacity:.5,transform:'translateY(6px)'},{opacity:1,transform:'none'}],250,'wb-calendar');},
     'calendar-step':b=>{ui.calendarDate=ui.calendarView==='week'?M.addDays(ui.calendarDate,Number(b.dataset.offset)*7):calendarMove(ui.calendarDate,Number(b.dataset.offset)*(ui.calendarView==='year'?12:1));render();animateUI($('.tc-cal-body'),[{opacity:.5,transform:'translateX(6px)'},{opacity:1,transform:'none'}],250,'wb-calendar');},
     'calendar-month':b=>{ui.calendarDate=b.dataset.date;actions['calendar-view']({dataset:{value:'month'}});},
-    'calendar-today':()=>{ui.calendarDate=today;render();},
-    'calendar-select':b=>{ui.calendarSelect=b.dataset.value;ui.calendarAnchor='';render();},
-    'calendar-day':b=>{const date=b.dataset.date;if(ui.calendarSelect==='range'&&!ui.calendarAnchor){ui.calendarAnchor=date;ui.queueRange='custom';ui.taskRangeStart=date;ui.taskRangeEnd=date;render();return;}const dates=[ui.calendarAnchor||date,date].sort();calendarChoose(dates[0],dates[1]);},
-    'calendar-open':()=>{if(ui.calendarAnchor){toast('请选择结束日期');return;}openCalendarTasks();},
-    'calendar-execute':b=>{$('#dialog').close();ui.calendarExecution=true;ui.focusPlanId=b.dataset.id;ui.focusBatchKey='';render();$('#tc-v2-focus')?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},
-    'calendar-collapse':()=>{ui.calendarExecution=false;render();},
+    'calendar-today':()=>{ui.calendarDate=today;calendarChoose(today,today);},
+    'calendar-select':b=>{ui.calendarAnchor='';ui.calendarSelect=b.dataset.value;if(ui.calendarSelect==='range')ui.calendarExecution=false;else if(ui.queueRange==='all'||queueBounds().start!==queueBounds().end){const date=ui.taskDate||today;calendarChoose(date,date);return;}render();},
+    'calendar-day':b=>{const date=b.dataset.date;if(ui.calendarSelect==='range'&&!ui.calendarAnchor){ui.calendarAnchor=date;render();return;}const dates=[ui.calendarAnchor||date,date].sort();calendarChoose(dates[0],dates[1]);},
+    'calendar-open':()=>openCalendarTasks(),
+    'calendar-panel-date':b=>{const date=M.addDays(queueBounds().start,Number(b.dataset.offset));ui.calendarDate=date;calendarChoose(date,date);},
+    'calendar-apply-range':()=>{const start=$('#task-range-start').value,end=$('#task-range-end').value;if(!start||!end||start>end)throw new Error('请填写有效日期，结束不能早于开始');M.dates(start,end);ui.calendarDate=start;calendarChoose(start,end);},
+    'calendar-cancel-range':()=>{ui.calendarAnchor='';ui.calendarSelect='day';render();},
+    'calendar-reset':()=>{const date=ui.taskDate||today;ui.calendarDate=date;calendarChoose(date,date);},
+    'calendar-collapse':()=>closeCalendarTasks(),
     'calendar-create':()=>{$('#dialog').close();ui.taskDate=ui.queueRange==='all'?ui.calendarDate:queueBounds().start;ui.workView='planning';ui.generated=null;ui.replacingPlanId=null;render();},
     'plan-card':b=>{const select=$('#plan-task');select.value=b.dataset.id;select.dispatchEvent(new Event('change',{bubbles:true}));},
-    'task-range-preset':b=>{ui.calendarExecution=true;ui.calendarAnchor='';ui.queueRange=b.dataset.value;if(ui.queueRange==='day')ui.taskDate=today;resetQueueFocus();render();},
+    'task-range-preset':b=>{ui.calendarExecution=true;ui.calendarAnchor='';ui.calendarSelect='day';ui.queueRange=b.dataset.value;if(ui.queueRange==='day')ui.taskDate=today;resetQueueFocus();render();},
     'task-today':()=>{ui.taskDate=today;syncTaskDate();ui.queueRange='day';ui.generated=null;ui.progressSelection=[];render();},
     'task-date-step':b=>{ui.taskDate=M.addDays(ui.taskDate,Number(b.dataset.offset)*(ui.queueRange==='week'&&ui.workView==='queue'?7:1));syncTaskDate();ui.generated=null;ui.progressSelection=[];render();},
 
@@ -1947,6 +1971,7 @@
   document.addEventListener('pointerover',e=>{const group=e.target.closest('.trend-group');if(group)inspectTrend(group);});
   document.addEventListener('pointerout',e=>{const chart=e.target.closest('.trend-bars');if(chart&&!chart.contains(e.relatedTarget))inspectTrend(chart.querySelector('.trend-group[data-index="'+chart.dataset.selected+'"]'));});
   document.addEventListener('focusin',e=>{if(e.target.matches('.trend-group'))inspectTrend(e.target);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#dialog').open&&ui.page==='task'&&(ui.calendarExecution||ui.calendarSelect==='range')){e.preventDefault();actions[ui.calendarExecution?'calendar-collapse':'calendar-cancel-range']();}});
   document.addEventListener('keydown',e=>{if(!e.target.matches('.trend-group')||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const groups=[...e.target.closest('.trend-bars').querySelectorAll('.trend-group')],i=groups.indexOf(e.target),next=e.key==='Home'?0:e.key==='End'?groups.length-1:Math.max(0,Math.min(groups.length-1,i+(e.key==='ArrowRight'?1:-1)));groups[next].focus();inspectTrend(groups[next],true);});
   document.addEventListener('keydown',e=>{const b=e.target.closest('[data-action][role="button"]');if(b&&(e.key==='Enter'||e.key===' ')){e.preventDefault();b.dispatchEvent(new MouseEvent('click',{bubbles:true}));}});
   document.addEventListener('change',e=>{
@@ -1984,7 +2009,7 @@
       if(el.id==='global-account'){ui.roiResult=null;ui.account=el.value;ui.role='';ui.generated=null;render();}
       if(el.id==='global-role'){ui.roiTaskIds=null;ui.roiResult=null;ui.role=el.value;ui.trajectoryAccount='';ui.generated=null;render();}
       if(el.id==='currency'){ui.currency=el.value;try{localStorage.setItem('jx3-workbench-currency',ui.currency);}catch{toast('显示已切换，浏览器无法保存偏好');}render();}if(el.id==='mode'){ui.mode=el.value;render();}
-      if(el.id==='task-range-start'||el.id==='task-range-end'){const bounds=queueBounds(),start=el.id==='task-range-start'?el.value:bounds.start,end=el.id==='task-range-end'?el.value:bounds.end;if(!start||!end||start>end)throw new Error('请填写有效日期，结束不能早于开始');M.dates(start,end);ui.taskRangeStart=start;ui.taskRangeEnd=end;ui.queueRange='custom';ui.calendarAnchor='';ui.calendarExecution=true;resetQueueFocus();render();}
+      if(el.id==='task-range-start'||el.id==='task-range-end'){/* Applied together by calendar-apply-range. */}
       if(el.id==='task-date'){if(!el.value)throw new Error('日期不能为空');ui.taskDate=el.value;syncTaskDate();ui.generated=null;ui.progressSelection=[];render();}
       if(el.id==='rank-metric'){ui.rankMetric=el.value;render();}
       if(el.id==='raid-team-count'||el.dataset.teamField){try{updateRaidTeams(el);}catch(err){render();throw err;}}
