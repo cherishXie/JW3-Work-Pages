@@ -24,10 +24,15 @@
     return addDays(d,-delta);
   }
   const dungeonRewardDefaults={dailyBossEquipment:1,dailyEquipmentGold:25,dailyBossGold:10,raidBossEquipment:2,raidEquipmentGold:100,raidBossGold:100,gongzhanExtraEquipment:1,raidClearBoxes:2,raidWeeklyBoxes:1,raidBoxEquipmentGold:100};
+  function raidExecutionTask(t,completedBossCount){
+    if(t.partyRule!=='raid10'||completedBossCount==null||completedBossCount==='')return {...t};
+    const total=t.bossCount??1,count=number(completedBossCount,'已击败首领数量',{min:0,max:total,integer:true});
+    return {...t,completedBossCount:count};
+  }
   function dungeonRewards(t,players,c={}){
     if(!['daily5','raid10'].includes(t.partyRule)||t.dungeonRewardMode!=='auto')return null;
-    const r={...dungeonRewardDefaults,...c},raid=t.partyRule==='raid10',bosses=t.bossCount??(raid?1:3),extra=players.some(p=>p.gongzhanBuff===true)?r.gongzhanExtraEquipment:0;
-    return {direct:raid?(r.raidClearBoxes+(t.raidWeekly? r.raidWeeklyBoxes:0))*r.raidBoxEquipmentGold:t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,
+    const r={...dungeonRewardDefaults,...c},raid=t.partyRule==='raid10',bosses=raid?(t.completedBossCount??t.bossCount??1):(t.bossCount??3),extra=players.some(p=>p.gongzhanBuff===true)?r.gongzhanExtraEquipment:0;
+    return {direct:raid?(bosses===(t.bossCount??1)?(r.raidClearBoxes+(t.raidWeekly? r.raidWeeklyBoxes:0))*r.raidBoxEquipmentGold:0):t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,
       shared:bosses*((raid?r.raidBossEquipment:r.dailyBossEquipment)+extra)*(raid?r.raidEquipmentGold:r.dailyEquipmentGold)+bosses*(raid?r.raidBossGold:r.dailyBossGold)};
   }
   function dungeonGold(t,batches,c){return batches.reduce((sum,players)=>{const r=dungeonRewards(t,players,c);return sum+(r?players.length*r.direct+r.shared:0);},0);}
@@ -979,5 +984,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

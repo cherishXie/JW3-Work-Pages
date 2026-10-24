@@ -70,6 +70,7 @@
   if(!fact)checkBatch(s,p,taskId,index,M.planStart(s,p,taskId));
   if(s.records.some(r=>r.planId===planId&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(index))))throw new Error('本批已有实测，请使用调整完成记录');
   for(const key of ['gold','minutes','onlineMinutes','otherCost'])if(input[key]!==''&&input[key]!=null)M.number(input[key],key);
+  M.raidExecutionTask(p.taskSnapshots?.[taskId]||s.tasks.find(t=>t.id===taskId),input.completedBossCount);
   const draft={taskId,index,roleIds:[...p.batches[index]],values:JSON.parse(JSON.stringify(input)),updatedAt:new Date().toISOString()};
   p.executionDrafts=(p.executionDrafts||[]).filter(d=>d.taskId!==taskId||d.index!==index);p.executionDrafts.push(draft);p.updatedAt=draft.updatedAt;return draft;
  }
@@ -197,6 +198,8 @@
   if(timing.startedAt&&fact.startedAt&&fact.startedAt!==timing.startedAt)throw new Error('补录须沿用完成登记的开始时刻；需要改期请先撤销完成');
   if(timing.startedAt&&!fact.startedAt){if(M.cycle(fact.cycleSnapshot||fact.cdSnapshot||copy.tasks.find(t=>t.id===taskId),timing.startedAt)!==fact.cycle)throw new Error('开始时间属于另一刷新周期，请先撤销完成并改期');fact.startedAt=timing.startedAt;}
   if(timing.endedAt)fact.endedAt=timing.endedAt;
+  const executionTask=M.raidExecutionTask(fact.allocationTask||p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId),input.completedBossCount??fact.completedBossCount);
+  if(executionTask.partyRule==='raid10'){fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount??1;fact.allocationTask=structuredClone(executionTask);}
   const previousMeasurements=fact.measurements||{},financialAllocation=input.financialAllocation||previousMeasurements.financialAllocation||'task',timeAllocation=input.timeAllocation||previousMeasurements.timeAllocation||'task';
   if(timeAllocation==='task'&&input.minutes!==undefined&&input.minutes!==''&&input.minutes!==null)input={...input,onlineMinutes:Number(input.minutes)*fact.roleIds.length};
   const measurements={...previousMeasurements,financialAllocation,timeAllocation,allocationVersion:2};
@@ -211,7 +214,7 @@
    if(pref.timeAllocation==='task'){record.roleOnlineMinutes=Object.fromEntries(fact.roleIds.map(id=>[id,record.onlineMinutes/n]));for(const id of fact.roleIds){const account=fact.roleAccounts[id];record.accountMinutes[account]=(record.accountMinutes[account]||0)+record.onlineMinutes/n;}}
    if(pref.timeAllocation==='attendance'||pref.financialAllocation==='attendance'){record.accountMinutes={};record.roleOnlineMinutes={};if(pref.financialAllocation==='attendance'){record.roleAllocations={};record.allocationMethod='attendance';}for(const id of fact.roleIds){const account=fact.roleAccounts[id],online=record.onlineMinutes/n;record.roleOnlineMinutes[id]=online;record.accountMinutes[account]=(record.accountMinutes[account]||0)+online;if(record.roleAllocations)record.roleAllocations[id]={gold:record.gold/n,minutes:record.minutes/n,onlineMinutes:online,otherCost:record.otherCost/n};}}
    record.allocationMethod=financialAllocation==='none'?'manual-none':financialAllocation==='attendance'?'manual':'task';
-   if(financialAllocation==='task'){record.allocationBatches=[...fact.planBatchIndices].map(i=>[...p.batches[i]]);record.allocationTask=structuredClone(p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId));record.onlineAllocationMethod=timeAllocation==='task'?'batch-duration':'manual';Object.assign(record,M.allocatedRecord(copy,record));}
+   if(financialAllocation==='task'){record.allocationBatches=[...fact.planBatchIndices].map(i=>[...p.batches[i]]);record.allocationTask=structuredClone(executionTask);record.onlineAllocationMethod=timeAllocation==='task'?'batch-duration':'manual';Object.assign(record,M.allocatedRecord(copy,record));}
    const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
   }
@@ -299,6 +302,14 @@
    for(const key of ['roleBillableMinutes','roleCoveredMinutes'])if(previous[key])r[key]=scale(previous[key],r.onlineMinutes,previous.onlineMinutes,roleWeights);
    if(previous.roleAllocations)for(const id of r.roleIds)for(const key of ['gold','minutes','onlineMinutes','otherCost'])r.roleAllocations[id][key]=previous[key]?previous.roleAllocations[id][key]/previous[key]*r[key]:roleWeights[id]*r[key];
    if(previous.onlineMinutes===0&&r.roleBillableMinutes)for(const id of r.roleIds){const account=r.roleAccounts[id],m=r.roleOnlineMinutes?.[id]||0,fraction=r.accountMinutes[account]?r.billableAccountMinutes[account]/r.accountMinutes[account]:0;r.roleBillableMinutes[id]=m*fraction;r.roleCoveredMinutes[id]=m-r.roleBillableMinutes[id];}
+   if(input.completedBossCount!=null){
+    const oldTask=r.allocationTask||p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId),task=M.raidExecutionTask(oldTask,input.completedBossCount);
+    if(task.partyRule==='raid10'){
+     const oldCount=oldTask.completedBossCount??oldTask.bossCount??1;r.completedBossCount=task.completedBossCount;r.allocationTask=task;
+     if(r.allocationBasis&&task.dungeonRewardMode==='auto')for(const a of Object.values(r.allocationBasis)){a.sharedGold=oldCount?a.sharedGold*task.completedBossCount/oldCount:M.dungeonRewards(task,r.roleIds.map(id=>copy.roles.find(x=>x.id===id)),r.snapshot).shared/r.roleIds.length;a.directGold=M.dungeonRewards(task,[],r.snapshot).direct;a.gold=a.directGold+a.sharedGold;}
+     if(fact){fact.completedBossCount=r.completedBossCount;fact.allocationTask=structuredClone(task);}
+    }
+   }
    if(r.allocationMethod==='task'){Object.assign(r,M.allocatedRecord(copy,r));}
    if(input.gold!==undefined&&input.gold!=='')r.measurementStatus='confirmed';
    r.note=input.note??r.note;r.updatedAt=new Date(Math.max(Date.now(),Date.parse(previous.updatedAt||'')+1||0)).toISOString();r.correctionRevision=(r.correctionRevision||0)+1;r.corrections??=[];const {corrections,...snapshot}=previous;r.corrections.push({at:r.updatedAt,reason:input.reason?.trim()||'用户调整实测',before:snapshot});
