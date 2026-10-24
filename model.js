@@ -610,12 +610,67 @@
     if(r.incompleteMeasurement)for(const k of ['net','timeNet','netGold','hourly','hourlyGold','roi'])result[k]=null;return {...result,incompleteMeasurement:!!r.incompleteMeasurement,goldCost,accountMinutes:r.accountMinutes||{},...(r.billableAccountMinutes?{billableAccountMinutes:r.billableAccountMinutes,coveredAccountMinutes:r.coveredAccountMinutes||{}}:{}),billingWarnings:[...(r.billingWarnings||[]),...(currentConfig?.discount>0&&r.snapshot.discount===0&&!r.billableAccountMinutes&&r.snapshot.accountBillingRates?['原记录为零折扣且缺少计费分钟，月卡覆盖无法还原，暂按计时单价估算']:[]),...(r.pricingSource?[r.pricingSource]:[])]};
   }
   function selectedRecordRoles(s,r,scope={}){return r.roleIds.filter(id=>{const role=s.roles.find(x=>x.id===id);return role&&(!scope.role||id===scope.role)&&(!scope.account||recordAccount(s,r,id)===scope.account)&&(!scope.group||(r.roleGroups?.[id]??s.accounts.find(a=>a.id===recordAccount(s,r,id))?.group)===scope.group);});}
+  // Read-through allocation from the actual roster. Never rewrite an existing record:
+  // totals, observed rewards, historical pricing and account snapshots remain authoritative.
+  function roleShares(s,r){
+    const ids=[...new Set(r.roleIds||[])],out={};if(!ids.length)return out;
+    const plan=(s.plans||[]).find(p=>p.id===r.planId),task=plan?.taskSnapshots?.[r.taskId]||s.tasks.find(t=>t.id===r.taskId);
+    // Preserve deliberately customized financial allocations. Old "attendance" allocations
+    // are automatically upgraded on read when an exact batch roster is available.
+    const indices=r.planBatchIndices||[],planned=plan&&indices.length?indices.map(i=>plan.batches[i]?.filter(id=>ids.includes(id))).filter(b=>b?.length):[];
+    const haveRoster=planned.length>0;
+    if(r.roleAllocations&&r.allocationMethod!=='attendance')return r.roleAllocations;
+    if(r.roleAllocations&&!haveRoster&&(!r.attendanceWeights||!task))return r.roleAllocations;
+    const visits=haveRoster?planned:(()=>{const weights=r.attendanceWeights||{},count=Math.max(1,...ids.map(id=>Math.round(weights[id]||1))),batches=[];for(let i=0;i<count;i++){const batch=ids.filter(id=>i<Math.max(1,Math.round(weights[id]||1)));if(batch.length)batches.push(batch);}return batches;})();
+    const reward=new Map(ids.map(id=>[id,0])),occurrences=new Map(ids.map(id=>[id,0]));
+    const perGold=task?.components?.length?task.components.reduce((n,c)=>n+c.quantity*c.price,0):task?.gold||0;
+    for(const batch of visits){
+      const members=batch.map(id=>s.roles.find(role=>role.id===id)).filter(Boolean),n=batch.length,automatic=task?dungeonRewards(task,members,r.snapshot||s.config):null;
+      const shared=automatic?automatic.shared:(task?.sharedMode==='person'?n*(task.shared||0):task?.shared||0)+(task?.type==='team'&&!task?.rewardPerRole?perGold:0);
+      const direct=automatic?automatic.direct:(task?.type==='team'&&!task?.rewardPerRole?0:perGold);
+      for(const id of batch){occurrences.set(id,(occurrences.get(id)||0)+1);reward.set(id,(reward.get(id)||0)+direct+shared/n);}
+    }
+    const attendance=ids.reduce((sum,id)=>sum+occurrences.get(id),0)||ids.length;
+    const basis=ids.reduce((sum,id)=>sum+reward.get(id),0);
+    const financialWeights=ids.map(id=>basis>0?reward.get(id)/basis:(occurrences.get(id)||1)/attendance);
+    const usageWeights=ids.map(id=>(occurrences.get(id)||1)/attendance);
+    function divide(total,weights){
+      const shares={};let allocated=0;ids.forEach((id,i)=>{const amount=i===ids.length-1?(total||0)-allocated:(total||0)*weights[i];shares[id]=amount;allocated+=amount;});return shares;
+    }
+    const gold=divide(r.gold,financialWeights),minutes=divide(r.minutes,usageWeights),otherCost=divide(r.otherCost,usageWeights);
+    const online={};
+    // Recorded per-role online time is authoritative; otherwise split each account's
+    // known time by visits, leaving unknown account time at the fallback card rate.
+    if(r.roleOnlineMinutes&&ids.every(id=>Number.isFinite(r.roleOnlineMinutes[id]))){
+      for(const id of ids)online[id]=r.roleOnlineMinutes[id];
+    }else{
+      const assigned=new Set();let known=0;
+      for(const [account,m]of Object.entries(r.accountMinutes||{})){
+        const members=ids.filter(id=>recordAccount(s,r,id)===account),weight=members.reduce((v,id)=>v+(occurrences.get(id)||1),0);
+        if(!weight)continue;
+        let subtotal=0;members.forEach((id,i)=>{const value=i===members.length-1?m-subtotal:m*(occurrences.get(id)||1)/weight;online[id]=value;subtotal+=value;assigned.add(id);});
+        known+=m;
+      }
+      const unknownIds=ids.filter(id=>!assigned.has(id)),remaining=Math.max(0,(r.onlineMinutes||0)-known);
+      const remainingWeight=unknownIds.reduce((n,id)=>n+(occurrences.get(id)||1),0);
+      unknownIds.forEach((id,i)=>{online[id]=i===unknownIds.length-1?remaining-unknownIds.slice(0,i).reduce((n,k)=>n+online[k],0):remaining*(occurrences.get(id)||1)/remainingWeight;});
+      // If an old record has partially allocated account time all owned by one account,
+      // do not drop its residual online usage from the role-level report.
+      if(!unknownIds.length&&remaining>1e-6){const extra=divide(remaining,usageWeights);for(const id of ids)online[id]=(online[id]||0)+extra[id];}
+    }
+    for(const id of ids)out[id]={gold:gold[id],minutes:minutes[id],onlineMinutes:online[id]||0,otherCost:otherCost[id]};
+    return out;
+  }
   function scopedRecord(s,r,scope={}){
     if(r.unallocated&&(scope.role||scope.account||scope.group))return null;const ids=selectedRecordRoles(s,r,scope);if(!ids.length&&!r.unallocated)return null;
     if(ids.length===r.roleIds.length)return r;
-    if(!r.roleAllocations||ids.some(id=>!r.roleAllocations[id]))return null;
+    const allocations=roleShares(s,r);if(ids.some(id=>!allocations[id]))return null;
     const amounts={gold:0,minutes:0,onlineMinutes:0,otherCost:0},accountMinutes={};
-    for(const id of ids){const a=r.roleAllocations[id],accountId=recordAccount(s,r,id);for(const k of Object.keys(amounts))amounts[k]+=a[k]||0;accountMinutes[accountId]=(accountMinutes[accountId]||0)+(a.onlineMinutes||0);}
+    for(const id of ids){const a=allocations[id],accountId=recordAccount(s,r,id);for(const k of Object.keys(amounts))amounts[k]+=a[k]||0;
+      // Only distribute minutes that were actually assigned to the account.
+      const siblings=r.roleIds.filter(roleId=>recordAccount(s,r,roleId)===accountId),onlineForAccount=siblings.reduce((n,k)=>n+(allocations[k]?.onlineMinutes||0),0);
+      const known=r.accountMinutes?.[accountId];if(known!==undefined&&onlineForAccount>0)accountMinutes[accountId]=(accountMinutes[accountId]||0)+known*(a.onlineMinutes||0)/onlineForAccount;
+    }
     const billableAccountMinutes={},coveredAccountMinutes={};for(const [id,m]of Object.entries(accountMinutes)){const fraction=m/(r.accountMinutes?.[id]||m||1);billableAccountMinutes[id]=(r.billableAccountMinutes?.[id]||0)*fraction;coveredAccountMinutes[id]=(r.coveredAccountMinutes?.[id]||0)*fraction;}
     return {...r,...amounts,roleIds:ids,accountMinutes,...(r.billableAccountMinutes?{billableAccountMinutes,coveredAccountMinutes}:{})};
   }
@@ -756,8 +811,8 @@
     const events=[],seen=new Set();
     for(const e of s.ledger||[]){const key=e.linkedEventId||e.eventKey||e.id;if(seen.has(key+'|'+e.roleId+'|'+e.direction))continue;seen.add(key+'|'+e.roleId+'|'+e.direction);events.push({...e,amount:e.direction==='in'?e.gold:-e.gold});}
     const add=(e,roleId,gold)=>{if(roleId&&!events.some(x=>x.linkedEventId===e.id||x.recordId===e.id&&x.direction==='in'))events.push({id:e.id,roleId,date:e.date,capturedAt:e.receivedAt,amount:gold,category:'reward',source:'已确认执行',recordId:e.id});};
-    for(const r of s.records||[])if(r.measurementStatus==='confirmed'){if(r.roleAllocations)for(const [id,a]of Object.entries(r.roleAllocations))add(r,id,a.gold);else if(r.roleIds.length===1)add(r,r.roleIds[0],r.gold);}
-    for(const f of completionRecords(s))if(f.measurements?.gold!=null){if(f.measurements.financialAllocation==='attendance')for(const id of f.roleIds)add(f,id,f.measurements.gold/f.roleIds.length);else if(f.roleIds.length===1)add(f,f.roleIds[0],f.measurements.gold);}
+    for(const r of s.records||[])if(r.measurementStatus==='confirmed'){for(const [id,a]of Object.entries(roleShares(s,r)))add(r,id,a.gold);}
+    for(const f of completionRecords(s))if(f.measurements?.gold!=null){const provisional={...f,gold:f.measurements.gold,minutes:f.measurements.minutes||0,onlineMinutes:f.measurements.onlineMinutes||0};for(const [id,a]of Object.entries(roleShares(s,provisional)))add(f,id,a.gold);}
     for(const e of s.wageReceipts||[])if(e.roleId&&!events.some(x=>x.linkedEventId===e.id))add(e,e.roleId,e.gold);
     for(const e of s.materialSales||[])if(e.roleId&&!events.some(x=>x.linkedEventId===e.id))add(e,e.roleId,e.quantity*e.unitGold-e.feeGold);
     return events;
@@ -923,5 +978,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {roleShares,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
