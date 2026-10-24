@@ -46,7 +46,7 @@ SOFTWARE.
       'warm-sand':[l.bronze[10],d.bronze[7],d.bronze[6],d.amber[6],l.amber[10],d.sand[7]],
       'amethyst-night':[l.violet[8],l.violet[9],l.violet[10],d.violet[7],l.mauve[10],d.mauve[8]]
     }[theme.id];
-    const p={bg:n[0],sidebar:n[1],surface:n[1],'surface-2':n[2],hover:n[3],border:n[5],text:n[11],'text-secondary':n[10],'text-muted':n[10],primary:theme.mode==='light'&&['jade','bronze'].includes(theme.accent)?a[10]:a[8],cyan:at('teal',11),purple:at('violet',11),success:at('green',11),warning:at('amber',11),danger:at('red',11),'primary-text':'#ffffff',
+    const p={bg:n[0],sidebar:n[1],surface:n[1],'surface-2':n[2],hover:n[3],border:n[5],text:n[11],'text-secondary':n[10],'text-muted':n[10],primary:theme.mode==='light'&&['jade','bronze'].includes(theme.accent)?a[10]:a[8],cyan:at('teal',11),purple:at('violet',11),success:at('green',11),warning:at('amber',11),'task-warning-text':at('amber',theme.mode==='light'?12:11),danger:at('red',11),'primary-text':'#ffffff',
       'input-bg':n[2],'control-border':n[6],'primary-soft':a[2],'primary-hover':theme.mode==='dark'?a[8]:['jade','bronze'].includes(theme.accent)?a[10]:a[9],'primary-label':theme.mode==='light'?a[11]:a[10],
       'notice-bg':a[2],'notice-border':a[5],'success-bg':at('green',3),'success-border':at('green',6),'forecast-bg':at('violet',3),'forecast-border':at('violet',6),'warning-bg':at('amber',3),'warning-border':at('amber',6),
       'chart-bg-0':tileColors[0],'chart-bg-1':tileColors[1],'chart-bg-2':tileColors[2],'chart-bg-3':tileColors[3],'chart-bg-4':tileColors[4],'chart-bg-5':tileColors[5],track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],

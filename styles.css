@@ -821,8 +821,8 @@ button,input,select,textarea{transition:background-color var(--wb-motion-fast) e
 .tc-cal-selection button{min-height:30px;padding:4px 8px}
 
 
-.flow-task-status.overdue{color:var(--wb-warning)}
-.flow-task-status.completed{color:var(--wb-success)}
+.flow-task-status.overdue{color:var(--wb-task-warning-text)}
+.flow-task-status.completed{color:var(--wb-text-secondary)}
 
 @media(min-width:768px) and (max-height:820px){.tc-cal-grid.is-month>.tc-cal-day{position:relative;padding:3px 6px;gap:1px}.tc-cal-grid.is-month .tc-cal-number{height:20px}.tc-cal-grid.is-month .tc-cal-events>small{position:absolute;top:4px;right:6px}}
 
@@ -841,7 +841,7 @@ button,input,select,textarea{transition:background-color var(--wb-motion-fast) e
 .tc-cal-event small{color:var(--wb-text-muted)}
 .tc-cal-event.is-completed small{color:var(--wb-text-muted)}
 .tc-cal-event.is-completed small::before{content:"✓";color:var(--wb-success);margin-right:3px}
-.tc-cal-event.is-overdue small{color:var(--wb-warning)}
+.tc-cal-event.is-overdue small{color:var(--wb-task-warning-text)}
 .tc-cal-event.is-cancelled{color:var(--wb-text-muted)}
 .tc-cal-mini .tc-cal-grid{background:var(--wb-border);gap:0;border:0.5px solid var(--wb-border);border-radius:4px}
 .tc-cal-mini .tc-cal-day{border-radius:0}
@@ -852,3 +852,4 @@ button,input,select,textarea{transition:background-color var(--wb-motion-fast) e
 .task-center .flow-batch-dot{color:var(--wb-text-muted);background:var(--wb-surface-2)}
 .task-center .flow-batch.is-selected .flow-batch-dot{color:var(--wb-primary-text);background:var(--wb-primary);border-color:var(--wb-primary)}
 .task-center .flow-batch .tc-v2-status.pending{color:var(--wb-text-secondary);background:transparent;padding-left:0;padding-right:0}
+.task-center .tc-v2-status.measured,.task-center .tc-v2-status.completed{color:var(--wb-text);background:var(--wb-success-bg)}
