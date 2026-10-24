@@ -685,7 +685,9 @@
       billableAccountMinutes[id]=(r.billableAccountMinutes?.[id]||0)*fraction;
       coveredAccountMinutes[id]=(r.coveredAccountMinutes?.[id]||0)*fraction;
     }
-    return {...r,...amounts,roleIds:ids,accountMinutes,
+    const exact=!!r.roleBillableMinutes&&!!r.billableAccountMinutes,baseRate=(r.snapshot?.cardPrice||0)*(r.snapshot?.discount||0)/(r.snapshot?.cardMinutes||1);
+    const snapshot=exact?{...r.snapshot,accountBillingRates:Object.fromEntries(Object.entries(accountMinutes).map(([account,m])=>[account,m?baseRate*(billableAccountMinutes[account]||0)/m:0]))}:r.snapshot;
+    return {...r,...amounts,roleIds:ids,accountMinutes,snapshot,
       ...(r.billableAccountMinutes?{billableAccountMinutes,coveredAccountMinutes}:{}),
       roleBillableMinutes:r.roleBillableMinutes?Object.fromEntries(ids.map(id=>[id,r.roleBillableMinutes[id]||0])):undefined,
       roleCoveredMinutes:r.roleCoveredMinutes?Object.fromEntries(ids.map(id=>[id,r.roleCoveredMinutes[id]||0])):undefined};
