@@ -129,6 +129,35 @@
   next.updatedAt=new Date().toISOString();return next;
  }
  // Validate arbitrary roster edits atomically. Completed and locked batches are immutable.
+ // Availability is evaluated at each route task's own start/reset cycle, excluding this plan's reservations.
+ function rosterRoleIssue(s,p,roleId,index,batches=p.batches){
+  const r=s.roles.find(r=>r.id===roleId);if(!r)return '角色不存在';
+  const members=(batches[index]||[]).filter(id=>id!==roleId).map(id=>s.roles.find(r=>r.id===id)).filter(Boolean);
+  for(const id of p.routeTaskIds||[p.taskId]){
+   const source=s.tasks.find(t=>t.id===id);if(!source?.enabled)return '任务已停用';
+   const t=M.savedPartyTask(M.taskForVersion(s,source),p),name=t.name+'：',when=M.planStart(s,{...p,batches},id);
+   if(r.enabled===false||!s.accounts.some(a=>a.id===r.accountId&&a.enabled!==false))return '角色或账号已停用';
+   if(!M.isMaxLevel(s,r))return '角色未满级或尚未创建';
+   if(!t.roleIds.includes(r.id))return name+'未加入任务范围';
+   if((r.level||0)<(t.minLevel||0))return name+'等级不足';
+   if((r.score||0)<(t.minScore||0))return name+'装分不足或待补';
+   if(t.requiresCamp&&!['hao','e'].includes(r.camp))return name+'阵营资格不满足';
+   if(M.cdRecord(s,t,r.id,when))return name+'当前 CD 已使用';
+   const progress=M.effectiveProgress(s,t,r,when);
+   if(progress.status==='skipped'||progress.manualStatus==='skipped')return name+'本周期已跳过';
+   if(progress.completed>=progress.target)return name+'本周期目标已完成';
+   if(!M.availableCount(s,t,r,when,p.id))return name+'目标或 CD 已被其他排程占用';
+   const conflict=members.find(x=>x.accountId===r.accountId);if(conflict)return '同账号角色 '+conflict.name+' 已在本队，同一账号不能同时登录';
+   const capacity=Math.min(s.config.concurrency,t.maxParallel,t.partyRule==='raid10'?10:t.partyRule==='daily5'?5:t.type==='team'?t.teamSize:Infinity);
+   if(members.length>=capacity)return name+'已达到本批人数或并行上限';
+   if(['daily5','raid10'].includes(t.partyRule)||t.type==='team'){
+    if(!r.server)return name+'区服待补';
+    if(members.some(x=>x.server!==r.server))return name+'与本队区服不一致';
+   }
+   try{M.validateDailyGongzhan(t,[...members,r]);}catch(e){return name+e.message;}
+  }
+  return '';
+ }
  function setBatchRosters(s,p,batches){
   if(!Array.isArray(batches)||!batches.length||batches.length>100)throw new Error('请保留 1–100 个队伍');
   if(batches.length<p.batches.length)throw new Error('已有批次请通过删除批次处理');
@@ -142,6 +171,7 @@
   next.batches=batches.map(ids=>[...ids]);next.teamConfigs=next.batches.map((_,i)=>p.teamConfigs?.[i]||null);next.companionAssignments=next.batches.map((_,i)=>p.companionAssignments?.[i]||[]);
   for(const i of affected){
    const members=next.batches[i].map(id=>s.roles.find(r=>r.id===id));if(members.some(r=>!r))throw new Error('角色不存在');
+   for(const role of members){const issue=rosterRoleIssue(s,next,role.id,i,next.batches);if(issue)throw new Error('第 '+(i+1)+' 队：'+issue);}
    const base=M.savedPartyTask(M.taskForVersion(s,s.tasks.find(t=>t.id===p.taskId)),p);
    if(base.partyRule==='raid10')next.teamConfigs[i]={...(next.teamConfigs[i]||{name:'第 '+(i+1)+' 队',tankMode:base.tankMode||'auto'}),playerSeats:members.length};
    const task=M.partyTask(base,next.teamConfigs[i]);M.validateDailyGongzhan(task,members);
@@ -333,5 +363,5 @@
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
  }
- return {isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });

@@ -52,6 +52,13 @@ SOFTWARE.
       'chart-bg-0':tileColors[0],'chart-bg-1':tileColors[1],'chart-bg-2':tileColors[2],'chart-bg-3':tileColors[3],'chart-bg-4':tileColors[4],'chart-bg-5':tileColors[5],track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
+    // Task-center surfaces and semantic day states; other pages keep their current tokens.
+    Object.assign(p,{'task-canvas':a[0],'task-surface':a[1],'task-edge':a[5],'task-hover':a[3],
+      'task-pending-bg':a[2],'task-pending-text':a[11],'task-pending-fill':p.primary,
+      'task-progress-bg':at('cyan',3),'task-progress-text':at('cyan',12),'task-progress-fill':at('cyan',theme.mode==='light'?11:9),
+      'task-done-bg':at('green',3),'task-done-text':at('green',12),'task-done-fill':at('green',theme.mode==='light'?11:9),
+      'task-overdue-bg':at('amber',3),'task-overdue-text':at('amber',12),'task-overdue-fill':at('amber',theme.mode==='light'?11:9),
+      'task-blocked-bg':n[2],'task-blocked-text':n[11],'task-blocked-border':n[6]});
     // Radix whiteA12 / blackA12; prefer consistent white ink whenever it meets 4.5:1.
     const luminance=hex=>{const c=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722;};
     for(let i=0;i<6;i++){const l=luminance(p['chart-bg-'+i]);p['chart-text-'+i]=1.05/(l+.05)>=4.5?'#ffffff':'#000000';}

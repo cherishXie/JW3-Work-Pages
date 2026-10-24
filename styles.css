@@ -826,30 +826,64 @@ button,input,select,textarea{transition:background-color var(--wb-motion-fast) e
 
 @media(min-width:768px) and (max-height:820px){.tc-cal-grid.is-month>.tc-cal-day{position:relative;padding:3px 6px;gap:1px}.tc-cal-grid.is-month .tc-cal-number{height:20px}.tc-cal-grid.is-month .tc-cal-events>small{position:absolute;top:4px;right:6px}}
 
-/* Calendar uses neutral surfaces; accent identifies selection, semantic ink identifies status. */
-.tc-cal-grid{gap:0;background:var(--wb-border);border:0.5px solid var(--wb-border);border-radius:6px}
-.tc-cal-grid>.tc-cal-day,.tc-cal-grid>span{border:0;border-right:0.5px solid var(--wb-border);border-bottom:0.5px solid var(--wb-border)}
+/* Task-center cockpit: theme-tinted surfaces, semantic day tiles, and explicit availability. */
+.task-context #app{background:var(--wb-task-canvas)}
+.task-center .card,.task-center .tc-v2-focus{background:var(--wb-task-surface);border-color:var(--wb-task-edge)}
+.task-center .tc-command{background:var(--wb-primary-soft)}
+.task-center .tc-command .tabs button.active{background:var(--wb-primary);color:var(--wb-primary-text);border-color:var(--wb-primary)}
+.task-center .tc-cal-toolbar,.task-center .tc-cal-panel-head{background:var(--wb-task-surface)}
+.task-center .tc-cal-panel{background:var(--wb-task-canvas);border-color:var(--wb-task-edge)}
+.tc-cal-grid{gap:0;background:var(--wb-task-edge);border:0.5px solid var(--wb-task-edge);border-radius:6px}
+.tc-cal-grid>.tc-cal-day,.tc-cal-grid>span{border:0;border-right:0.5px solid var(--wb-task-edge);border-bottom:0.5px solid var(--wb-task-edge)}
 .tc-cal-grid>:nth-child(7n){border-right:0}
 .tc-cal-grid>:nth-last-child(-n+7){border-bottom:0}
-.tc-cal-day{color:var(--wb-text);background:var(--wb-surface)}
-.tc-cal-day.is-outside{background:var(--wb-bg);color:var(--wb-text-muted)}
-.tc-cal-day:hover{background:var(--wb-hover);color:var(--wb-text)}
-.tc-cal-day.is-selected{background:var(--wb-surface-2);color:var(--wb-text);outline:0.5px solid var(--wb-primary);outline-offset:-0.5px}
-.tc-cal-day.is-selected>.tc-cal-number{background:var(--wb-primary-soft);color:var(--wb-primary-label)}
-.tc-cal-day.is-today>.tc-cal-number{background:var(--wb-primary);color:var(--wb-primary-text)}
-.tc-cal-event{color:var(--wb-text);line-height:1.5}
-.tc-cal-event small{color:var(--wb-text-muted)}
-.tc-cal-event.is-completed small{color:var(--wb-text-muted)}
-.tc-cal-event.is-completed small::before{content:"✓";color:var(--wb-success);margin-right:3px}
-.tc-cal-event.is-overdue small{color:var(--wb-task-warning-text)}
-.tc-cal-event.is-cancelled{color:var(--wb-text-muted)}
-.tc-cal-mini .tc-cal-grid{background:var(--wb-border);gap:0;border:0.5px solid var(--wb-border);border-radius:4px}
+.tc-cal-day{--day-bg:var(--wb-task-surface);--day-ink:var(--wb-text);--day-fill:var(--wb-primary);color:var(--day-ink);background:var(--day-bg)}
+.tc-cal-day.has-pending{--day-bg:var(--wb-task-pending-bg);--day-ink:var(--wb-task-pending-text);--day-fill:var(--wb-task-pending-fill)}
+.tc-cal-day.has-progress{--day-bg:var(--wb-task-progress-bg);--day-ink:var(--wb-task-progress-text);--day-fill:var(--wb-task-progress-fill)}
+.tc-cal-day.has-done{--day-bg:var(--wb-task-done-bg);--day-ink:var(--wb-task-done-text);--day-fill:var(--wb-task-done-fill)}
+.tc-cal-day.has-overdue{--day-bg:var(--wb-task-overdue-bg);--day-ink:var(--wb-task-overdue-text);--day-fill:var(--wb-task-overdue-fill)}
+.tc-cal-day.has-closed{--day-bg:var(--wb-surface-2);--day-ink:var(--wb-text-muted)}
+.tc-cal-day.is-outside.has-empty{background:var(--wb-task-canvas);color:var(--wb-text-muted)}
+.tc-cal-day:hover{color:var(--day-ink);outline:0.5px solid var(--day-fill);outline-offset:-0.5px}
+.tc-cal-day.is-selected{background:var(--day-bg);color:var(--day-ink);outline:0.5px solid var(--wb-primary);outline-offset:-1.5px}
+.tc-cal-day-head{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;width:100%;flex-wrap:wrap}
+.tc-cal-day-head .tc-cal-number{color:inherit}
+.tc-cal-day.is-selected .tc-cal-number,.tc-cal-day.is-today .tc-cal-number{background:var(--wb-primary);color:var(--wb-primary-text)}
+.tc-cal-day-state{font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
+.tc-cal-day .tc-cal-event,.tc-cal-day .tc-cal-event small,.tc-cal-day .tc-cal-events>small{color:var(--day-ink);line-height:1.4}
+.tc-cal-day .tc-cal-event.is-completed small::before{content:"✓ ";color:inherit}
+.tc-cal-day-progress{display:block;flex:none;width:100%;height:4px;margin-top:auto;background:var(--wb-track);overflow:hidden;border-radius:2px}
+.tc-cal-day-progress i{display:block;height:100%;background:var(--day-fill)}
+.tc-cal-mini .tc-cal-grid{background:var(--wb-task-edge);gap:0;border:0.5px solid var(--wb-task-edge);border-radius:4px}
 .tc-cal-mini .tc-cal-day{border-radius:0}
-.flow-task.is-selected,.flow-batch.is-selected{background:var(--wb-surface);border-color:var(--wb-primary);color:var(--wb-text)}
-.flow-task.is-selected .flow-task-title,.flow-batch.is-selected strong{color:var(--wb-primary-label)}
-.roster-pool-role:has(input:disabled){color:var(--wb-text-muted);background:var(--wb-bg)}
-.task-center .tc-v2-focus{background:var(--wb-surface);border-color:var(--wb-border)}
-.task-center .flow-batch-dot{color:var(--wb-text-muted);background:var(--wb-surface-2)}
+.tc-cal-mini .tc-cal-day-head{justify-content:center}
+.tc-cal-mini .tc-cal-dot{background:var(--day-fill)}
+.tc-cal-legend{display:flex;align-items:center;gap:10px;font-size:12px;flex-wrap:wrap}
+.tc-cal-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.tc-cal-legend span::before{content:"";width:10px;height:10px;border-radius:2px;background:var(--wb-task-pending-fill)}
+.tc-cal-legend [data-state=progress]::before{background:var(--wb-task-progress-fill)}
+.tc-cal-legend [data-state=done]::before{background:var(--wb-task-done-fill)}
+.tc-cal-legend [data-state=overdue]::before{background:var(--wb-task-overdue-fill)}
+.task-center .flow-task.is-selected,.task-center .flow-batch.is-selected{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
+.task-center .flow-task.is-selected .flow-task-title{color:var(--wb-primary-label)}
+.task-center .flow-batch-dot{color:var(--wb-primary-label);background:var(--wb-primary-soft)}
 .task-center .flow-batch.is-selected .flow-batch-dot{color:var(--wb-primary-text);background:var(--wb-primary);border-color:var(--wb-primary)}
-.task-center .flow-batch .tc-v2-status.pending{color:var(--wb-text-secondary);background:transparent;padding-left:0;padding-right:0}
-.task-center .tc-v2-status.measured,.task-center .tc-v2-status.completed{color:var(--wb-text);background:var(--wb-success-bg)}
+.task-center .flow-batch .tc-v2-status.pending{color:var(--wb-primary-label);background:transparent;padding-left:0;padding-right:0}
+.task-center .tc-v2-status.measured,.task-center .tc-v2-status.completed{color:var(--wb-task-done-text);background:var(--wb-task-done-bg)}
+.tc-cal-panel .tc-v2-summary .tc-v2-stat{padding:4px 7px;background:var(--wb-primary-soft);border:0.5px solid var(--wb-task-edge);border-radius:4px}
+.tc-cal-panel .tc-v2-summary .tc-v2-stat:nth-child(3){background:var(--wb-task-done-bg)}
+.tc-cal-panel .tc-v2-summary .tc-v2-stat:nth-child(4){background:var(--wb-forecast-bg)}
+.roster-dialog{background:var(--wb-task-canvas)}
+.roster-counts{font-size:12px;color:var(--wb-primary-label);margin:6px 0 8px}
+.roster-dialog .roster-pool-role{border-color:var(--wb-task-edge);background:var(--wb-task-surface)}
+.roster-dialog .roster-pool-role.is-picked{border-color:var(--wb-primary);background:var(--wb-primary-soft)}
+.roster-dialog .roster-pool-role.is-disabled{border-style:dashed;border-color:var(--wb-task-blocked-border);background:var(--wb-task-blocked-bg);cursor:not-allowed}
+.roster-dialog .roster-pool-role.is-disabled b{color:var(--wb-text-secondary)}
+.roster-dialog .roster-pool-role.is-disabled small{color:var(--wb-task-blocked-text)}
+.roster-role-state{font-weight:600;color:var(--wb-primary-label)}
+.roster-role-reason{line-height:1.5}
+.roster-team-check{font-size:12px;padding:6px 8px;margin-bottom:8px;background:var(--wb-task-done-bg);color:var(--wb-task-done-text);border-radius:4px;overflow-wrap:anywhere}
+.roster-team-check.needs-attention{background:var(--wb-task-overdue-bg);color:var(--wb-task-overdue-text)}
+@media(max-width:767px){.tc-cal-day-head{gap:2px;align-content:start}.tc-cal-day-state{font-weight:500;white-space:normal;overflow-wrap:anywhere}.tc-cal-grid.is-month>.tc-cal-day{min-height:110px;gap:4px}.tc-cal-grid.is-month .tc-cal-event small{display:none}.tc-cal-grid.is-month .tc-cal-event:nth-child(n+2){display:none}.tc-cal-legend{gap:6px 10px}.tc-cal-selection{gap:6px}.tc-cal-day-progress{height:4px}}
+@media(min-width:768px) and (max-height:820px){.tc-cal-grid.is-month .tc-cal-event{line-height:1.25}.tc-cal-grid.is-month .tc-cal-events>small{position:static}.tc-cal-grid.is-month .tc-cal-events{gap:0}}
+.roster-dialog .roster-pool-role.is-disabled .roster-role-state{display:inline-block;padding:1px 5px;margin:3px 0;background:var(--wb-task-overdue-bg);color:var(--wb-task-overdue-text);border-radius:4px}
