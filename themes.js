@@ -52,6 +52,12 @@ SOFTWARE.
       'chart-bg-0':tileColors[0],'chart-bg-1':tileColors[1],'chart-bg-2':tileColors[2],'chart-bg-3':tileColors[3],'chart-bg-4':tileColors[4],'chart-bg-5':tileColors[5],track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
+    // Small visual anchors share semantic roles across all five themes.
+    // Use low-step surfaces and high-step ink; never use saturated data fills as card backgrounds.
+    for(const [role,family] of Object.entries({income:'teal',cost:'bronze',time:'blue',efficiency:'violet',complete:'green',attention:'amber',danger:'red'})){
+      p['cue-'+role]=at(family,theme.mode==='light'?12:11);p['cue-'+role+'-bg']=at(family,3);
+    }
+    p['cue-primary']=p['primary-label'];p['cue-primary-bg']=p['primary-soft'];
     // Task-center surfaces and semantic day states; other pages keep their current tokens.
     Object.assign(p,{'task-canvas':a[0],'task-surface':a[1],'task-edge':a[5],'task-hover':a[3],
       'task-pending-bg':theme.accent==='jade'?at('indigo',3):a[2],'task-pending-text':theme.accent==='jade'?at('indigo',12):a[11],'task-pending-fill':theme.accent==='jade'?at('indigo',9):p.primary,
