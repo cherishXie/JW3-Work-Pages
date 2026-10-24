@@ -175,6 +175,12 @@
    const pref={timeAllocation:input.timeAllocation||copy.recordingPreferences?.timeAllocation||'attendance',financialAllocation:input.financialAllocation||copy.recordingPreferences?.financialAllocation||'none'},n=fact.roleIds.length;
    record={...fact,id:M.id('record'),completionOnly:false,completionId:fact.id,gold:M.number(input.gold,'实际金币'),minutes:M.number(input.minutes,'实际操作分钟'),onlineMinutes:M.number(input.onlineMinutes,'账号在线分钟'),otherCost:M.number(input.otherCost??0,'其他成本'),accountMinutes:{},measurementStatus:'confirmed',source:'手工实测',note:input.note||fact.note||'',attendanceWeights:Object.fromEntries(fact.roleIds.map(id=>[id,1]))};delete record.billingAccounts;
    if(pref.timeAllocation==='attendance'||pref.financialAllocation==='attendance'){record.roleOnlineMinutes={};if(pref.financialAllocation==='attendance'){record.roleAllocations={};record.allocationMethod='attendance';}for(const id of fact.roleIds){const account=fact.roleAccounts[id],online=record.onlineMinutes/n;record.roleOnlineMinutes[id]=online;record.accountMinutes[account]=(record.accountMinutes[account]||0)+online;if(record.roleAllocations)record.roleAllocations[id]={gold:record.gold/n,minutes:record.minutes/n,onlineMinutes:online,otherCost:record.otherCost/n};}}
+   // Each completed batch has a concrete roster: persist its direct/shared
+   // reward allocation and online time regardless of the legacy UI preference.
+   const shares=M.roleShares(copy,record);record.roleAllocations=shares;record.allocationMethod='task-rule';
+   record.roleOnlineMinutes=Object.fromEntries(fact.roleIds.map(id=>[id,shares[id]?.onlineMinutes||0]));
+   record.accountMinutes={};for(const id of fact.roleIds){const account=fact.roleAccounts[id];
+     record.accountMinutes[account]=(record.accountMinutes[account]||0)+(record.roleOnlineMinutes[id]||0);}
    const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
   }
