@@ -238,7 +238,7 @@
   if(timing.endedAt)fact.endedAt=timing.endedAt;
   if(input.timerPauses)fact.timerPauses=structuredClone(input.timerPauses);
   const executionTask=M.raidExecutionTask(fact.allocationTask||p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId),input.completedBossCount??fact.completedBossCount);
-  if(executionTask.partyRule==='raid10'){fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount;fact.allocationTask=structuredClone(executionTask);}
+  if(executionTask.partyRule==='raid10'){if(fact.completedBossCount!==(executionTask.completedBossCount??executionTask.bossCount))delete fact.merchantUnits;fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount;fact.allocationTask=structuredClone(executionTask);}
   const previousMeasurements=fact.measurements||{},financialAllocation=input.financialAllocation||previousMeasurements.financialAllocation||'task',timeAllocation=input.timeAllocation||previousMeasurements.timeAllocation||'task';
   if(timeAllocation==='task'&&input.minutes!==undefined&&input.minutes!==''&&input.minutes!==null)input={...input,onlineMinutes:Number(input.minutes)*fact.roleIds.length};
   const measurements={...previousMeasurements,financialAllocation,timeAllocation,allocationVersion:2};
