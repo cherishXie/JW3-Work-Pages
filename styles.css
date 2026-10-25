@@ -1092,3 +1092,4 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
  .raid-workspace:has(.plan-review-pane):not([data-stage=scope]) .plan-scope-section,.raid-workspace:has(.plan-review-pane)[data-stage=scope] .plan-team-section{display:none}
  .raid-workspace:has(.plan-review-pane) .plan-locks{grid-column:1/-1}
 }
+@media(min-width:768px){.tc-planning>.plan-config{align-self:start;max-height:100%}.daily-workspace:has(.plan-review-pane){grid-template-columns:minmax(260px,.65fr) minmax(0,2fr)}.daily-workspace .plan-review-pane .three-col{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}.daily-workspace .plan-review-pane .summary-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
