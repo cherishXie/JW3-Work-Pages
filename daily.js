@@ -245,7 +245,9 @@
   for(const k of ['gold','minutes','onlineMinutes','otherCost'])if(input[k]!==undefined&&input[k]!==''&&input[k]!==null)measurements[k]=M.number(input[k],k);
   if(['gold','minutes','onlineMinutes'].some(k=>measurements[k]!=null))fact.measurements=measurements;
   const complete=['gold','minutes','onlineMinutes'].every(k=>measurements[k]!=null);
+  const goldProvided=input.gold!==undefined&&input.gold!=='';
   input={...input,...measurements};
+  if(goldProvided&&input.gold!==undefined&&input.gold!=='')fact.snapshot={...fact.snapshot,...Object.fromEntries(['dailyEquipmentGold','raidEquipmentGold','raidBoxEquipmentGold'].map(k=>[k,copy.config[k]??M.dungeonRewardDefaults[k]]))};
   let record=null;
   if(complete){
    const pref={version:2,timeAllocation,financialAllocation},n=fact.roleIds.length;
@@ -254,7 +256,7 @@
    if(pref.timeAllocation==='attendance'||pref.financialAllocation==='attendance'){record.accountMinutes={};record.roleOnlineMinutes={};if(pref.financialAllocation==='attendance'){record.roleAllocations={};record.allocationMethod='attendance';}for(const id of fact.roleIds){const account=fact.roleAccounts[id],online=record.onlineMinutes/n;record.roleOnlineMinutes[id]=online;record.accountMinutes[account]=(record.accountMinutes[account]||0)+online;if(record.roleAllocations)record.roleAllocations[id]={gold:record.gold/n,minutes:record.minutes/n,onlineMinutes:online,otherCost:record.otherCost/n};}}
    record.allocationMethod=financialAllocation==='none'?'manual-none':financialAllocation==='attendance'?'manual':'task';
    if(financialAllocation==='task'){record.allocationBatches=[...fact.planBatchIndices].map(i=>[...p.batches[i]]);record.allocationTask=structuredClone(executionTask);record.onlineAllocationMethod=timeAllocation==='task'?'batch-duration':'manual';Object.assign(record,M.allocatedRecord(copy,record));}
-   const pricingState={...copy,config:fact.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
+   const pricingState={...copy,config:record.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
   }
   p.executionDrafts=(p.executionDrafts||[]).filter(d=>d.taskId!==taskId||d.index!==index);
@@ -331,6 +333,7 @@
   const copy=JSON.parse(JSON.stringify(s)),{record:r,fact,p}=executionGroup(copy,planId,taskId,index);
   if(!r){if(!fact)throw new Error('旧完成标记没有实测明细，请撤销完成后重新登记');if(['gold','minutes','onlineMinutes'].some(k=>input[k]!==''&&input[k]!=null))return registerBatch(s,planId,taskId,index,input);fact.note=input.note??fact.note;fact.updatedAt=new Date().toISOString();}
   else{
+   Object.assign(r,M.allocatedRecord(copy,r));
    M.freezeRecord(copy,r);
    const previous=JSON.parse(JSON.stringify(r));
    if(['startTime','endTime','startedAt','endedAt','endDate'].some(k=>input[k]!==undefined)){
@@ -355,7 +358,7 @@
     if(task.partyRule==='raid10'){
      const oldCount=oldTask.completedBossCount??oldTask.bossCount??1;r.completedBossCount=task.completedBossCount;r.allocationTask=task;
      if(r.allocationBasis&&task.dungeonRewardMode==='auto')for(const a of Object.values(r.allocationBasis)){a.sharedGold=oldCount?a.sharedGold*task.completedBossCount/oldCount:M.dungeonRewards(task,r.roleIds.map(id=>copy.roles.find(x=>x.id===id)),r.snapshot).shared/r.roleIds.length;a.directGold=M.dungeonRewards(task,[],r.snapshot).direct;a.gold=a.directGold+a.sharedGold;}
-     if(fact){fact.completedBossCount=r.completedBossCount;fact.allocationTask=structuredClone(task);}
+     delete r.merchantUnits;if(fact){delete fact.merchantUnits;fact.completedBossCount=r.completedBossCount;fact.allocationTask=structuredClone(task);}
     }
    }
    if(r.timerPauses?.length&&fact?.billingAccounts){
