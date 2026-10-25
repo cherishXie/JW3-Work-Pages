@@ -156,11 +156,38 @@
     if(t.tankMode==='companion'&&companions.filter(c=>c.duty==='tank').length<(t.tank||0))throw new Error('该队要求使用侠客 T');
     return true;
   }
-  // Apply the new daily allocation limit when grouping or editing, without
-  // invalidating the execution of historical parties.
-  function validateDailyGongzhan(task,players){
-    if(task.partyRule==='daily5'&&players.filter(r=>r?.gongzhanBuff===true).length>1)throw new Error('大战每队最多安排一名共战江湖角色，请分散到其他队伍');
+  function gongzhanAllocationPolicy(batches,pool=batches.flat()){
+    const teams=batches.filter(b=>b.length).length,count=pool.filter(r=>raidGongzhanStatus([r]).covered).length;
+    return {teams,count,sufficient:teams>0&&count>=teams,maxPerTeam:teams>0&&count<teams?1:Infinity};
+  }
+  // Called for new allocations and roster edits, never retroactively on history.
+  function validateDailyGongzhan(task,players,batches=[players]){
+    const max=task.gongzhanMaxPerTeam??gongzhanAllocationPolicy(batches).maxPerTeam;
+    if(raidGongzhanStatus(players).count>max)throw new Error('共战不足以覆盖所有队伍时，每队最多安排一名共战江湖角色，请分散到其他队伍');
     return true;
+  }
+  function validateGongzhanBatches(task,batches){
+    const policy=gongzhanAllocationPolicy(batches);for(const players of batches)validateDailyGongzhan({...task,gongzhanMaxPerTeam:policy.maxPerTeam},players,batches);
+    if(policy.sufficient&&batches.some(b=>b.length&&!raidGongzhanStatus(b).covered))throw new Error('共战角色足够，请先为每个队伍至少安排一名共战江湖角色');
+    return true;
+  }
+  function spreadGongzhanParties(input,rebuild,locked=[],allowResize=false){
+    let parties=input.map(p=>({...p,players:[...p.players]}));
+    for(let pass=0;pass<parties.length;pass++){
+      let changed=false;
+      for(let i=0;i<parties.length&&!changed;i++)if(raidGongzhanStatus(parties[i].players).count>1)for(let j=0;j<parties.length&&!changed;j++)if(!raidGongzhanStatus(parties[j].players).covered){
+        for(let a=0;a<parties[i].players.length&&!changed;a++)if(raidGongzhanStatus([parties[i].players[a]]).covered)for(let b=0;b<parties[j].players.length&&!changed;b++){
+          const next=parties.map(p=>({...p,players:[...p.players]}));[next[i].players[a],next[j].players[b]]=[next[j].players[b],next[i].players[a]];
+          if(!locked.every(id=>next[0].players.some(r=>r.id===id)))continue;
+          if([i,j].some(k=>new Set(next[k].players.map(r=>r.accountId)).size!==next[k].players.length))continue;
+          const left=rebuild(next[i]),right=rebuild(next[j]);if(!left||!right)continue;next[i]=left;next[j]=right;parties=next;changed=true;
+        }
+      }
+      if(!changed&&allowResize)for(let i=0;i<parties.length&&!changed;i++)if(raidGongzhanStatus(parties[i].players).count>1)for(let j=0;j<parties.length&&!changed;j++)if(!raidGongzhanStatus(parties[j].players).covered)for(const role of parties[i].players)if(raidGongzhanStatus([role]).covered&&!parties[j].players.some(r=>r.accountId===role.accountId)){
+        const next=parties.map(p=>({...p,players:[...p.players]}));next[i].players=next[i].players.filter(r=>r.id!==role.id);next[j].players.push(role);if(!locked.every(id=>next[0].players.some(r=>r.id===id)))continue;const left=rebuild(next[i]),right=rebuild(next[j]);if(left&&right){next[i]=left;next[j]=right;parties=next;changed=true;break;}
+      }
+      if(!changed)break;
+    }return parties;
   }
   function batchTransition(previous,players){
     const before=new Map(previous.map(r=>[r.accountId,r])),after=new Map(players.map(r=>[r.accountId,r]));
@@ -184,7 +211,7 @@
     for(let pass=0;pass<8&&attempts<6000&&current>lower;pass++){
       let best=null,bestScore=current;
       const consider=(candidate,changed)=>{
-        if(++attempts>6000)return;const cost=score(candidate);if(cost>=bestScore)return;
+        if(++attempts>6000)return;const cost=score(candidate);if(cost>=bestScore||candidate.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)return;
         if(!locked.every(id=>candidate[0].players.some(r=>r.id===id)))return;
         for(const i of changed){const players=candidate[i].players;if(new Set(players.map(r=>r.accountId)).size!==players.length)return;const valid=rebuild(candidate[i]);if(!valid)return;candidate[i]=valid;}
         best=candidate;bestScore=cost;
@@ -226,7 +253,7 @@
           if(new Set(left.map(r=>r.accountId)).size!==left.length||new Set(right.map(r=>r.accountId)).size!==right.length)continue;
           next[i]={...parties[i],players:left};next[j]={...parties[j],players:right};
           if(!locked.every(id=>next[0].players.some(r=>r.id===id)))continue;
-          const candidate=score(next);if(!better(candidate,bestScore))continue;const switching=batchSwitchCost(next.map(p=>p.players));if(switching.logins>budget.logins||switching.logins===budget.logins&&switching.switches>budget.switches)continue;
+          const candidate=score(next);if(!better(candidate,bestScore)||next.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)continue;const switching=batchSwitchCost(next.map(p=>p.players));if(switching.logins>budget.logins||switching.logins===budget.logins&&switching.switches>budget.switches)continue;
           const first=rebuild(next[i]),second=rebuild(next[j]);if(!first||!second)continue;next[i]=first;next[j]=second;best=next;bestScore=candidate;
         }
       }
@@ -262,7 +289,7 @@
       return [-covered(ps),-total,mode==='balanced'?variance:-variance,switching.logins,switching.switches];
     };
     const better=(a,b)=>{for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-7)return a[i]<b[i];}return false;};
-    const rebuild=p=>{try{const t=partyTask(task,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),companions=companionAssignments(t,p.players,10);if(!companions)return null;validateParty(t,p.players,companions,capacity);for(const other of task.routePartyTasks||[])validateParty(partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,companions,capacity);return {...p,companions,totalSlots:p.players.length+companions.length};}catch{return null;}};
+    const rebuild=p=>{try{validateDailyGongzhan(task,p.players);const t=partyTask(task,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),companions=companionAssignments(t,p.players,10);if(!companions)return null;validateParty(t,p.players,companions,capacity);for(const other of task.routePartyTasks||[])validateParty(partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,companions,capacity);return {...p,companions,totalSlots:p.players.length+companions.length};}catch{return null;}};
     let parties=input,current=objective(input),attempts=0;
     for(let pass=0;pass<12&&attempts<16000;pass++){
       let best=null,bestScore=current;
@@ -282,13 +309,15 @@
   function planningTask(task){return task.partyRule==='raid10'?{...task,fillCompanionSlots:true}:task;}
   function savedPartyTask(task,plan){const snapshot=plan.taskSnapshots?.[task.id];if(snapshot)task={...task,...Object.fromEntries(['raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'].filter(k=>snapshot[k]!==undefined).map(k=>[k,snapshot[k]]))};return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
   function optimizeTaskBatches(task,batches,capacity,parties=[],locked=[]){
-    const cache=new Map(),hasParty=['daily5','raid10'].includes(task.partyRule);
-    const rebuild=p=>{
+    const policy=gongzhanAllocationPolicy(batches),cache=new Map(),hasParty=['daily5','raid10'].includes(task.partyRule);
+    const rebuild=(p,relaxGongzhan=false)=>{
+      if(!p.players.length||p.players.length>Math.min(capacity,task.maxParallel??Infinity))return null;
+      if(!relaxGongzhan&&raidGongzhanStatus(p.players).count>(task.gongzhanMaxPerTeam??policy.maxPerTeam))return null;
       if(task.requireGongzhanPerTeam&&!raidGongzhanStatus(p.players).covered)return null;
-      const key=JSON.stringify([p.teamConfig||null,p.players.map(r=>r.id).sort()]);if(cache.has(key))return cache.get(key)?{...p,...cache.get(key)}:null;
+      const key=JSON.stringify([relaxGongzhan,p.teamConfig||null,p.players.map(r=>r.id).sort()]);if(cache.has(key))return cache.get(key)?{...p,...cache.get(key)}:null;
       let result=null;
       try{
-        if(hasParty){const q=partyTask(task,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig);validateDailyGongzhan(q,p.players);const companions=companionAssignments(q,p.players,q.partyRule==='daily5'?5:10);if(companions===null)throw new Error('无可用侠客');validateParty(q,p.players,companions,capacity);for(const other of task.routePartyTasks||[])validateParty(partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,companions,capacity);result={companions,totalSlots:p.players.length+companions.length};}
+        if(hasParty){const q=partyTask(task,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig);validateDailyGongzhan(relaxGongzhan?{...q,gongzhanMaxPerTeam:Infinity}:q,p.players);const companions=companionAssignments(q,p.players,q.partyRule==='daily5'?5:10);if(companions===null)throw new Error('无可用侠客');validateParty(q,p.players,companions,capacity);for(const other of task.routePartyTasks||[])validateParty(partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,companions,capacity);result={companions,totalSlots:p.players.length+companions.length};}
         else if(task.type==='team'){
           if(new Set(p.players.map(r=>r.server)).size!==1||p.players.some(r=>!r.server))throw new Error('区服不兼容');
           for(const d of ['tank','heal'])if(p.players.filter(r=>Catalog.profile(r).duty===d).length<(task[d]||0))throw new Error('职责不足');result={};
@@ -296,7 +325,8 @@
       }catch{}cache.set(key,result);return result?{...p,...result}:null;
     };
     const source=batches.map((players,i)=>{const p={...parties[i],players};if(!hasParty||parties[i])return p;const valid=rebuild(p);if(!valid)throw new Error('原批次不满足队伍条件');return valid;});
-    let optimized=optimizeBatchSwitching(source,{rebuild,reorder:!task.raidTeams?.length,locked});
+    const spread=spreadGongzhanParties(source,p=>rebuild(p,true),locked,!hasParty&&task.type!=='team');
+    let optimized=optimizeBatchSwitching(spread,{rebuild,reorder:!task.raidTeams?.length,locked});
     if(task.partyRule==='daily5')optimized=balanceDailyParties(optimized,rebuild,locked);
     return {batches:optimized.map(p=>p.players),parties:hasParty?optimized.map((p,i)=>({...p,teamIndex:task.raidTeams?.length?p.teamIndex:i})):[]};
   }
@@ -304,7 +334,6 @@
     const t=withPartyRule(task),total=t.partyRule==='daily5'?5:10,cap=Math.min(capacity,t.maxParallel),reasons=[],seen=new Set();
     const available=roles.filter(r=>{const okay=!seen.has(r.id)&&r.accountId&&r.server&&r.creationStatus!=='planned'&&(!t.levelCap||r.level===t.levelCap)&&r.enabled!==false&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0);seen.add(r.id);if(!okay)reasons.push(r.name+'：账号 / 区服 / 等级 / 装备信息不足或资格不满足');return okay;});
     if(locked.some(id=>!available.some(r=>r.id===id)))return {teams:[],parties:[],unassigned:roles,reasons:['锁定成员不在可用候选范围']};
-    if(t.partyRule==='daily5'&&available.filter(r=>locked.includes(r.id)&&r.gongzhanBuff===true).length>1)return {teams:[],parties:[],unassigned:roles,reasons:['首队固定了多名共战角色：大战每队最多安排一名共战江湖角色，请调整固定成员']};
     if(t.raidMode!==undefined&&t.raidMode!=='legacy'&&!raidModes.includes(t.raidMode))throw new Error('副本组队模式无效');
     const modeBasis=raidPowerBasis(available),ranked=[...available].sort((a,b)=>roleOutputPower(b,modeBasis)-roleOutputPower(a,modeBasis)||(b.score||0)-(a.score||0)),priority=new Map(ranked.map((r,i)=>[r.id,i]));
     if(t.raidMode==='mentor'){const weak=available.filter(r=>r.score>0).sort((a,b)=>a.score-b.score),mixed=[];for(let i=0;i<Math.max(ranked.length,weak.length);i++)for(const r of [ranked[i],weak[i]])if(r&&!mixed.includes(r))mixed.push(r);mixed.forEach((r,i)=>priority.set(r.id,i));}
@@ -312,7 +341,7 @@
     const configs=coverAll?[]:t.raidTeams?.length?t.raidTeams:Array.from({length:t.runs},(_,i)=>({name:'团队 '+(i+1),playerSeats:t.raidPlayerSeats,tankMode:t.tankMode||'auto'}));
     if(!coverAll&&!t.raidTeams?.length&&t.raidPlayerSeats==='auto'&&cap<7)return {teams:[],parties:[],unassigned:roles,reasons:['自动模式至少需要 7 个并行账号；当前上限 '+cap+'，请调整全局并行数或逐队人数。']};
     // Search the whole allocation, so a feasible first party cannot strand later parties.
-    const gongzhanMode=!coverAll&&raidModes.includes(t.raidMode);let requireGongzhan=gongzhanMode&&available.filter(r=>raidGongzhanStatus([r]).covered).length>=configs.length,gongzhanSearchLimited=false;
+    const gongzhanMode=true,buffTotal=raidGongzhanStatus(available).count;let requireGongzhan=!coverAll&&buffTotal>=configs.length,maxGongzhan=!coverAll&&buffTotal<configs.length?1:Infinity,gongzhanSearchLimited=false;
     const profiles=new Map(available.map(r=>[r.id,Catalog.profile(r)])),owned=new Map(available.map(r=>[r.id,Catalog.owned(r)])),cache=new Map(),failed=new Set();
     let visits=0,limited=false,best=[],solution=null;
     const tick=()=>{if(++visits>300000){limited=true;return false;}return true;};
@@ -343,7 +372,7 @@
         for(const supportBudget of budgets){
         function* build(from,players,accounts,server){
           if(!tick())return;
-          if(q.partyRule==='daily5'&&players.filter(r=>r.gongzhanBuff===true).length>1)return;
+          if(raidGongzhanStatus(players).count>maxGongzhan)return;
           if(requireGongzhan){const count=raidGongzhanStatus(players).count;if(count>poolBuffs-reserveBuffs||!count&&!ordered.slice(from).some(r=>raidGongzhanStatus([r]).covered))return;}
           const support=players.filter(r=>['tank','heal'].includes(profiles.get(r.id).duty)).length;
           if(support>supportBudget||support+size-players.length<supportBudget)return;
@@ -367,7 +396,6 @@
       if(requireGongzhan&&pool.filter(r=>raidGongzhanStatus([r]).covered).length<left)return false;
       if(coverAll){
         if(pool.length>left*cap)return false;
-        if(t.partyRule==='daily5'&&pool.filter(r=>r.gongzhanBuff===true).length>left)return false;
         const accounts={},servers={};for(const r of pool){accounts[r.accountId]=(accounts[r.accountId]||0)+1;servers[r.server]=(servers[r.server]||0)+1;}
         if(Math.max(...Object.values(accounts))>left||Object.values(servers).reduce((n,count)=>n+Math.ceil(count/cap),0)>left)return false;
         for(const duty of ['tank','heal','dps']){
@@ -395,7 +423,7 @@
       }
       failed.add(key);return false;
     }
-    if(coverAll&&cap>0){const freq={};for(const r of available)freq[r.accountId]=(freq[r.accountId]||0)+1;const lower=Math.max(Math.ceil(available.length/cap),t.partyRule==='daily5'?available.filter(r=>r.gongzhanBuff===true).length:0,0,...Object.values(freq));for(let groups=lower;groups<=available.length&&!limited;groups++){failed.clear();if(search(available,[],groups,0))break;}}
+    if(coverAll&&cap>0){const freq={};for(const r of available)freq[r.accountId]=(freq[r.accountId]||0)+1;const lower=Math.max(Math.ceil(available.length/cap),0,0,...Object.values(freq));for(let groups=lower;groups<=available.length&&!limited;groups++){requireGongzhan=buffTotal>=groups;maxGongzhan=buffTotal<groups?1:Infinity;failed.clear();if(search(available,[],groups,0))break;if(requireGongzhan&&!limited){requireGongzhan=false;failed.clear();best=[];if(search(available,[],groups,0))break;}}}
     else if(!coverAll){search(available,[],configs.length,0);if(requireGongzhan&&!solution){gongzhanSearchLimited=limited;requireGongzhan=false;visits=0;limited=false;failed.clear();best=[];search(available,[],configs.length,0);}}
     let parties=solution||best;
     // Keep useful partial output when full coverage is impossible or the search is bounded.
@@ -409,12 +437,12 @@
       if(!locked.length)parties.sort((a,b)=>b.players.length-a.players.length);
       parties.forEach((p,i)=>p.teamIndex=i);
     }
-    parties=optimizeTaskBatches({...t,requireGongzhanPerTeam:gongzhanMode&&parties.length>0&&parties.every(p=>raidGongzhanStatus(p.players).covered)},parties.map(p=>p.players),capacity,parties,locked).parties;
-    if(!coverAll)parties=optimizeRaidMode(t,parties,available,capacity,locked);
+    parties=optimizeTaskBatches({...t,gongzhanMaxPerTeam:maxGongzhan,requireGongzhanPerTeam:gongzhanMode&&parties.length>0&&parties.every(p=>raidGongzhanStatus(p.players).covered)},parties.map(p=>p.players),capacity,parties,locked).parties;
+    if(!coverAll)parties=optimizeRaidMode({...t,gongzhanMaxPerTeam:maxGongzhan},parties,available,capacity,locked);
     for(const p of parties)validateParty(partyTask(t,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,p.companions,capacity);
     if(gongzhanMode){reasons.push(...raidGongzhanWarnings(parties.map(p=>p.players)));if(gongzhanSearchLimited&&parties.some(p=>!raidGongzhanStatus(p.players).covered))reasons.push('共战分配搜索达到上限，请复核缺少共战的队伍。');}
     const used=new Set(parties.flatMap(p=>p.players.map(r=>r.id))),unassigned=roles.filter(r=>!used.has(r.id));
-    if(t.partyRule==='daily5'&&unassigned.some(r=>r.gongzhanBuff===true))reasons.push('部分共战角色未安排：大战每队最多一名共战江湖角色；仍保留五人优先、3–4 人侠客补位及 1–2 人世界组队规则，请调整成员或侠客后重算。');
+    if(unassigned.some(r=>r.gongzhanBuff===true))reasons.push('部分共战角色未安排，请检查职责、账号与区服限制；共战充足时允许同队多人，不为多余共战增加队伍。');
     if(unassigned.length)reasons.push('未安排 '+unassigned.length+' 个角色：'+unassigned.map(r=>r.name).join('、')+'。请复核账号互斥、区服、职责、侠客归属与并行上限。');
     if(!solution&&coverAll)reasons.push('未找到覆盖全部角色的方案；可调整成员职责或侠客资料后重算。');
     if(searchLimited||limited)reasons.push('搜索达到上限，当前建议未保证完整或最优；请调整逐队配置或缩小角色范围后重算。');
@@ -430,7 +458,7 @@
     while([...groups.values()].some(v=>v.length)){
       const batch=[...groups.entries()].filter(([,v])=>v.length).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).slice(0,capacity).map(([,v])=>v.shift());batches.push(batch);
     }
-    return optimizeBatchSwitching(batches.map(players=>({players}))).map(p=>p.players);
+    return optimizeTaskBatches({partyRule:'none',type:'role'},batches,capacity).batches;
   }
   function costs(gold,minutes,onlineMinutes,config,other=0,accountMinutes={}) {
     const rate=config.cardPrice*config.discount/config.cardMinutes,entries=Object.entries(accountMinutes),allocated=entries.reduce((n,[,m])=>n+m,0);
@@ -514,20 +542,24 @@
     const reject=roles.filter(r=>!filtered.includes(r)).map(r=>r.name+'：等级或装备门槛未满足');
     if(locked.some(r=>!filtered.some(x=>x.id===r)))return {teams:[],reasons:['锁定成员不在可用候选范围']};
     const candidates=filtered.sort((a,b)=>Number(locked.includes(b.id))-Number(locked.includes(a.id))|| (Catalog.profile(a).duty==='dps')-(Catalog.profile(b).duty==='dps'));
-    const teams=[];let available=[...candidates];
+    const teams=[];let available=[...candidates];const buffTotal=raidGongzhanStatus(candidates).count,maxBuffs=buffTotal<t.runs?1:Infinity;let requireBuff=buffTotal>=t.runs;
     for(let run=0;run<t.runs;run++){
-      let solution=null;let visits=0;
+      let solution=null;let visits=0,reserveSupport=true;const feasibleTeams=Math.min(t.runs-run,Math.floor(available.length/t.teamSize),...['tank','heal'].filter(d=>t[d]>0).map(d=>Math.floor(available.filter(r=>Catalog.profile(r).duty===d).length/t[d])));
       function search(index,team,accounts,server){
-        if(++visits>100000)return;
-        if(team.length===t.teamSize){if(team.filter(r=>Catalog.profile(r).duty==='tank').length>=t.tank&&team.filter(r=>Catalog.profile(r).duty==='heal').length>=t.heal&&(!teams.length?locked.every(id=>team.some(r=>r.id===id)):true))solution=team;return;}
+        if(++visits>100000||raidGongzhanStatus(team).count>maxBuffs)return;
+        if(reserveSupport&&['tank','heal'].some(d=>t[d]>0&&team.filter(r=>Catalog.profile(r).duty===d).length>available.filter(r=>Catalog.profile(r).duty===d).length-Math.max(0,feasibleTeams-1)*t[d]))return;
+        if(requireBuff&&raidGongzhanStatus(team).count>raidGongzhanStatus(available).count-(t.runs-run-1))return;
+        if(team.length===t.teamSize){if((!requireBuff||raidGongzhanStatus(team).covered)&&team.filter(r=>Catalog.profile(r).duty==='tank').length>=t.tank&&team.filter(r=>Catalog.profile(r).duty==='heal').length>=t.heal&&(!teams.length?locked.every(id=>team.some(r=>r.id===id)):true))solution=team;return;}
         if(solution||available.length-index<t.teamSize-team.length)return;
         for(let i=index;i<available.length&&!solution;i++){const r=available[i];if(accounts.has(r.accountId)||!r.server||server&&r.server!==server)continue;search(i+1,[...team,r],new Set([...accounts,r.accountId]),server||r.server);}
       }
       search(0,[],new Set(),null);
+      if(!solution&&requireBuff){requireBuff=false;visits=0;search(0,[],new Set(),null);}
+      if(!solution&&reserveSupport){reserveSupport=false;visits=0;search(0,[],new Set(),null);}
       if(!solution)break;teams.push(solution);available=available.filter(r=>!solution.some(x=>x.id===r.id));
     }
     const reasons=[...reject];if(teams.length<t.runs)reasons.push('目标 '+t.runs+' 队，仅找到 '+teams.length+' 队。请检查独立账号、自有席位、区服、CD、坦克 '+t.tank+' / 治疗 '+t.heal+' 及装备门槛。');
-    return {teams:optimizeTaskBatches(t,teams,capacity,[],locked).batches,reasons};
+    return {teams:optimizeTaskBatches(t,teams,capacity,[],locked).batches,reasons,unassigned:roles.filter(r=>!teams.some(b=>b.some(x=>x.id===r.id)))};
   }
   function calculateTeam(t,teams,c) {
     const active=t.enabled===false?[]:teams,k=active.length,players=active.flat(),duration=t.minutes/t.efficiency;
@@ -1002,5 +1034,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

@@ -3,6 +3,9 @@
  'use strict';
  function doneIndices(s,p,taskId){return M.recordedBatchIndices(s,p,taskId);}
  function remaining(s,p,taskId=p.taskId){return M.pendingBatchIndices(s,p,taskId);}
+ function validatePendingGongzhan(s,p){
+  for(const id of p.routeTaskIds||[p.taskId]){const task=s.tasks.find(t=>t.id===id),batches=remaining(s,p,id).map(i=>p.batches[i].map(id=>s.roles.find(r=>r.id===id)).filter(Boolean));M.validateGongzhanBatches(task,batches);}
+ }
  function reconcile(s,p){p.executedTaskIds=(p.routeTaskIds||[p.taskId]).filter(id=>doneIndices(s,p,id).length===p.batches.length);p.executed=p.executedTaskIds.length===(p.routeTaskIds||[p.taskId]).length;p.ended=(p.routeTaskIds||[p.taskId]).every(id=>!remaining(s,p,id).length);}
  // Original completion facts keep backfills and note edits from changing order.
  function completedTime(s,p,taskId=null,index=null){
@@ -142,7 +145,7 @@
    }
    for(const taskId of next.routeTaskIds||[next.taskId])checkBatch(s,next,taskId,i,M.planStart(s,next,taskId));
   }
-  M.validatePlanCapacity(s,next);next.updatedAt=new Date().toISOString();return next;
+  validatePendingGongzhan(s,next);M.validatePlanCapacity(s,next);next.updatedAt=new Date().toISOString();return next;
  }
  function removeBatchRole(s,p,index,roleId){
   assertBatchEditable(s,p,index);
@@ -160,7 +163,7 @@
    if(!companions)throw new Error('移除后职责或已有侠客不足，请先调整队伍');next.companionAssignments[index]=companions;
   }
   for(const taskId of next.routeTaskIds||[next.taskId])checkBatch(s,next,taskId,index,M.planStart(s,next,taskId));
-  M.validatePlanCapacity(s,next);
+  validatePendingGongzhan(s,next);M.validatePlanCapacity(s,next);
   if(next.executionDrafts)next.executionDrafts=next.executionDrafts.filter(d=>d.index!==index);
   next.updatedAt=new Date().toISOString();return next;
  }
@@ -190,7 +193,7 @@
     if(!r.server)return name+'区服待补';
     if(members.some(x=>x.server!==r.server))return name+'与本队区服不一致';
    }
-   try{M.validateDailyGongzhan(t,[...members,r]);}catch(e){return name+e.message;}
+   try{M.validateDailyGongzhan(t,[...members,r],batches.map((b,i)=>i===index?[...members,r]:b.map(id=>s.roles.find(x=>x.id===id)).filter(Boolean)));}catch(e){return name+e.message;}
   }
   return '';
  }
@@ -215,7 +218,7 @@
    for(const id of next.routeTaskIds||[next.taskId])checkBatch(s,next,id,i,M.planStart(s,next,id));
   }
   for(const id of next.routeTaskIds||[next.taskId])if(next.taskSnapshots?.[id])next.taskSnapshots[id].roleIds=[...new Set([...(next.taskSnapshots[id].roleIds||[]),...next.batches.flat()])];
-  M.validatePlanCapacity(s,next);if(next.executionDrafts)next.executionDrafts=next.executionDrafts.filter(d=>!affected.includes(d.index));next.updatedAt=new Date().toISOString();return next;
+  validatePendingGongzhan(s,next);M.validatePlanCapacity(s,next);if(next.executionDrafts)next.executionDrafts=next.executionDrafts.filter(d=>!affected.includes(d.index));next.updatedAt=new Date().toISOString();return next;
  }
  function registerBatch(s,planId,taskId,index,input={}){
   const copy=JSON.parse(JSON.stringify(s)),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
@@ -270,7 +273,7 @@
    const combined={...first,tank:Math.max(...tasks.map(t=>t.tank||0)),heal:Math.max(...tasks.map(t=>t.heal||0)),allowCompanions:tasks.every(t=>t.allowCompanions!==false),companionLimit:Math.min(...tasks.map(t=>t.companionLimit??3))};
    const companions=M.companionAssignments(M.partyTask(combined,p.teamConfigs[i]),members,10);if(!companions)throw new Error('第 '+(i+1)+' 队已有侠客或职责不足，无法补满 10 席');p.companionAssignments.push(companions);
   }
-  M.validatePlanCapacity(s,p,excludePlanId);for(const task of tasks)for(const i of p.batches.keys())checkBatch(s,p,task.id,i,M.planStart(s,p,task.id));
+  validatePendingGongzhan(s,p);M.validatePlanCapacity(s,p,excludePlanId);for(const task of tasks)for(const i of p.batches.keys())checkBatch(s,p,task.id,i,M.planStart(s,p,task.id));
   return p;
  }
  function reusePlan(s,source,date,{fullRaid=false}={}){
@@ -280,6 +283,7 @@
    const trial={...next,batches:[...next.batches,[...batch]],companionAssignments:[...next.companionAssignments,source.companionAssignments?.[i]||[]],teamConfigs:next.teamConfigs?[...next.teamConfigs,source.teamConfigs[i]]:undefined};
    try{if(primary)M.validateDailyGongzhan(primary,batch.map(id=>s.roles.find(r=>r.id===id)));if(fullRaid&&primary?.partyRule==='raid10'){const members=batch.map(id=>s.roles.find(r=>r.id===id)),task=M.partyTask(M.planningTask(M.taskForVersion(s,primary)),source.teamConfigs?.[i]),companions=M.companionAssignments(task,members,10);if(!companions)throw new Error('已拥有侠客不足，无法补满 10 席');trial.companionAssignments[trial.batches.length-1]=companions;}M.validatePlanCapacity(s,trial);for(const taskId of ids)checkBatch(s,trial,taskId,trial.batches.length-1,M.planStart(s,trial,taskId));Object.assign(next,trial);}catch(e){reasons.push('第 '+(i+1)+' 批：'+e.message);}
   }
+  try{validatePendingGongzhan(s,next);}catch(e){reasons.push(e.message);next.batches=[];next.companionAssignments=[];if(next.teamConfigs)next.teamConfigs=[];}
   return {plan:next,reasons};
  }
  function changeRemaining(s,p,taskId,indices,{action='move',date=p.date,startTime='',fromRoleId='',toRoleId='',reason=''}={}){
@@ -294,7 +298,7 @@
    if(fromRoleId&&!indices.some(i=>p.batches[i].includes(fromRoleId)))throw new Error('原角色不在所选批次中');
    next={...JSON.parse(JSON.stringify(p)),id:M.id('plan'),taskId,taskName:task.name,routeTaskIds:undefined,executedTaskIds:[],completionFacts:undefined,favorite:undefined,closedBatches:undefined,lockedBatches:[],changes:undefined,date,startedAt:startTime?date+'T'+startTime+':00+08:00':null,batches:indices.map(i=>p.batches[i].map(id=>id===fromRoleId?toRoleId:id)),teamConfigs:p.teamConfigs?indices.map(i=>p.teamConfigs[i]):undefined,executed:false,ended:false,cancelled:false,parentPlanId:p.id,createdAt:new Date().toISOString()};
    next.companionAssignments=next.batches.map((batch,i)=>{const members=batch.map(id=>copy.roles.find(r=>r.id===id)),t=M.partyTask(M.savedPartyTask(M.taskForVersion(copy,task),p),next.teamConfigs?.[i]);if(new Set(batch).size!==batch.length||new Set(members.map(r=>r?.accountId)).size!==members.length||members.length>Math.min(t.maxParallel,copy.config.concurrency))throw new Error('替换后角色重复、同账号冲突或超过并行上限');if(fromRoleId)M.validateDailyGongzhan(t,members);if(['daily5','raid10'].includes(t.partyRule)){const companions=M.companionAssignments(t,members,t.partyRule==='daily5'?5:10);if(!companions)throw new Error('换人后职责或侠客不足');M.validateParty(t,members,companions,copy.config.concurrency);return companions;}if(t.type==='team'&&!M.teamCandidates({...t,runs:1},members,[],copy.config.concurrency).teams.length)throw new Error('队伍条件不满足');return [];});
-   M.validatePlanCapacity(copy,next);copy.plans.push(next);
+   validatePendingGongzhan(copy,next);M.validatePlanCapacity(copy,next);copy.plans.push(next);
   }
   original.updatedAt=new Date().toISOString();if(next)next.updatedAt=original.updatedAt;original.changes??=[];original.changes.push({taskId,indices:[...indices],action,date:action==='move'?date:null,reason:reason.trim(),nextPlanId:next?.id||null,at:new Date().toISOString()});reconcile(copy,original);M.validateState(copy);
   Object.assign(p,original);if(next)s.plans.push(next);return next;
@@ -422,5 +426,5 @@
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
  }
- return {transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {validatePendingGongzhan,transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });
