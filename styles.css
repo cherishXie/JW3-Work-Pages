@@ -992,3 +992,103 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .raid-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
 .plan-team-section{margin-top:20px}
 @media(max-width:600px){.route-order li{gap:8px;flex-wrap:wrap}.route-order li>.flex{margin-left:auto}}
+
+/* Task choices use cards; dense layouts grow with content, not empty containers. */
+.task-card-picker{min-width:0;width:100%;display:grid;gap:6px}
+.task-card-picker>input[type=search]{width:100%;min-width:0;min-height:32px}
+.task-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr));gap:6px}
+.task-choice-card{display:flex;align-items:center;justify-content:space-between;gap:6px;text-align:left;white-space:normal;overflow-wrap:anywhere;min-width:0;min-height:34px;padding:6px 9px;border:.5px solid var(--wb-border);border-radius:6px;background:var(--wb-surface);color:var(--wb-text-secondary);font-size:12px;line-height:1.4}
+.task-choice-card.is-selected{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label);font-weight:600}
+.task-choice-card:focus-visible,.raid-choice-card:focus-within{outline:.5px solid var(--wb-primary);outline-offset:2px}
+.task-choice-pages{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:var(--wb-text-muted)}
+.task-choice-pages:empty{display:none}.task-choice-pages button{min-height:28px;padding:3px 9px}.task-choice-pages .flex{gap:6px}
+.task-number-choice{display:flex;gap:6px;align-items:center}.task-number-choice input{width:82px;min-width:0;min-height:32px}.task-number-choice button{min-height:32px;font-size:12px}.task-number-choice button[aria-pressed=true]{background:var(--wb-primary-soft);color:var(--wb-primary-label);border-color:var(--wb-primary)}
+.task-center .plan-type-field{display:grid;grid-template-columns:auto minmax(250px,380px);gap:8px;flex:none;width:auto;align-items:center}
+.task-center .plan-type-field .task-choice-grid{grid-template-columns:1fr 1fr}
+.task-center .tc-command-filters{gap:12px;padding-top:8px;padding-bottom:8px}
+.tc-planning .plan-context{justify-content:flex-end;margin-bottom:6px}
+.tc-planning .plan-config{padding:12px!important;margin-bottom:12px}
+.tc-planning .plan-config:has(.plan-team-section){display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px;align-items:start}
+.plan-scope-section{min-width:0}.tc-planning .plan-step-title{margin-bottom:8px;gap:7px}
+.tc-planning .plan-team-section{margin:0;padding:0;border:0;min-width:0}
+.tc-planning .plan-locks{grid-column:1/-1;margin-top:0}
+.tc-planning .raid-route-picker{padding:0;border:0;background:none;margin-top:0}
+.tc-planning .raid-route-picker>p:first-child{display:none}
+.tc-planning .plan-route-toolbar{align-items:start;gap:8px;margin-top:0}
+.tc-planning .plan-route-toolbar>.plan-selection-tools{flex:none}
+.tc-planning .plan-route-toolbar>label{gap:4px}
+.tc-planning .plan-route-toolbar .task-choice-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tc-planning .plan-route-toolbar .task-choice-card{padding:5px 6px;min-height:30px}
+.raid-choice-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:6px;max-height:224px;overflow:auto;overscroll-behavior:contain;padding:2px}
+.raid-choice-card{display:flex;align-items:start;gap:7px;padding:8px;border:.5px solid var(--wb-border);border-radius:6px;background:var(--wb-surface);cursor:pointer;min-width:0}
+.raid-choice-card:has(input:checked){background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
+.raid-choice-card input{flex:none;margin-top:3px}.raid-choice-card>span{min-width:0;overflow-wrap:anywhere;font-weight:600;font-size:14px}.raid-choice-card small{display:block;color:var(--wb-text-secondary);font-size:12px;font-weight:400;margin-top:3px}
+.tc-planning .route-selection{margin-top:8px}.tc-planning .route-order{max-height:160px;overflow:auto;overscroll-behavior:contain;gap:5px;margin-top:6px}
+.tc-planning .route-order li{padding:5px 7px;gap:7px;font-size:12px}.tc-planning .route-order button{min-height:28px;padding:3px 7px;font-size:12px}
+.tc-planning .raid-team-editor{padding:8px;border-radius:6px}.tc-planning .raid-team-editor .mt{margin-top:6px}.tc-planning .raid-team-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:8px;max-height:280px;overflow:auto;overscroll-behavior:contain}
+.tc-planning .raid-team-row{grid-template-columns:minmax(80px,1fr) 70px minmax(112px,1.2fr);gap:6px;align-items:start}
+.tc-planning .raid-team-row label{font-size:12px;gap:4px}.tc-planning .raid-team-row .task-choice-grid{grid-template-columns:1fr}.tc-planning .raid-team-row .task-choice-card{min-height:28px;padding:4px 6px}
+.tc-planning .raid-mode-picker{display:grid;gap:6px;margin-top:6px}.tc-planning .raid-mode-picker label{font-size:12px}.tc-planning .raid-mode-picker .task-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.tc-planning .raid-mode-picker details{margin:0}
+.tc-planning .plan-rules-fold{margin-top:8px;padding-top:6px}.tc-planning .plan-team-section>.tabs{margin:0 0 8px}.tc-planning .plan-raid-reuse{padding:8px;margin-top:8px;border-radius:6px}
+.tc-planning .tc-plan-task-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:6px;max-height:250px;overflow:auto;margin-top:6px}.tc-planning .tc-plan-task-card{padding:8px;min-height:0;gap:5px}.tc-planning .tc-plan-task-card[hidden]{display:none}.tc-planning .plan-task-search{max-width:320px;gap:4px}
+.task-center .checkbox-list>label,.task-choice-context .checkbox-list>label{padding:7px 8px;border:.5px solid var(--wb-border);border-radius:6px;background:var(--wb-surface);gap:7px;min-width:0}
+.task-center .checkbox-list>label:has(input:checked),.task-choice-context .checkbox-list>label:has(input:checked){background:var(--wb-primary-soft);border-color:var(--wb-primary)}
+.tc-planning .plan-result-heading{margin:12px 0 8px}.tc-planning .plan-result-heading h2{margin:0}.tc-planning .three-col{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:10px}.tc-planning .batch-card{padding:12px}.tc-planning .summary-strip{gap:12px;padding:8px;margin-bottom:10px;flex-wrap:wrap}
+.tc-planning .raid-library{margin-top:6px}.tc-planning .raid-library-grid{gap:8px;margin-top:6px;max-height:320px;overflow:auto}.tc-planning .raid-library-grid>.card{padding:10px}.tc-planning .raid-library h3{font-size:14px}.tc-planning .raid-library p{margin:4px 0}
+.roster-school{display:block;color:var(--wb-text-secondary);font-size:12px;line-height:1.4}.roster-member>span{min-width:0}.roster-member small{overflow-wrap:anywhere}
+@media(max-width:1100px){.tc-planning .plan-config:has(.plan-team-section){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.tc-planning .raid-team-row{grid-template-columns:minmax(0,1fr) 70px}.tc-planning .raid-team-row>label:first-child{grid-column:auto}.tc-planning .raid-team-row>label:last-child{grid-column:1/-1}.tc-planning .raid-team-row .task-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:767px){.tc-planning .plan-config:has(.plan-team-section){grid-template-columns:1fr;gap:12px}.tc-planning .plan-config{padding:10px!important}.task-center .plan-type-field{grid-template-columns:1fr;width:100%;gap:4px}.tc-planning .plan-route-toolbar .task-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.tc-planning .plan-team-section{padding-top:10px;border-top:.5px solid var(--wb-border)}.tc-planning .raid-team-rows{grid-template-columns:1fr}.tc-planning .raid-choice-cards{grid-template-columns:1fr 1fr}.tc-planning .plan-task-selection{flex-wrap:wrap}.tc-planning .plan-task-selection>label{width:100%;max-width:none}.tc-planning .raid-mode-picker .task-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Same-screen planning: independent panes and always-visible commit controls. */
+.tc-planning .plan-next,.plan-stage-nav{display:none}
+@media(min-width:768px){
+ .tc-planning{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:8px;height:var(--plan-available-height,calc(100dvh - 240px));min-height:420px;position:relative}
+ .tc-planning:has(.plan-review-pane){grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr)}
+ .tc-planning>.plan-context{grid-row:1;grid-column:1/-1;margin:0;min-height:28px}
+ .tc-planning>.plan-config{grid-column:1;grid-row:2;overflow:auto;overscroll-behavior:contain;margin:0;min-height:0}
+ .tc-planning>.plan-review-pane{grid-column:2;grid-row:2;overflow:auto;overscroll-behavior:contain;min-height:0;min-width:0;padding:0 4px 4px}
+ .tc-planning>.tc-plan-actions{grid-row:3;grid-column:1/-1;position:static;margin:0;min-width:0;padding:8px 12px;z-index:2}
+ .tc-planning .plan-review-pane>.plan-result-heading{position:sticky;top:0;z-index:1;background:var(--wb-bg);padding:6px 0;margin:0 0 8px}
+ .tc-planning .plan-review-pane .three-col{display:grid;grid-template-columns:1fr}
+ .tc-planning .plan-review-pane .summary-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;font-size:12px}
+ .tc-planning .plan-review-pane .summary-strip b{font-size:14px}
+ .tc-planning .plan-review-pane .card-head{padding:8px 10px}
+ .tc-planning .plan-review-pane .mb{margin-bottom:8px}
+ .tc-planning .plan-review-pane h2{font-size:14px}
+ .tc-planning:has(.plan-review-pane) .plan-config{grid-template-columns:1fr;align-content:start}
+ .tc-planning:has(.plan-review-pane) .plan-scope-section{display:grid;grid-template-columns:1fr;min-width:0}
+ .tc-planning:has(.plan-review-pane) .raid-choice-cards{max-height:145px}
+ .tc-planning:has(.plan-review-pane) .route-order{max-height:105px}
+}
+@media(min-width:1400px){.tc-planning:has(.plan-review-pane){grid-template-columns:minmax(0,2fr) minmax(310px,1fr)}.tc-planning:has(.plan-review-pane) .plan-config{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
+.plan-member-details{margin-top:8px}.plan-member-details>summary{padding:6px 0;cursor:pointer;color:var(--wb-primary-label);font-size:12px}.tc-planning .batch-members{gap:6px;margin-top:8px}.tc-planning .member{padding:7px}
+@media(max-width:767px){
+ .raid-workspace .plan-stage-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;position:sticky;top:0;z-index:4;background:var(--wb-bg);padding:6px 0;margin-bottom:6px}
+ .plan-stage-nav button{min-height:34px;padding:6px;font-size:12px}.plan-stage-nav button.active{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
+ .raid-workspace[data-stage=scope] .plan-team-section,.raid-workspace[data-stage=team] .plan-scope-section,.raid-workspace:not([data-stage=review])>.plan-review-pane,.raid-workspace[data-stage=review]>.plan-config{display:none}
+ .raid-workspace:not([data-stage=team]) .plan-locks{display:none}
+ .raid-workspace[data-stage=scope] .tc-plan-actions .plan-next{display:inline-flex}
+ .raid-workspace[data-stage=scope] .tc-plan-actions [data-action=generate-plan],.raid-workspace[data-stage=scope] .tc-plan-actions [data-action=confirm-plan],.raid-workspace[data-stage=team] .tc-plan-actions [data-action=confirm-plan]{display:none}
+ .raid-workspace .plan-team-section{border:0;padding:0}.raid-workspace .tc-plan-actions{position:sticky;bottom:0;margin:8px 0 0;padding:8px;gap:6px;z-index:5;background:var(--wb-surface)}
+ .raid-workspace .tc-plan-action-context{width:100%}.raid-workspace .tc-plan-actions>.flex{width:100%;justify-content:flex-end}.raid-workspace .tc-plan-actions button{font-size:12px;padding:7px 9px;min-height:34px}
+ .raid-workspace .plan-result-heading{margin-top:6px}
+}
+.task-choice-overview{display:flex;align-items:center;gap:6px}.task-choice-overview>.task-choice-card{flex:1;min-width:0}.task-choice-overview>button{font-size:12px;padding:6px 9px;min-height:32px;flex:none}
+.task-card-picker:has(.task-choice-browser){position:relative}.task-choice-browser{position:absolute;top:100%;left:0;z-index:8;width:100%;min-width:230px;max-width:calc(100vw - 44px);background:var(--wb-surface);border:.5px solid var(--wb-border);border-radius:6px;padding:8px;box-shadow:var(--wb-shadow);display:grid;gap:6px}.task-choice-browser[hidden]{display:none}.task-choice-browser input{width:100%;min-width:0}
+.raid-choice-card strong{font-size:14px;line-height:1.35;display:block;font-weight:600}.raid-choice-card .raid-card-difficulty{color:var(--wb-primary-label);font-weight:600}.tc-planning .raid-choice-card{padding:7px;gap:6px}.tc-planning .raid-choice-card small{margin-top:2px;line-height:1.3}.tc-planning .route-order .flex{gap:3px}.tc-planning .route-order button{min-height:24px;padding:2px 5px}.tc-planning .route-order{max-height:150px!important}.raid-default-config>summary{cursor:pointer;font-size:12px;color:var(--wb-text-secondary);padding:4px 0}
+@media(max-width:767px){
+ .daily-workspace .plan-stage-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;position:sticky;top:0;z-index:4;background:var(--wb-bg);padding:6px 0;margin-bottom:6px}
+ .daily-workspace[data-stage=scope]>.plan-review-pane,.daily-workspace[data-stage=review]>.plan-config{display:none}
+ .daily-workspace .tc-plan-actions{position:sticky;bottom:0;margin:8px 0 0;padding:8px;gap:6px;z-index:5;background:var(--wb-surface)}
+ .daily-workspace .tc-plan-action-context{width:100%}.daily-workspace .tc-plan-actions>.flex{width:100%;justify-content:flex-end}.daily-workspace .tc-plan-actions button{font-size:12px;min-height:34px;padding:7px 9px}
+ .daily-workspace[data-stage=scope] .tc-plan-actions [data-action=confirm-plan]{display:none}
+}
+/* The action bar is now part of the workspace; remove its legacy blank spacer. */
+.tc-planning{padding-bottom:0}
+@media(min-width:768px) and (max-width:1399px){
+ .raid-workspace:has(.plan-review-pane)>.plan-stage-nav{display:flex;gap:6px;grid-row:1;grid-column:1;min-width:0;align-items:center}
+ .raid-workspace:has(.plan-review-pane)>.plan-stage-nav button{flex:1;min-width:0;font-size:12px;min-height:32px;padding:5px}
+ .raid-workspace:has(.plan-review-pane)>.plan-context{grid-column:2}
+ .raid-workspace:has(.plan-review-pane):not([data-stage=scope]) .plan-scope-section,.raid-workspace:has(.plan-review-pane)[data-stage=scope] .plan-team-section{display:none}
+ .raid-workspace:has(.plan-review-pane) .plan-locks{grid-column:1/-1}
+}

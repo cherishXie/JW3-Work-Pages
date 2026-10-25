@@ -243,13 +243,13 @@
     const known=players.filter(r=>Number.isFinite(r.score)&&r.score>0),profiles=players.map(r=>Catalog.profile(r)),dps=profiles.filter(p=>p.duty==='dps');
     return {averageScore:known.length?known.reduce((n,r)=>n+r.score,0)/known.length:null,knownScores:known.length,unknownScores:players.length-known.length,melee:dps.filter(p=>p.range==='melee').length,ranged:dps.filter(p=>p.range==='ranged').length,unknownRange:dps.filter(p=>!['melee','ranged'].includes(p.range)).length};
   }
-  // Balance only feasible daily allocations: retain sizes, duties, coverage and login budget.
+  // Spread player tanks before score/range balance; retain feasibility and gongzhan coverage.
   function balanceDailyParties(input,rebuild,locked=[]){
     if(input.length<2)return input;
-    let parties=input;const budget=batchSwitchCost(input.map(p=>p.players));
+    let parties=input,budget=batchSwitchCost(input.map(p=>p.players));
     const groups=new Map();for(const r of input.flatMap(p=>p.players)){const key=r.server;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
     const targets=new Map([...groups].map(([key,players])=>[key,{...partyStats(players),size:players.length}]));
-    const score=ps=>{let range=0,unknown=0,gear=0;for(const p of ps){const a=partyStats(p.players),t=targets.get(p.players[0]?.server),dps=a.melee+a.ranged,total=t.melee+t.ranged;if(total)range+=(a.melee-dps*t.melee/total)**2;unknown+=(a.unknownScores-p.players.length*t.unknownScores/t.size)**2;if(a.averageScore!==null&&t.averageScore)gear+=((a.averageScore-t.averageScore)/t.averageScore)**2;}return [range,unknown,gear];};
+    const score=ps=>{const tanks=ps.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),tankOverflow=tanks.reduce((n,v)=>n+Math.max(0,v-1),0),tankVariance=tanks.reduce((n,v)=>n+v*v,0);let range=0,unknown=0,gear=0;for(const p of ps){const a=partyStats(p.players),t=targets.get(p.players[0]?.server),dps=a.melee+a.ranged,total=t.melee+t.ranged;if(total)range+=(a.melee-dps*t.melee/total)**2;unknown+=(a.unknownScores-p.players.length*t.unknownScores/t.size)**2;if(a.averageScore!==null&&t.averageScore)gear+=((a.averageScore-t.averageScore)/t.averageScore)**2;}return [tankOverflow,tankVariance,range,unknown,gear];};
     const better=(a,b)=>{for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-10)return a[i]<b[i];}return false;};
     let current=score(parties),attempts=0;
     for(let pass=0;pass<12&&attempts<20000;pass++){
@@ -257,16 +257,16 @@
       for(let i=0;i<parties.length&&attempts<20000;i++)for(let j=i+1;j<parties.length&&attempts<20000;j++){
         if(parties[i].players[0]?.server!==parties[j].players[0]?.server)continue;
         for(let a=0;a<parties[i].players.length&&attempts<20000;a++)for(let b=0;b<parties[j].players.length&&attempts<20000;b++){
-          const from=parties[i].players[a],to=parties[j].players[b];if(Catalog.profile(from).duty!==Catalog.profile(to).duty)continue;attempts++;
+          const from=parties[i].players[a],to=parties[j].players[b];const fromDuty=Catalog.profile(from).duty,toDuty=Catalog.profile(to).duty;if(fromDuty!==toDuty&&fromDuty!=='tank'&&toDuty!=='tank')continue;attempts++;
           const next=[...parties],left=[...parties[i].players],right=[...parties[j].players];[left[a],right[b]]=[right[b],left[a]];
           if(new Set(left.map(r=>r.accountId)).size!==left.length||new Set(right.map(r=>r.accountId)).size!==right.length)continue;
           next[i]={...parties[i],players:left};next[j]={...parties[j],players:right};
           if(!locked.every(id=>next[0].players.some(r=>r.id===id)))continue;
-          const candidate=score(next);if(!better(candidate,bestScore)||next.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)continue;const switching=batchSwitchCost(next.map(p=>p.players));if(switching.logins>budget.logins||switching.logins===budget.logins&&switching.switches>budget.switches)continue;
+          const candidate=score(next);if(!better(candidate,bestScore)||next.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)continue;const tankImproved=candidate[0]<current[0]||candidate[0]===current[0]&&candidate[1]<current[1],switching=batchSwitchCost(next.map(p=>p.players));if(!tankImproved&&(switching.logins>budget.logins||switching.logins===budget.logins&&switching.switches>budget.switches))continue;
           const first=rebuild(next[i]),second=rebuild(next[j]);if(!first||!second)continue;next[i]=first;next[j]=second;best=next;bestScore=candidate;
         }
       }
-      if(!best)break;parties=best;current=bestScore;
+      if(!best)break;if(bestScore[0]<current[0]||bestScore[0]===current[0]&&bestScore[1]<current[1])budget=batchSwitchCost(best.map(p=>p.players));parties=best;current=bestScore;
     }
     return parties;
   }
@@ -460,6 +460,7 @@
       parties.forEach((p,i)=>p.teamIndex=i);
     }
     parties=optimizeTaskBatches({...t,gongzhanMaxPerTeam:maxGongzhan,requireGongzhanPerTeam:gongzhanMode&&parties.length>0&&parties.every(p=>raidGongzhanStatus(p.players).covered)},parties.map(p=>p.players),capacity,parties,locked).parties;
+    if(t.partyRule==='daily5'){const tanks=parties.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),totalT=tanks.reduce((a,b)=>a+b,0);if(tanks.some(n=>n>1))reasons.push(totalT>parties.length?'玩家 T '+totalT+' 名，超过 '+parties.length+' 支队伍，允许同队多 T。':'当前分配仍有多 T 队伍，请复核账号、区服、固定成员与侠客职责。');}
     if(!coverAll)parties=optimizeRaidMode({...t,gongzhanMaxPerTeam:maxGongzhan},parties,available,capacity,locked);
     for(const p of parties)validateParty(partyTask(t,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,p.companions,capacity);
     if(gongzhanMode){reasons.push(...raidGongzhanWarnings(parties.map(p=>p.players)));if(gongzhanSearchLimited&&parties.some(p=>!raidGongzhanStatus(p.players).covered))reasons.push('共战分配搜索达到上限，请复核缺少共战的队伍。');}
