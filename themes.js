@@ -51,6 +51,7 @@ SOFTWARE.
       'notice-bg':a[2],'notice-border':a[5],'success-bg':at('green',3),'success-border':at('green',6),'forecast-bg':at('violet',3),'forecast-border':at('violet',6),'warning-bg':at('amber',3),'warning-border':at('amber',6),
       'chart-bg-0':tileColors[0],'chart-bg-1':tileColors[1],'chart-bg-2':tileColors[2],'chart-bg-3':tileColors[3],'chart-bg-4':tileColors[4],'chart-bg-5':tileColors[5],track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
+      'login-action-bg':at('orange',theme.mode==='light'?12:11),'login-action-text':at('orange',1),'switch-action-bg':at('blue',theme.mode==='light'?12:11),'switch-action-text':at('blue',1),
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
     const schoolFamilies=['amber','teal','red','blue','violet','orange','green','bronze','cyan','jade','slate','indigo','sand','mauve','gray','sage','teal','blue','orange','violet','gray'];
     schoolFamilies.forEach((family,i)=>{p['school-'+i+'-bg']=at(family,3);p['school-'+i+'-text']=at(family,theme.mode==='light'?12:11);p['school-'+i+'-edge']=at(family,7);p['stance-'+i+'-bg']=at(family,4);});

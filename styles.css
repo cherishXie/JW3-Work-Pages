@@ -1150,3 +1150,14 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
  .planning-wizard .wizard-actions{padding:7px;gap:5px;flex-wrap:wrap}.planning-wizard .tc-plan-action-context{max-width:none;width:100%}.planning-wizard .wizard-actions>.flex{width:100%;justify-content:flex-end}.planning-wizard .wizard-actions button{font-size:12px;flex:0 1 auto;min-height:32px;padding:5px 8px}
  .planning-wizard .plan-review-pane .three-col{grid-template-columns:1fr}.planning-wizard .planning-lineup{grid-template-columns:repeat(2,minmax(0,1fr))}.planning-wizard .raid-team-row{grid-template-columns:minmax(0,1fr) 70px}.planning-wizard .raid-team-row>label:last-child{grid-column:1/-1}
 }
+
+/* Account actions precede identity tags so the next login step stays prominent. */
+.tc-account-slot .tc-account-action{display:flex;align-items:center;gap:6px;align-self:stretch;min-height:28px;margin:0 0 5px;padding:4px 6px;border:0.5px solid var(--wb-border);border-radius:3px;background:var(--wb-surface-2);color:var(--wb-text-secondary);font-size:12px;line-height:1.5}
+.tc-account-slot .tc-account-action b{font-weight:700;color:inherit;font-size:12px}
+.tc-account-slot .tc-account-action-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:16px;font-size:16px;line-height:1}
+.tc-account-slot.is-login .tc-account-action{background:var(--wb-login-action-bg);color:var(--wb-login-action-text);border-color:var(--wb-login-action-bg)}
+.tc-account-slot.is-switch .tc-account-action{background:var(--wb-switch-action-bg);color:var(--wb-switch-action-text);border-color:var(--wb-switch-action-bg)}
+
+/* Identity labels size to their text, even inside stretched member and form grids. */
+.role-identity-tags{width:fit-content;min-width:0;max-width:100%;align-self:flex-start;justify-self:start;flex:0 1 auto;gap:3px}
+.role-school-tag,.role-stance-tag,.role-duty-tag{display:block;align-self:flex-start;justify-self:start;flex:0 0 auto;width:fit-content;max-width:min(100%,8em);min-height:19px;padding:1px 4px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
