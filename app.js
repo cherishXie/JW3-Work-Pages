@@ -879,7 +879,7 @@
   }
   function refreshGeneratedPlan(p){const state=planningState();
     const g=ui.generated,old=g.result,when=g.startedAt||g.date,batches=p.batches.map(b=>b.map(id=>state.roles.find(r=>r.id===id))),tasks=(p.routeTaskIds||[p.taskId]).map(id=>M.taskForVersion(state,state.tasks.find(t=>t.id===id)));
-    const parties=batches.map((players,i)=>({...old.parties?.[i],players,companions:p.companionAssignments[i]||[],teamConfig:p.teamConfigs?.[i]??old.parties?.[i]?.teamConfig,totalSlots:players.length+(p.companionAssignments[i]?.length||0)}));
+    const parties=batches.map((players,i)=>({...old.parties?.[i],players,companions:p.companionAssignments[i]||[],teamConfig:p.teamConfigs?.[i]??old.parties?.[i]?.teamConfig,totalSlots:M.raidCapacity(tasks[0])===25?25:players.length+(p.companionAssignments[i]?.length||0)}));
     let start=M.planStart(state,p),taskResults=tasks.map(task=>{const result=M.pricePrediction(state,task,M.calculateBatches(task,batches,M.pricingConfig(state,when)),start);start=new Date(Date.parse(start)+result.minutes*60000).toISOString();return {task,result};});
     const result=tasks.length>1?{...M.sum(taskResults.map(x=>x.result),state.config),taskResults}:taskResults[0].result;
     g.result={...old,...result,batches,parties,reasons:[...(old.reasons||[]).filter(reason=>!reason.includes('缺少共战江湖')&&!reason.startsWith('共战分配搜索达到上限')),...(tasks[0]?.partyRule==='raid10'?M.raidGongzhanWarnings(batches):[])],unassigned:M.availableRoles(state,tasks[0],when,scope(),ui.replacingPlanId).filter(r=>!batches.flat().some(x=>x.id===r.id))};g.lockedBatches=p.lockedBatches||[];
