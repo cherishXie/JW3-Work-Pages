@@ -671,7 +671,7 @@ html[data-theme] .revenue-map-tile[data-share-vertical="true"] .revenue-map-shar
 @media(max-width:600px){.flow-workspace .flow-batch{flex-basis:155px}.tc-completion-roster{padding:10px}.tc-completion-roster .tc-v2-person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tc-completion-roster .tc-v2-person{padding:8px}.tc-completion-roster .tc-v2-member-head{flex-wrap:wrap;gap:4px}}
 #dialog:has(.tc-completion-roster){width:min(900px,calc(100vw - 24px))}
 .tc-completion-roster .tc-v2-person-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
-.tc-completion-roster .combat-tag{display:none}
+.tc-completion-roster .combat-tag:not(.gongzhan):not(.gongzhan-state){display:none}
 @media(max-width:600px){.tc-completion-roster .tc-v2-person-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}.tc-completion-roster .tc-v2-person{flex:0 0 145px;scroll-snap-align:start}.tc-completion-roster .tc-v2-member-head>span::after{content:' · 左右滑动查看'}}
 @media(min-width:900px){
 #dialog:has(.tc-completion-roster){width:min(1040px,calc(100vw - 40px))}
@@ -1161,3 +1161,11 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 /* Identity labels size to their text, even inside stretched member and form grids. */
 .role-identity-tags{width:fit-content;min-width:0;max-width:100%;align-self:flex-start;justify-self:start;flex:0 1 auto;gap:3px}
 .role-school-tag,.role-stance-tag,.role-duty-tag{display:block;align-self:flex-start;justify-self:start;flex:0 0 auto;width:fit-content;max-width:min(100%,8em);min-height:19px;padding:1px 4px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+
+/* Completion review always exposes the recorded gongzhan state. */
+.gongzhan-state{display:inline-flex;align-self:flex-start;width:fit-content;max-width:100%;margin:2px 0 0;padding:1px 4px;line-height:16px;white-space:nowrap;font-size:12px;border-radius:4px}
+.gongzhan-state.is-present{color:var(--wb-task-warning-text);background:var(--wb-warning-bg);border-color:var(--wb-warning-border);font-weight:700}
+.gongzhan-state.is-absent{color:var(--wb-text-secondary);background:var(--wb-surface-2);border-color:var(--wb-border)}
+.gongzhan-state.is-unknown{color:var(--wb-text-muted);background:var(--wb-surface-2);border-color:var(--wb-control-border);border-style:dashed}
+
+.roster-school{display:flex;flex-wrap:wrap;gap:3px;align-items:center}.roster-school .gongzhan-state{margin:3px 0 0}.library-role-identity .gongzhan-state{margin:0}
