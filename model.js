@@ -50,14 +50,14 @@
     s.roles=names.map((name,i)=>({id:'r'+(i+1),accountId:'a'+(i%8+1),name,server:'梦江南',school:schools[i%8],stance:stances[i%8],duty:i%8===1?'heal':i%8===2?'tank':'dps',companionIds:['kang-yanbie','mu-qingrou','tang-xiaoke'],level:130,score:85000+i*1200,enabled:true,openingGold:18000+i*2500,observedGold:18000+i*2500,tags:'',companion:i%3===0?'沈剑心':'',updatedAt:new Date().toISOString()}));
     s.tasks=[
       {id:'t1',name:'大战日常',period:'daily',type:'role',roleIds:s.roles.map(r=>r.id),days:[1,2,3,4,5,6,0],target:1,gold:1600,shared:0,sharedMode:'batch',minutes:12,prepare:2,onlineExtra:0,maxParallel:3,efficiency:1,otherCost:0,enabled:true,resetHour:7,resetDay:5,minLevel:120,minScore:0,tank:0,heal:0,teamSize:5,runs:1},
-      {id:'t2',name:'矿跑 · 联合日常',period:'daily',type:'role',roleIds:s.roles.map(r=>r.id),days:[1,2,3,4,5],target:1,gold:900,shared:300,sharedMode:'batch',minutes:6,prepare:1,onlineExtra:0,maxParallel:8,efficiency:1,otherCost:0,enabled:true,resetHour:7,resetDay:5,minLevel:0,minScore:0,tank:0,heal:0,teamSize:5,runs:1,components:[]},
+      {id:'t2',name:'矿跑联合日常',period:'daily',type:'role',roleIds:s.roles.map(r=>r.id),days:[1,2,3,4,5],target:1,gold:900,shared:300,sharedMode:'batch',minutes:6,prepare:1,onlineExtra:0,maxParallel:8,efficiency:1,otherCost:0,enabled:true,resetHour:7,resetDay:5,minLevel:0,minScore:0,tank:0,heal:0,teamSize:5,runs:1,components:[]},
       {id:'t3',name:'10 人副本',period:'weekly',type:'team',roleIds:s.roles.map(r=>r.id),days:[6],target:1,gold:52000,shared:0,sharedMode:'batch',minutes:42,prepare:5,onlineExtra:0,maxParallel:8,efficiency:1,otherCost:2,enabled:true,resetHour:7,resetDay:5,minLevel:120,minScore:80000,tank:1,heal:1,teamSize:5,externalSeats:5,runs:2},
-      {id:'t4',name:'周常 · 勤修不辍',period:'weekly',type:'role',roleIds:s.roles.slice(0,8).map(r=>r.id),days:[0],target:1,gold:4800,shared:0,sharedMode:'batch',minutes:15,prepare:2,onlineExtra:0,maxParallel:4,efficiency:1,otherCost:0,enabled:true,resetHour:7,resetDay:5,minLevel:0,minScore:0,tank:0,heal:0,teamSize:5,runs:1}
+      {id:'t4',name:'周常勤修不辍',period:'weekly',type:'role',roleIds:s.roles.slice(0,8).map(r=>r.id),days:[0],target:1,gold:4800,shared:0,sharedMode:'batch',minutes:15,prepare:2,onlineExtra:0,maxParallel:4,efficiency:1,otherCost:0,enabled:true,resetHour:7,resetDay:5,minLevel:0,minScore:0,tank:0,heal:0,teamSize:5,runs:1}
     ];
     upgradeState(s);
     // Demo completion observations are separate from demonstration execution records.
     const monday=weekStart(today);
-    for(let d=monday;d<=today;d=addDays(d,1)){
+    for(let d=addDays(today,-6);d<=today;d=addDays(d,1)){
       for(const t of s.tasks.filter(t=>t.type==='role'&&t.days.includes(weekday(d)))) {
         const roles=s.roles.filter(r=>t.roleIds.includes(r.id)).slice(0,d===today?4:s.roles.length);
         for(const r of roles)s.progress.push({id:id('p'),roleId:r.id,taskId:t.id,cycle:cycle(t,d),date:d,completed:1,status:'completed',target:1,source:'示例',updatedAt:new Date().toISOString()});
@@ -65,6 +65,13 @@
       }
     }
     s.cash=[{id:'c1',date:monday,type:'income',amount:65,note:'示例 · 金币兑现'},{id:'c2',date:monday,type:'expense',amount:30,note:'示例 · 点卡充值'}];
+    // Pending plans make forecasts, the queue and completion controls immediately usable.
+    for(const date of [today,addDays(today,1)])for(const task of s.tasks.filter(t=>t.type==='role'&&t.days.includes(weekday(date)))){
+      const result=plan(s,task,date,{},true);
+      if(!result.batches.length)continue;
+      const saved={id:id('demo_plan'),taskId:task.id,taskName:task.name,date,batches:result.batches.map(b=>b.map(r=>r.id)),companionAssignments:(result.parties||[]).map(p=>p.companions),taskSnapshots:{[task.id]:JSON.parse(JSON.stringify(task))},executedTaskIds:[],executed:false,createdAt:new Date().toISOString()};
+      validatePlanCapacity(s,saved);s.plans.push(saved);
+    }
     return s;
   }
   function number(value,name,{min=0,max=Infinity,integer=false}={}) {if(value===''||value===null||!Number.isFinite(Number(value))||Number(value)<min||Number(value)>max||(integer&&!Number.isInteger(Number(value))))throw new Error(name+' 必须为'+(integer?'整数':'数字')+'，范围 '+min+'–'+(max===Infinity?'无上限':max));return Number(value);}

@@ -27,10 +27,10 @@
     if(at<0)next.snapshots.push(row);else next.snapshots[at]=row;
     return validate(next);
   }
-  function read(storage){
-    const raw=storage.getItem(KEY);
+  function read(storage,key=KEY){
+    const raw=storage.getItem(key);
     if(raw!==null)return {store:validate(unpack(JSON.parse(raw))),migrated:false};
-    const legacy=storage.getItem(LEGACY_KEY);
+    const legacy=key===KEY?storage.getItem(LEGACY_KEY):null;
     if(legacy===null)return {store:empty(),migrated:false};
     const state=M.validateState(JSON.parse(legacy)),time=new Date(state.updatedAt);
     return {store:withState(empty(),state,Number.isFinite(time.getTime())?time:new Date()),migrated:true};
@@ -67,12 +67,12 @@
     return decode(root,decoded.length);
   }
   function quotaError(e){return e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22||e?.code===1014;}
-  function write(storage,store){
+  function write(storage,store,key=KEY){
     const raw=JSON.stringify(validate(store));
-    try{storage.setItem(KEY,raw);return;}catch(e){if(!quotaError(e))throw e;}
+    try{storage.setItem(key,raw);return;}catch(e){if(!quotaError(e))throw e;}
     const compact=JSON.stringify(pack(JSON.parse(raw)));
     if(compact.length<raw.length){
-      try{storage.setItem(KEY,compact);return;}catch(e){if(!quotaError(e))throw e;}
+      try{storage.setItem(key,compact);return;}catch(e){if(!quotaError(e))throw e;}
     }
     // setItem is atomic. Never remove the previous value or discard archives.
     throw new Error('浏览器本地存储空间不足，无损去重后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');

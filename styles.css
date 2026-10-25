@@ -1171,3 +1171,10 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .roster-school{display:flex;flex-wrap:wrap;gap:3px;align-items:center}.roster-school .gongzhan-state{margin:3px 0 0}.library-role-identity .gongzhan-state{margin:0}
 
 .overview-date-range{display:flex;align-items:end;flex-wrap:wrap;gap:6px}.overview-date-range label{display:grid;gap:3px;font-size:12px}.overview-date-range input{min-width:0;width:145px}.overview-date-range button{min-height:34px}@media(max-width:650px){.overview-date-range{width:100%}.overview-date-range label{flex:1;min-width:0}.overview-date-range input{width:100%}.insight-toolbar>div{min-width:0;max-width:100%}}
+
+/* Experience uses the same semantic palette and remains visible in the global header. */
+.experience-banner{display:flex;width:100%;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;white-space:normal;padding:8px 10px;margin-bottom:8px;border:0.5px solid var(--wb-warning);border-radius:6px;background:var(--wb-warning-bg);color:var(--wb-text);font-size:14px}
+.experience-banner strong{color:var(--wb-warning)}.experience-banner span{font-size:12px}.experience-banner b{margin-left:auto;font-size:12px}
+.experience-start{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:0.5px solid var(--wb-border);border-radius:8px;background:var(--wb-surface)}
+.setup-options{gap:10px;margin-bottom:10px}.experience-start .panel-sub{margin-top:6px}.experience-start button{flex-shrink:0}
+@media(max-width:767px){.experience-start{flex-wrap:wrap}.experience-banner{gap:6px}.experience-banner b{margin-left:0}}
