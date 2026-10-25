@@ -37,7 +37,7 @@
   if(!M.planExecutionValid(s,p,t,when))throw new Error('执行日期或刷新周期不同，请先调整该批次日期');
   if(members.some(r=>!r||!canRegisterPlannedRole(s,t,r.id,when)))throw new Error('成员资格或剩余 CD 已变化，请先调整批次');
   if(new Set(members.map(r=>r.accountId)).size!==members.length||members.length>Math.min(t.maxParallel,s.config.concurrency))throw new Error('同账号冲突或超过并行上限');
-  if(['daily5','raid10'].includes(t.partyRule))M.validateParty(M.partyTask(t,p.teamConfigs?.[index]),members,p.companionAssignments?.[index]||[],s.config.concurrency);
+  if(['daily5','raid10'].includes(t.partyRule))M.validateParty(M.partyTask(t,p.teamConfigs?.[index]),members,M.raidCapacity(t)===M.raidCapacity(s.tasks.find(t=>t.id===p.taskId))?(p.companionAssignments?.[index]||[]):M.partyCompanions(M.partyTask(t,p.teamConfigs?.[index]),members)||[],s.config.concurrency);
   else if(t.type==='team'&&!M.teamCandidates({...t,runs:1},members,[],s.config.concurrency).teams.length)throw new Error('队伍职责或区服不满足');
   return t;
  }
@@ -187,7 +187,7 @@
    if(progress.completed>=progress.target)return name+'本周期目标已完成';
    if(!M.availableCount(s,t,r,when,p.id))return name+'目标或 CD 已被其他排程占用';
    const conflict=members.find(x=>x.accountId===r.accountId);if(conflict)return '同账号角色 '+conflict.name+' 已在本队，同一账号不能同时登录';
-   const capacity=Math.min(s.config.concurrency,t.maxParallel,t.partyRule==='raid10'?10:t.partyRule==='daily5'?5:t.type==='team'?t.teamSize:Infinity);
+   const capacity=Math.min(s.config.concurrency,t.maxParallel,t.partyRule==='raid10'?M.raidCapacity(t):t.partyRule==='daily5'?5:t.type==='team'?t.teamSize:Infinity);
    if(members.length>=capacity)return name+'已达到本批人数或并行上限';
    if(['daily5','raid10'].includes(t.partyRule)||t.type==='team'){
     if(!r.server)return name+'区服待补';
@@ -238,7 +238,7 @@
   if(timing.endedAt)fact.endedAt=timing.endedAt;
   if(input.timerPauses)fact.timerPauses=structuredClone(input.timerPauses);
   const executionTask=M.raidExecutionTask(fact.allocationTask||p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId),input.completedBossCount??fact.completedBossCount);
-  if(executionTask.partyRule==='raid10'){fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount??1;fact.allocationTask=structuredClone(executionTask);}
+  if(executionTask.partyRule==='raid10'){fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount;fact.allocationTask=structuredClone(executionTask);}
   const previousMeasurements=fact.measurements||{},financialAllocation=input.financialAllocation||previousMeasurements.financialAllocation||'task',timeAllocation=input.timeAllocation||previousMeasurements.timeAllocation||'task';
   if(timeAllocation==='task'&&input.minutes!==undefined&&input.minutes!==''&&input.minutes!==null)input={...input,onlineMinutes:Number(input.minutes)*fact.roleIds.length};
   const measurements={...previousMeasurements,financialAllocation,timeAllocation,allocationVersion:2};
@@ -260,9 +260,16 @@
   p.executionDrafts=(p.executionDrafts||[]).filter(d=>d.taskId!==taskId||d.index!==index);
   p.updatedAt=new Date().toISOString();reconcile(copy,p);M.validateState(copy);Object.assign(s,copy);return record||fact;
  }
+ function saveTeamTemplate(s,input){
+  const name=String(input.name||'').trim();if(!name||name.length>80)throw new Error('请填写队伍名称（最多 80 字）');
+  if(![10,25].includes(input.raidSize)||!Array.isArray(input.batches)||!input.batches.length)throw new Error('自定义队伍无效');
+  const all=new Set();for(const batch of input.batches){if(!batch.length||batch.length>input.raidSize)throw new Error('队伍人数超出容量');const accounts=new Set(),servers=new Set();for(const id of batch){const role=s.roles.find(r=>r.id===id);if(!role||role.enabled===false)throw new Error('角色不存在或已停用');if(all.has(id))throw new Error('同一角色不能重复编入多个队伍');all.add(id);if(accounts.has(role.accountId))throw new Error('同账号角色不能同时组队');accounts.add(role.accountId);if(role.server)servers.add(role.server);}if(servers.size>1)throw new Error('同队角色必须在同一区服');}
+  const entry={id:input.id||M.id('raidteam'),kind:'raid-team-template',name,raidSize:input.raidSize,batches:structuredClone(input.batches),teamConfigs:input.batches.map((b,i)=>({...input.teamConfigs?.[i],name:input.teamConfigs?.[i]?.name||'第 '+(i+1)+' 队',playerSeats:b.length,tankMode:input.teamConfigs?.[i]?.tankMode||'auto'})),updatedAt:new Date().toISOString()};
+  const old=s.notes.find(n=>n.id===entry.id);if(old&&old.kind!==entry.kind)throw new Error('队伍编号冲突');if(old)Object.assign(old,entry,{deletedAt:undefined});else s.notes.push(entry);return entry;
+ }
  function reuseRaidTeams(s,source,taskIds,date,{indices=null,startTime='',excludePlanId=null}={}){
   const tasks=taskIds.map(id=>s.tasks.find(t=>t.id===id)).map(t=>t&&M.planningTask(M.taskForVersion(s,t)));
-  if(!source||!tasks.length||tasks.some(t=>!t?.enabled||t.partyRule!=='raid10')||!(source.routeTaskIds||[source.taskId]).every(id=>s.tasks.find(t=>t.id===id)?.partyRule==='raid10'))throw new Error('请选择十人副本队伍及启用的目标副本');
+  if(!source||!tasks.length||tasks.some(t=>!t?.enabled||t.partyRule!=='raid10')||!(source.routeTaskIds||[source.taskId]).every(id=>s.tasks.find(t=>t.id===id)?.partyRule==='raid10'))throw new Error('请选择副本队伍及启用的目标副本');
   indices??=source.batches.map((_,i)=>i);
   if(new Set(tasks.map(M.cdKey)).size!==tasks.length)throw new Error('同一路线不能重复选择相同副本 CD');
   if(!indices.length||new Set(indices).size!==indices.length||indices.some(i=>!Number.isInteger(i)||!source.batches[i]))throw new Error('请勾选要沿用的队伍');
@@ -270,7 +277,8 @@
   const first=tasks[0],p={id:M.id('plan'),taskId:first.id,taskName:first.name,routeTaskIds:tasks.length>1?tasks.map(t=>t.id):undefined,date,startedAt:startTime?date+'T'+startTime+':00+08:00':null,batches:indices.map(i=>[...source.batches[i]]),teamConfigs:indices.map(i=>source.teamConfigs?.[i]?JSON.parse(JSON.stringify(source.teamConfigs[i])):{name:'团队 '+(i+1),playerSeats:source.batches[i].length,tankMode:'auto'}),companionAssignments:[],rulesSnapshot:{fillCompanionSlots:true},executed:false};
   for(const [i,batch]of p.batches.entries()){
    const members=batch.map(id=>s.roles.find(r=>r.id===id));if(members.some(r=>!r))throw new Error('原队伍角色已移除，请重新配置');
-   const combined={...first,tank:Math.max(...tasks.map(t=>t.tank||0)),heal:Math.max(...tasks.map(t=>t.heal||0)),allowCompanions:tasks.every(t=>t.allowCompanions!==false),companionLimit:Math.min(...tasks.map(t=>t.companionLimit??3))};
+   const compatible=tasks.filter(t=>M.raidCapacity(t)===M.raidCapacity(first));
+   const combined={...first,tank:Math.max(...compatible.map(t=>t.tank||0)),heal:Math.max(...compatible.map(t=>t.heal||0)),allowCompanions:compatible.every(t=>t.allowCompanions!==false),companionLimit:Math.min(...compatible.map(t=>t.companionLimit??3))};
    const companions=M.companionAssignments(M.partyTask(combined,p.teamConfigs[i]),members,10);if(!companions)throw new Error('第 '+(i+1)+' 队已有侠客或职责不足，无法补满 10 席');p.companionAssignments.push(companions);
   }
   validatePendingGongzhan(s,p);M.validatePlanCapacity(s,p,excludePlanId);for(const task of tasks)for(const i of p.batches.keys())checkBatch(s,p,task.id,i,M.planStart(s,p,task.id));
@@ -426,5 +434,5 @@
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
  }
- return {validatePendingGongzhan,transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {saveTeamTemplate,validatePendingGongzhan,transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
 });

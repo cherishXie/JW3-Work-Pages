@@ -980,3 +980,15 @@ body{background:var(--wb-canvas)}
 .insight-metric{padding:16px 14px;min-height:130px}
 @media(min-width:768px) and (max-width:1200px){.insight-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:767px){.insight-metric{min-height:146px;padding:14px 12px}.insight-metric strong{font-size:16px}}
+
+/* Visible destructive task action and ordered raid route */
+button.danger{color:var(--wb-cue-danger);background:var(--wb-cue-danger-bg);border:.5px solid var(--wb-cue-danger);font-weight:600}
+button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-danger)}
+.flow-task-actions{display:flex;justify-content:flex-end;padding:12px 0;gap:12px}
+.route-order{list-style:none;padding:0;display:grid;gap:8px}
+.route-order li{display:flex;align-items:center;gap:12px;padding:8px;border:.5px solid var(--wb-border);border-radius:6px;background:var(--wb-panel)}
+.route-order li>span:not(.route-handle){flex:1;min-width:0;overflow-wrap:anywhere}
+.route-handle{cursor:grab;color:var(--wb-text-muted)}
+.raid-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.plan-team-section{margin-top:20px}
+@media(max-width:600px){.route-order li{gap:8px;flex-wrap:wrap}.route-order li>.flex{margin-left:auto}}
