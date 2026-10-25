@@ -52,6 +52,9 @@ SOFTWARE.
       'chart-bg-0':tileColors[0],'chart-bg-1':tileColors[1],'chart-bg-2':tileColors[2],'chart-bg-3':tileColors[3],'chart-bg-4':tileColors[4],'chart-bg-5':tileColors[5],track:n[3],grid:n[5],'avatar-bg':n[2],backdrop:'#000000b3',shadow:'#00000026','button-muted':n[2],
       'login':at('orange',11),'login-bg':at('orange',3),'switch':at('blue',11),'switch-bg':at('blue',3),
       'chart-primary':at('indigo',9),'chart-cyan':at('teal',9),'chart-purple':at('violet',9),'chart-warning':at('amber',8),'chart-success':at('green',8),'chart-danger':at('red',8)};
+    const schoolFamilies=['amber','teal','red','blue','violet','orange','green','bronze','cyan','jade','slate','indigo','sand','mauve','gray','sage','teal','blue','orange','violet','gray'];
+    schoolFamilies.forEach((family,i)=>{p['school-'+i+'-bg']=at(family,3);p['school-'+i+'-text']=at(family,theme.mode==='light'?12:11);p['school-'+i+'-edge']=at(family,7);p['stance-'+i+'-bg']=at(family,4);});
+    for(const [role,family]of Object.entries({tank:'blue',heal:'green',dps:'orange',unknown:'gray'})){p['role-'+role+'-bg']=at(family,3);p['role-'+role+'-text']=at(family,theme.mode==='light'?12:11);p['role-'+role+'-edge']=at(family,7);}
     // Small visual anchors share semantic roles across all five themes.
     // Use low-step surfaces and high-step ink; never use saturated data fills as card backgrounds.
     for(const [role,family] of Object.entries({income:'teal',cost:'bronze',time:'blue',efficiency:'violet',complete:'green',attention:'amber',danger:'red'})){
