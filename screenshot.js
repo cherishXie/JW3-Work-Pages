@@ -140,7 +140,7 @@
   function importedDigests(state){
     return new Set((state.sourceArchives||[]).flatMap(a=>(a.files||[]).map(f=>f.sha256).filter(Boolean)));
   }
-  function apply(state,rows,{digest,name,files,capturedAt,now=new Date().toISOString(),rawRows,duplicates,allowReimport=false}){
+  function apply(state,rows,{digest,name,files,capturedAt,now=new Date().toISOString(),rawRows,duplicates,allowReimport=false,allowHistorical=false}){
     if(!/^[a-f0-9]{64}$/.test(digest)||!Number.isFinite(Date.parse(capturedAt))||Date.parse(capturedAt)>Date.parse(now)+60000)throw new Error('截图标识或采集时间无效（不能在未来）');
     const incoming=files||[{name,sha256:digest}];
     if(!Array.isArray(incoming)||!incoming.length||incoming.some(f=>!f.name||!/^[a-f0-9]{64}$/.test(f.sha256))||new Set(incoming.map(f=>f.sha256)).size!==incoming.length)throw new Error('截图文件清单无效或存在重复文件');
@@ -155,12 +155,13 @@
     for(const row of rows.filter(x=>x.selected)){
       if(Object.keys(row.conflicts||{}).length&&!row.conflictsConfirmed)throw new Error(row.name+' 存在截图数据冲突，请逐项核对并勾选冲突确认');
       const role=next.roles.find(r=>r.id===row.roleId);if(!role)throw new Error('请为选中行选择已有角色');if(seen.has(role.id))throw new Error('同一角色出现多次，请只保留一行');seen.add(role.id);
-      if(role.resourceUpdatedAt&&Date.parse(role.resourceUpdatedAt)>Date.parse(capturedAt)||role.observedDate&&role.observedDate>date||role.screenshotCapturedAt&&Date.parse(role.screenshotCapturedAt)>Date.parse(capturedAt))throw new Error(role.name+' 已有更新的快照，请取消选择旧数据');
-      const changed={};for(const key of numeric){const n=value(row[key],key);if(n==null)continue;const target=key==='gold'?'observedGold':key;changed[target]={before:role[target]??null,after:n};role[target]=n;}
+      const newer=role.resourceUpdatedAt&&Date.parse(role.resourceUpdatedAt)>Date.parse(capturedAt)||role.observedDate&&role.observedDate>date||role.screenshotCapturedAt&&Date.parse(role.screenshotCapturedAt)>Date.parse(capturedAt)||(state.balanceSnapshots||[]).some(x=>x.roleId===role.id&&Date.parse(x.capturedAt||x.date+'T00:00:00+08:00')>Date.parse(capturedAt));
+      if(newer&&!allowHistorical)throw new Error(role.name+' 已有更新的快照，请取消选择旧数据');
+      const changed={};for(const key of numeric){const n=value(row[key],key);if(n==null)continue;const target=key==='gold'?'observedGold':key;changed[target]={before:role[target]??null,after:n};if(!newer)role[target]=n;}
       if(!Object.keys(changed).length)throw new Error(role.name+' 没有可更新的数值');
-      if(row.school?.trim()){changed.school={before:role.school??'',after:row.school.trim()};role.school=row.school.trim();}
-      if(changed.observedGold){role.observedDate=date;role.observedGoldSource='茗伊角色统计截图';next.balanceSnapshots??=[];next.balanceSnapshots.push({id:id+'_'+role.id,roleId:role.id,gold:role.observedGold,date,source:'茗伊角色统计截图',importedAt:now,capturedAt});}
-      role.screenshotCapturedAt=capturedAt;role.updatedAt=now;changes.push({roleId:role.id,sourceName:row.name,ocrNames:row.ocrNames||[row.name],sources:row.sourceNames||[],changes:changed});
+      if(row.school?.trim()){changed.school={before:role.school??'',after:row.school.trim()};if(!newer)role.school=row.school.trim();}
+      if(changed.observedGold){if(!newer){role.observedDate=date;role.observedGoldSource='茗伊角色统计截图';}next.balanceSnapshots??=[];next.balanceSnapshots.push({id:id+'_'+role.id,roleId:role.id,gold:changed.observedGold.after,date,source:'茗伊角色统计截图',importedAt:now,capturedAt});}
+      if(!newer){role.screenshotCapturedAt=capturedAt;role.updatedAt=now;}changes.push({roleId:role.id,historical:!!newer,sourceName:row.name,ocrNames:row.ocrNames||[row.name],sources:row.sourceNames||[],changes:changed});
     }
     if(!changes.length)throw new Error('请至少选择一行有效角色');
     next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:allowReimport?'mingyi-role-screenshot-review-v1':incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,reviewedDigests:repeated.map(f=>f.sha256),issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。',...(repeated.length?['复核已导入截图：保留原导入档案，新建更正记录；观测余额不计收入。']:[])],updatedAt:now,capturedAt});

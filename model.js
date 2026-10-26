@@ -969,6 +969,100 @@
     const accounts=s.accounts.filter(a=>rows.some(r=>r.role.accountId===a.id)).map(account=>{const list=rows.filter(r=>r.role.accountId===account.id),valid=list.filter(r=>r.comparable);return {account,rows:list,delta:valid.reduce((n,r)=>n+r.delta,0),count:valid.length};}).sort((a,b)=>b.delta-a.delta);
     return {range,batches,index,current,previous,rows,accounts,count:comparable.length,total:roles.length,balance:rows.reduce((n,r)=>n+(r.now?.gold||0),0),collected:rows.filter(r=>r.now).length,delta:comparable.length?delta:null,rate:base?delta/base*100:null,known,unexplained:comparable.length?delta-known:null};
   }
+  // Snapshot-led asset reports. Last-known inventory and comparable movement are
+  // deliberately separate: missing observations are never zero or income.
+  function goldDateRange(mode,anchor=dateKey(),start=anchor,end=anchor) {
+    const day=d=>resourceDateRange('day',d).start;
+    if(mode==='batch'||mode==='all')return null;
+    let first,last;
+    if(mode==='week'||mode==='last-week'){first=weekStart(day(anchor));if(mode==='last-week')first=addDays(first,-7);last=addDays(first,6);}
+    else if(mode==='month'||mode==='last-month'){first=day(anchor).slice(0,7)+'-01';if(mode==='last-month')first=addDays(first,-1).slice(0,7)+'-01';last=resourceDateRange('month',first).end;}
+    else if(mode==='day'){first=last=day(anchor);}
+    else if(mode==='custom'){first=start;last=end;}
+    else throw new Error('未知金币统计周期');
+    const parse=(value,closing)=>{
+      if(/^\d{4}-\d{2}-\d{2}$/.test(value)){day(value);return Date.parse(value+'T00:00:00+08:00')+(closing?86400000-1:0);}
+      if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw new Error('请选择有效采集时间');
+      day(value.slice(0,10));const time=Date.parse(value+':00+08:00');
+      if(!Number.isFinite(time)||Number(value.slice(11,13))>23||Number(value.slice(14,16))>59)throw new Error('请选择有效采集时间');
+      return time+(closing?59999:0);
+    };
+    const startTime=parse(first,false),endTime=parse(last,true);
+    if(startTime>endTime)throw new Error('开始时间不能晚于结束时间');
+    return {start:first,end:last,startTime,endTime,precise:first.includes('T')||last.includes('T')};
+  }
+  function goldAssetReport(s,{scope={},mode='batch',batchId='',baselineId='',range=null}={}) {
+    const roles=s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));
+    // Keep the global collection nodes when narrowing scope. Filtering an account
+    // must not silently replace the user's chosen collection interval.
+    const ids=new Set(roles.map(r=>r.id)),batches=resourceBatches(s).map(b=>({...b,observations:b.observations.filter(x=>ids.has(x.roleId))}));
+    if(range)range=goldDateRange('custom',dateKey(),range.start,range.end);
+    const index=batchId?batches.findIndex(b=>b.id===batchId):batches.length-1,current=batches[index],previous=baselineId?batches.find(b=>b.id===baselineId):batches[index-1];
+    if(mode==='batch'&&batchId&&index<0)throw new Error('所选结束采集不存在，请重新选择');
+    if(mode==='batch'&&baselineId&&(!previous||!current||previous.time>=current.time))throw new Error('起始采集必须早于结束采集');
+    const endTime=range?.endTime??(mode==='all'?Infinity:current?.time??Infinity),startTime=range?.startTime??(mode==='all'?-Infinity:previous?.time??current?.time??-Infinity);
+    const histories=new Map(roles.map(r=>[r.id,[]]));
+    for(const b of batches)for(const x of b.observations)histories.get(x.roleId).push(x);
+    const events=confirmedGoldEvents(s),dayStart=d=>Date.parse(d+'T00:00:00+08:00');
+    const beforeEnd=x=>x.precision==='date'&&range?dayStart(x.date)+86400000-1<=endTime:x.time<=endTime;
+    const inRange=x=>x.precision==='date'?(dayStart(x.date)>=startTime&&dayStart(x.date)+86400000-1<=endTime):(x.time>=startTime&&x.time<=endTime);
+    const rows=roles.map(role=>{
+      const history=histories.get(role.id),knownHistory=history.filter(beforeEnd),latest=knownHistory.at(-1);
+      let now,before;
+      if(mode==='batch'){now=current?.observations.find(x=>x.roleId===role.id);before=previous?.observations.find(x=>x.roleId===role.id);}
+      else if(mode==='all'){before=knownHistory.length>1?knownHistory[0]:undefined;now=latest;}
+      else{now=history.filter(inRange).at(-1);before=history.filter(x=>x.precision==='date'?dayStart(x.date)+86400000-1<startTime:x.time<=startTime).at(-1);}
+      const comparable=!!now&&!!before&&now.time>before.time&&(now.date!==before.date||now.precision==='instant'&&before.precision==='instant'),delta=comparable?now.gold-before.gold:null,included=[],uncertain=[];
+      if(comparable)for(const e of events.filter(e=>e.roleId===role.id)){
+        if(e.capturedAt&&before.precision==='instant'&&now.precision==='instant'){const t=Date.parse(e.capturedAt);if(t>before.time&&t<=now.time)included.push(e);}
+        else if(e.date>before.date&&e.date<now.date)included.push(e);
+        else if(e.date===before.date||e.date===now.date)uncertain.push(e);
+      }
+      const known=included.reduce((n,e)=>n+e.amount,0),days=comparable?(now.time-before.time)/86400000:null;
+      return {role,history,latest,now,before,comparable,delta,known,included,uncertain,unexplained:comparable?delta-known:null,days,daily:days>0?delta/days:null,rate:comparable&&before.gold>0?delta/before.gold*100:null,intervalApprox:!!before&&(before.precision==='date'||now?.precision==='date'),crossBoundary:comparable&&!!range&&before.time<startTime,stale:!!latest&&!now,status:!latest?'尚未采集':!now?'期内未采集':!before?(history.some(x=>x.time<now.time)?'缺少起始采集':'首次基线'):!comparable?'采集时刻待补':''};
+    });
+    const summarize=list=>{const valid=list.filter(r=>r.comparable),collected=list.filter(r=>r.latest),opening=valid.reduce((n,r)=>n+r.before.gold,0),delta=valid.length?valid.reduce((n,r)=>n+r.delta,0):null;return {total:list.length,collected:collected.length,count:valid.length,balance:collected.length?collected.reduce((n,r)=>n+r.latest.gold,0):null,opening:valid.length?opening:null,closing:valid.length?valid.reduce((n,r)=>n+r.now.gold,0):null,delta,rate:opening?delta/opening*100:null,known:valid.reduce((n,r)=>n+r.known,0),unexplained:valid.length?valid.reduce((n,r)=>n+r.unexplained,0):null,stale:list.filter(r=>r.stale).length,crossBoundary:valid.filter(r=>r.crossBoundary).length};};
+    const accounts=s.accounts.filter(a=>rows.some(r=>r.role.accountId===a.id)).map(account=>{const list=rows.filter(r=>r.role.accountId===account.id);return {account,rows:list,...summarize(list)};});
+    const actualTimes=rows.filter(r=>r.latest).map(r=>r.latest.time),collectedTimes=rows.filter(r=>r.latest).map(r=>r.latest);
+    return {...summarize(rows),rows,accounts,batches,current,previous,range,mode,baselineSelected:!!baselineId,startTime,endTime,firstKnown:collectedTimes.sort((a,b)=>a.time-b.time)[0],lastKnown:collectedTimes.at(-1),mixedTimes:new Set(actualTimes).size>1,events:events.filter(e=>ids.has(e.roleId)),histories};
+  }
+  function goldBalanceTrend(report,limit=16) {
+    let batches=report.batches.filter(b=>b.observations.length&&b.time<=report.endTime);
+    if(report.range){const prior=batches.filter(b=>b.time<report.startTime).at(-1);batches=batches.filter(b=>b.time>=report.startTime);if(prior)batches.unshift(prior);}
+    else if(report.mode==='batch'&&report.previous&&report.baselineSelected){batches=batches.filter(b=>b.time>=report.previous.time);}
+    // Downsample actual nodes; never manufacture daily observations.
+    if(batches.length>limit)batches=Array.from({length:limit},(_,i)=>batches[Math.round(i*(batches.length-1)/(limit-1))]);
+    if(!batches.length)return {points:[],count:0};
+    const cohort=report.rows.filter(r=>r.history.some(x=>x.time<=batches[0].time));
+    const points=batches.map(b=>{const observations=cohort.map(r=>r.history.filter(x=>x.time<=b.time).at(-1));return {batch:b,balance:observations.reduce((n,x)=>n+x.gold,0),carried:observations.filter(x=>x.time<b.time).length,count:cohort.length};});
+    return {points,count:cohort.length};
+  }
+  function goldBalanceCheck(s,row) {
+    const role=row.role,opening=role.openingGold??null,date=role.openingGoldDate,latest=row.latest;
+    if(opening===null||!date||!latest||date>latest.date)return {opening,date,expected:null,difference:null,uncertain:[]};
+    const included=[],uncertain=[];
+    for(const e of confirmedGoldEvents(s).filter(e=>e.roleId===role.id)){
+      if(e.date<date||e.date>latest.date)continue;
+      if(e.date===date){uncertain.push(e);continue;}
+      if(e.capturedAt&&latest.precision==='instant'){if(Date.parse(e.capturedAt)<=latest.time)included.push(e);}
+      else if(e.date<latest.date)included.push(e);
+      else uncertain.push(e);
+    }
+    const expected=opening+included.reduce((n,e)=>n+e.amount,0);
+    return {opening,date,expected,difference:latest.gold-expected,included,uncertain};
+  }
+  function goldLedgerGroups(report) {
+    const startDate=Number.isFinite(report.startTime)?dateKey(new Date(report.startTime)):null,endDate=Number.isFinite(report.endTime)?dateKey(new Date(report.endTime)):null,groups=new Map();
+    for(const e of report.events){
+      if(e.capturedAt){const t=Date.parse(e.capturedAt);if((report.mode==='batch'&&report.previous?t<=report.startTime:t<report.startTime)||t>report.endTime)continue;}
+      else if(startDate&&e.date<startDate||endDate&&e.date>endDate)continue;
+      const key=e.category==='transfer'&&e.transferId?'transfer_'+e.transferId:'event_'+e.id+'_'+e.roleId;
+      if(!groups.has(key))groups.set(key,{id:key,date:e.date,category:e.category||'reward',events:[],amount:0});
+      const g=groups.get(key);g.events.push(e);g.amount+=e.amount;
+      if(!e.capturedAt){const day=Date.parse(e.date+'T00:00:00+08:00');g.timeUncertain=!!g.timeUncertain||(report.mode==='batch'&&(e.date===startDate||e.date===endDate))||(!!report.range?.precise&&day<=report.endTime&&day+86400000-1>=report.startTime&&(day<report.startTime||day+86400000-1>report.endTime));}
+    }
+    return [...groups.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.id.localeCompare(b.id));
+  }
   function partialMeasurementRecord(f) {
     const m=f.measurements||{},r={...f,id:f.id+'_measurement',completionOnly:false,gold:m.gold??0,minutes:m.minutes??0,onlineMinutes:m.onlineMinutes??0,otherCost:m.otherCost??0,accountMinutes:{},measurementStatus:'confirmed',incompleteMeasurement:['gold','minutes','onlineMinutes'].some(k=>m[k]==null),financialEvent:true};
     r.allocationMethod=m.financialAllocation==='task'?'task':m.financialAllocation==='attendance'?'manual':m.allocationVersion===2&&m.financialAllocation==='none'?'manual-none':undefined;
@@ -1110,5 +1204,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
