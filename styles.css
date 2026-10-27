@@ -1217,3 +1217,6 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 #dialog.completion-dialog .tc-quick-fields{grid-template-columns:repeat(6,minmax(0,1fr))}#dialog.completion-dialog .tc-quick-fields>.field:not(.full){grid-column:span 2}#dialog.completion-dialog .tc-quick-fields>.field:nth-child(-n+4){grid-column:span 3}
 @media(max-width:600px){#dialog.completion-dialog .tc-quick-fields{grid-template-columns:repeat(2,minmax(0,1fr))}#dialog.completion-dialog .tc-quick-fields>.field:not(.full),#dialog.completion-dialog .tc-quick-fields>.field:nth-child(-n+4){grid-column:span 1}}
 #dialog.completion-dialog .tc-quick-fields>.full{grid-column:1/-1}
+
+.planning-search-status{margin:6px 0 0;color:var(--wb-text-secondary);font-size:12px}
+.planning-search-status:empty{display:none}
