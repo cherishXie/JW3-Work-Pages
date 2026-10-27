@@ -2,6 +2,8 @@
 (() => {
   function startWorkbench(){
   'use strict';
+  const Platform=WorkbenchPlatform,localStorage=Platform.storage;
+  document.querySelectorAll('[data-storage-label]').forEach(el=>el.textContent=Platform.storageLabel);
   const Theme=WorkbenchThemes, Catalog=JX3Catalog, Raids=JX3Raids, Activity=WorkbenchActivity, Ops=WorkbenchOperations;
   const ROI=WorkbenchROI, Daily=WorkbenchDaily, Importer=WorkbenchImporter, Execution=WorkbenchExecution;
   const M=Workbench, Store=WorkbenchStorage, DEMO_KEY='jx3-workbench-experience-v1', $=s=>document.querySelector(s);
@@ -397,7 +399,7 @@
   document.addEventListener('input',()=>{if(ui.privacy)queueMicrotask(applyPrivacy);});
   function renderSidebar(){
     const nav=[['overview','总览'],['task','任务中心'],['roles','账号与角色'],['roi','收益分析'],['assets','资产台账']];
-    $('#sidebar').innerHTML=`<div class="brand"><span class="brandmark">${icon('bolt')}</span><div><strong>剑网三工作台</strong></div></div><div class="navlabel">工作空间</div><nav class="nav" aria-label="工作空间">${nav.map(([id,name])=>button(icon(id)+name,'nav',(ui.page===id||id==='task'&&['taskmanage','history'].includes(ui.page))?'active':'',`data-page="${id}"`)).join('')}</nav><div class="navlabel mt">管理</div><nav class="nav" aria-label="数据管理">${button(icon('settings')+'工作台设置','nav',['settings','data'].includes(ui.page)?'active':'','data-page="settings"')}</nav><div class="sidebar-bottom"><div class="storage-status"><i class="dot" style="background:${storageError?'var(--wb-danger)':'var(--wb-success)'}"></i>${storageError?'本地保存异常':experience?'体验数据独立保存':'浏览器本地工作空间'}</div><div class="sidebar-note">${!Store.hasData(state)?'当前为空白工作空间':state.dataKind==='simulated'?'当前载入示例 / 模拟数据':'当前已加载个人数据'}</div>${button(icon('settings')+'配置引导','setup','ghost small mt')}${button(icon('info')+'使用与计算指南','guide','ghost small mt')}</div>`;
+    $('#sidebar').innerHTML=`<div class="brand"><span class="brandmark">${icon('bolt')}</span><div><strong>剑网三工作台</strong></div></div><div class="navlabel">工作空间</div><nav class="nav" aria-label="工作空间">${nav.map(([id,name])=>button(icon(id)+name,'nav',(ui.page===id||id==='task'&&['taskmanage','history'].includes(ui.page))?'active':'',`data-page="${id}"`)).join('')}</nav><div class="navlabel mt">管理</div><nav class="nav" aria-label="数据管理">${button(icon('settings')+'工作台设置','nav',['settings','data'].includes(ui.page)?'active':'','data-page="settings"')}</nav><div class="sidebar-bottom"><div class="storage-status"><i class="dot" style="background:${storageError?'var(--wb-danger)':'var(--wb-success)'}"></i>${storageError?'本地保存异常':experience?'体验数据独立保存':(Platform.kind==='electron'?'桌面本地工作空间':'浏览器本地工作空间')}</div><div class="sidebar-note">${!Store.hasData(state)?'当前为空白工作空间':state.dataKind==='simulated'?'当前载入示例 / 模拟数据':'当前已加载个人数据'}</div>${button(icon('settings')+'配置引导','setup','ghost small mt')}${button(icon('info')+'使用与计算指南','guide','ghost small mt')}</div>`;
   }
   function syncPeriod(){ui.trajectoryWeek=M.weekStart(ui.start);}
   function syncTaskDate(){ui.queueRange='day';ui.focusPlanId='';ui.focusBatchKey='';ui.generated=null;}
@@ -1358,7 +1360,7 @@
     if(ui.dataTab==='verify'){const tests=verificationResults;content=`${notice(`内置 ${tests.length} 项独立用例直接调用当前计算模型。${tests.every(t=>t.pass)?'<b class="success">全部通过</b>':'<b class="negative">存在失败</b>'}；浏览器交互与布局另行检查。`,button('重新运行','rerender','small'))}<section class="card">${table(['用例','检查内容','结果'],tests.map(t=>`<tr><td>${esc(t.id)}</td><td>${esc(t.name)}</td><td class="${t.pass?'success':'negative'}">${t.pass?'✓ 通过':'✕ '+esc(t.error)}</td></tr>`))}</section><section class="card pad mt"><h2>交付能力边界</h2><ul class="help-list"><li><b>本版已实现</b>档案管理、周期矩阵、任务参数、角色 / 全队收入、联合收入组成、双时间、账号互斥、门派心法与远近 Tag、侠客补位、5席大战与7/8玩家十人本、排程确认与执行、历史计价、金币转账、装备槽位、现金流、情景对比、逐账号单套餐预算、JSON/CSV 交换、PNG 分享。</li><li><b>需后续真实文件验证</b>茗伊 .jx3dat 解码、SQLite 配装与 CD 适配、完整流水、文件自动同步、原 Excel 月矩阵迁移、包月与多档混合采购、跨任务时间重叠优化、实际侠客培养强度与副本召请条件、复杂队伍的最优搜索。</li></ul></section>`;}
     else if(ui.dataTab==='components')content=`<section class="card pad"><h2>Design System / 组件状态</h2><p class="panel-sub mb">所有控件使用同一套 Deep Ocean Tokens；焦点可见，状态同时表达文本与形状。</p><div class="state-samples"><div class="state-sample"><h3>常规 / 选中</h3><div class="flex mt">${button('常规按钮','sample')}${button('当前选中','sample','primary')}</div></div><div class="state-sample"><h3>状态标签</h3><div class="stack mt"><span class="status completed">已完成</span><span class="status progressing">进行中</span><span class="status unknown">未知</span></div></div><div class="state-sample"><h3>输入与聚焦</h3><input class="mt" aria-label="组件示例输入" placeholder="Tab 键查看焦点" style="width:100%"></div><div class="state-sample"><h3>加载</h3><p class="flex mt"><i class="spinner"></i>正在读取本地文件…</p></div><div class="state-sample"><h3>失败</h3><p class="negative mt">✕ 不支持的来源版本</p><small>既有数据保留</small></div><div class="state-sample"><h3>无数据 / 禁用</h3><p class="muted mt">暂无实测数据</p><button class="mt" disabled>暂无可执行角色</button></div></div></section>`;
     else content=`<div class="two-col"><section class="card pad"><h2>数据交换与备份</h2><p class="panel-sub">支持工作台 JSON v1、规范化角色 CSV 与本地 Excel（.xlsx）。导入先预览，再确认合并；不修改源文件。</p><div class="stack mt">${button('上传角色截图并识别','screenshot-import','primary')}${button(icon('download')+'导出完整 JSON 备份','export')}${button(icon('download')+'下载角色 CSV 模板','csv-template')}${button('下载运营 CSV 模板','operations-csv-template')}${button('运营 CSV 格式说明','operations-csv-help')}<label class="field">选择 JSON / CSV / Excel<input id="import-file" type="file" accept=".json,.csv,.xlsx"></label><small>JSON 合并保留当前全局配置；金融事件同 ID 不覆盖。可选择合并或替换当前数据；空白导入自动恢复文件参数，已有数据合并时可单独应用参数。</small></div><div id="import-preview" class="mt"></div></section><section class="card pad"><h2>数据来源支持情况</h2><div class="list-detail mt"><div><span>手工档案 / 任务 / 流水</span><b class="success">✓ 可用</b></div><div><span>工作台 JSON / 角色 CSV</span><b class="success">✓ 预览与合并</b></div><div><span>现用 Excel 原始迁移</span><b class="warning">可迁移角色 / 完成状态 / 总余额，原表归档</b></div><div><span>茗伊角色 / 任务 .jx3dat</span><b class="warning">加密样本 / 需游戏内明文导出</b></div><div><span>茗伊副本 / 装备 / 背包 .db</span><b class="success">已核对 1018 样本 / 脚本转 JSON 导入</b></div><div><span>角色统计截图</span><b class="success">本地识别 / 核对后更新</b></div><div><span>游戏目录自动同步</span><b class="muted">尚未接入</b></div></div><p class="panel-sub mt">版本不明、解析失败和缺失字段不会以零值覆盖记录。当前界面没有实时采集能力。</p></section></div><section class="card mt">${head('导入批次','重复 ID 不新增，过期记录不覆盖新记录')}${state.imports.length?table(['日期','来源','新增','更新','跳过 / 旧数据','状态'],state.imports.map(i=>`<tr><td>${esc(i.date)}</td><td>${esc(i.name)}</td><td>${i.stats.added}</td><td>${i.stats.updated}</td><td>${i.stats.skipped+i.stats.old}</td><td>已合并${i.rolledBack?' / 已撤销':''}</td></tr>`)):empty('尚无导入记录','请先备份当前数据，再选择一个标准交换文件。')}</section>${sourceArchivePanel()}<section class="card pad mt"><div class="flex between wrap"><div><h2>开始自己的工作空间</h2><p class="panel-sub">切换前建议导出备份。一键清除当前数据和全部日期档案，恢复空白状态；确认后可立即撤销。</p></div><div class="flex">${button('重新打开配置引导','setup')}${button('一键重置为空白','reset-blank','danger')}</div></div></section>`;
-    return (ui.page==='settings'?'':pageHead('DATA & VALIDATION','数据有依据，结果可验证','当前工作空间保存于浏览器 localStorage。导出备份可以在其他浏览器继续使用。'))+tabs(ui.page==='settings'?(ui.settingsTab==='data'?[['exchange','数据交换']]:[['verify','计算验收'],['components','组件状态']]):[['exchange','数据交换'],['verify','计算验收'],['components','组件状态']],ui.dataTab,'data-tab')+(ui.dataTab==='exchange'?archivePanel():'')+content;
+    return (ui.page==='settings'?'':pageHead('DATA & VALIDATION','数据有依据，结果可验证','当前工作空间保存于本机。导出备份可以在其他客户端继续使用。'))+tabs(ui.page==='settings'?(ui.settingsTab==='data'?[['exchange','数据交换']]:[['verify','计算验收'],['components','组件状态']]):[['exchange','数据交换'],['verify','计算验收'],['components','组件状态']],ui.dataTab,'data-tab')+(ui.dataTab==='exchange'?archivePanel():'')+content;
   }
   let submitModal=null;
   function modal(title,body,handler=null,label='保存'){
@@ -1580,7 +1582,7 @@
       modal('MuMu 本机配置读取失败','<p>'+esc(e.message)+'</p><p>原配置保留，可清除本机绑定后重新设置。</p>'+button('清除 MuMu 本机绑定','mumu-clear','small','type="button"'));return;
     }
     const accounts=state.accounts.filter(a=>a.enabled!==false);
-    modal('MuMu 本机设置 / Windows','<p class="panel-sub">为账号绑定 MuMu 实例索引和实际游戏包名。配置仅保存在此浏览器，不随业务备份迁移。目前提供启动准备，尚未连接模拟器。</p>'+table(['账号','实例索引','游戏包名','操作'],accounts.map(a=>{
+    modal('MuMu 本机设置 / Windows','<p class="panel-sub">为账号绑定 MuMu 实例索引和实际游戏包名。配置仅保存在此客户端，不随业务备份迁移。目前提供启动准备，尚未连接模拟器。</p>'+table(['账号','实例索引','游戏包名','操作'],accounts.map(a=>{
       const b=config.bindings.find(b=>b.accountId===a.id);
       return '<tr><td>'+esc(a.name)+'</td><td data-label="实例索引">'+esc(b?.instanceId??'未绑定')+'</td><td data-label="游戏包名">'+esc(b?.packageName||'待配置')+'</td><td>'+button(b?'修改绑定':'绑定实例','mumu-bind','small','data-account="'+esc(a.id)+'" type="button"')+(b?button('解除','mumu-unbind','ghost small','data-account="'+esc(a.id)+'" type="button"'):'')+'</td></tr>';
     }))+'<p class="panel-sub">允许不同批次复用实例；同一批次的不同账号必须使用不同实例。绑定表示目标映射，实际登录账号仍需在连接时核验。</p>');
@@ -1856,7 +1858,7 @@
   function screenshotDialog(){
     clearScreenshotQueue();screenshotDraft=null;
     modal('批量上传角色统计截图',`<p>支持一次选择多张茗伊「角色统计」截图，自动合并重复角色，并补齐空白字段。包含名字、门派、金钱、通宝、等级、资历、宠物、侠行、侠行周等列。</p>
-      <p class="panel-sub mt">图片只在浏览器内识别，不上传。相同角色的冲突数值会标明来源，需要人工确认；最后统一勾选更新，可以撤销。</p>
+      <p class="panel-sub mt">图片只在本机识别，不上传。相同角色的冲突数值会标明来源，需要人工确认；最后统一勾选更新，可以撤销。</p>
       <label class="field mt">添加图片（可分多次选择）<input id="screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="screenshot-queue" class="mt" aria-live="polite"></div>
       <div class="form-grid mt"><label class="field">表格数据顶部（图片高度 %）<input id="screenshot-top" type="number" value="23" min="0" max="90"></label><label class="field">表格数据底部（图片高度 %）<input id="screenshot-bottom" type="number" value="92" min="10" max="100"></label></div>
       <p class="panel-sub">使用同一组裁剪比例逐张识别。最多 12 张，每张不超过 12 MB，总计不超过 60 MB；本批相同截图自动去重；已导入截图仍可重新识别并核对。</p>
@@ -2354,7 +2356,7 @@
       if(el.id==='group'){ui.roiTaskIds=null;ui.roiResult=null;ui.group=el.value;ui.account='';ui.role='';ui.trajectoryAccount='';ui.generated=null;render();}
       if(el.id==='global-account'){ui.roiResult=null;ui.account=el.value;ui.role='';ui.generated=null;render();}
       if(el.id==='global-role'){ui.roiTaskIds=null;ui.roiResult=null;ui.role=el.value;ui.trajectoryAccount='';ui.generated=null;render();}
-      if(el.id==='currency'){ui.currency=el.value;try{localStorage.setItem('jx3-workbench-currency',ui.currency);}catch{toast('显示已切换，浏览器无法保存偏好');}render();}if(el.id==='mode'){ui.mode=el.value;render();}
+      if(el.id==='currency'){ui.currency=el.value;try{localStorage.setItem('jx3-workbench-currency',ui.currency);}catch{toast('显示已切换，本机无法保存偏好');}render();}if(el.id==='mode'){ui.mode=el.value;render();}
       if(el.id==='task-range-start'||el.id==='task-range-end'){/* Applied together by calendar-apply-range. */}
       if(el.id==='reuse-history-date'){ui.reuseHistoryDate=el.value;ui.reuseHistoryPage=0;render();return;}
       if(el.id==='reuse-history-query'){ui.reuseHistoryQuery=el.value;ui.reuseHistoryPage=0;render();return;}
@@ -2398,7 +2400,7 @@
   window.addEventListener('focus',resumeWorkspace);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeWorkspace();});
   // A fresh opening stays blank. Migrate valid old data without creating a sample.
-  try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=structuredClone(state);Store.write(localStorage,dataStore,KEY);}}catch(e){storageError='浏览器存储不可用：'+e.message;}
+  try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=structuredClone(state);Store.write(localStorage,dataStore,KEY);}}catch(e){storageError='本机存储不可用：'+e.message;}
   let savedStorageRaw;try{savedStorageRaw=localStorage.getItem(KEY);}catch{}
   setInterval(()=>{for(const el of document.querySelectorAll('[data-account-time]')){const a=state.accounts.find(a=>a.id===el.dataset.accountTime);if(a)el.textContent=Ops.duration(Ops.remaining(a),a.billingType==='monthly');}},1000);
   globalThis.WorkbenchBoot?.stage('正在生成工作台视图');
