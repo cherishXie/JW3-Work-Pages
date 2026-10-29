@@ -4,10 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111111'/%3E%3Cpath d='M18 4L8 18h8l-2 10 10-15h-8z' fill='%23009e96'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="app-icon.png">
   <meta name="theme-color" content="#111111">
   <meta name="description" content="剑网三多账号效率工作台 / 可验证 HTML 原型">
   <!-- Public release: published via allowlisted JW3-Work-Pages workflow; user data stays browser-local. -->
   <title>剑网三 / 效率工作台</title>
+  <script defer src="version.js"></script>
   <script defer src="boot.js?v=startup-20261024"></script>
   <script defer src="platform.js?v=desktop-20261027"></script>
   <script defer src="themes.js?v=startup-20261024"></script>
@@ -22,8 +25,9 @@
   <aside id="sidebar" class="sidebar"></aside>
   <div class="workspace">
     <header id="topbar" class="topbar"></header>
+    <section id="app-update" class="app-update" aria-label="版本更新" hidden><div><strong id="update-message" role="status" aria-live="polite"></strong><p id="update-detail"></p></div><div class="update-actions"><button id="update-apply" class="primary" type="button">立即更新</button><button id="update-dismiss" type="button">稍后</button></div></section>
     <main id="app" tabindex="-1"></main>
-    <footer class="footer"><span>剑网三工作台</span><span data-storage-label>数据保存在此浏览器</span></footer>
+    <footer class="footer"><span id="app-version">剑网三工作台</span><button id="update-check" type="button" class="small">检查更新</button><span data-storage-label>数据保存在此浏览器</span></footer>
   </div>
   <dialog id="dialog"><div id="dialog-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -37,5 +41,6 @@
   <script type="application/x-workbench-module" data-workbench-module="zip" src="vendor/jszip.min.js"></script><script defer src="daily.js?v=custom-teams-20261024"></script><script defer src="execution.js"></script><script defer src="importer.js?v=season50-20261029-2"></script>
 <script defer src="roi.js"></script>
 <script type="application/x-workbench-module" data-workbench-module="ocr" src="vendor/ocr/tesseract.min.js"></script><script defer src="screenshot.js?v=season50-20261029-2"></script><script defer src="app.js?v=season50-20261029-2"></script>
+<script defer src="update.js"></script>
 </body>
 </html>

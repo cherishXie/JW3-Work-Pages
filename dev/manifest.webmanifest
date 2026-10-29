@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "剑网三工作台",
+  "short_name": "剑三工作台",
+  "description": "账号角色、任务排程与收益分析，数据保存在本机",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

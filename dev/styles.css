@@ -1282,3 +1282,9 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .tc-cal-panel{inset:12px 12px 12px auto;width:min(920px,calc(100vw - 36px));max-height:calc(100dvh - 24px)}
 @media(min-width:1100px){#calendar-task-panel{width:min(1120px,calc(100vw - 260px))}}
 @media(max-width:900px){.tc-cal-panel{inset:8px 8px 8px auto;width:calc(100vw - 16px);max-height:calc(100dvh - 16px);transform-origin:right center}}
+
+/* Update notice follows existing theme tokens and stays in document flow. */
+.app-update{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 12px 0;padding:10px 12px;border:.5px solid var(--wb-border);border-radius:8px;background:var(--wb-surface);font-size:14px}
+.app-update>div:first-child{min-width:0}.app-update strong{font-size:14px;font-weight:600;overflow-wrap:anywhere}.app-update p{margin:6px 0 0;font-size:12px;color:var(--wb-text-muted);overflow-wrap:anywhere}
+.update-actions{display:flex;gap:8px;flex-shrink:0}.update-actions button{min-height:40px}.footer{flex-wrap:wrap;gap:8px}.footer #app-version{font-variant-numeric:tabular-nums}.footer #update-check{font-size:12px}
+@media(max-width:600px){.app-update{align-items:flex-start;flex-wrap:wrap;margin:8px 10px 0;padding:10px}.update-actions{margin-left:auto}.footer #app-version{flex-basis:100%}}

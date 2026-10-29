@@ -37,10 +37,18 @@ git push
 
 公共仓库 main/dev 保存可开发源码。gh-pages 仅保存白名单静态产物，根目录是稳定快照，dev/ 是开发快照。Pages 使用 GitHub Actions 部署组合快照。部署任务串行执行，逐字节核对两个线上快照。
 
-所有客户端按平台独立提供 EXE 或 DMG，文件名包含平台、架构和版本。dev 产生预发布构建；main 产生正式版。现阶段没有应用内自动更新、签名或 Apple 公证。
+所有客户端按平台独立提供 EXE 或 DMG，文件名包含平台、架构和版本。dev 产生预发布构建；main 产生正式版。0.2.1 起支持界面与业务资源的应用内更新；原生壳升级仍需新安装包，现阶段没有签名或 Apple 公证。
 
 ## 私人文件与迁移边界
 
 data/、output/、docs/、本机截图和备份、.private-source.git/、.public-migration/ 全部忽略。不要公开私人文件或私有仓库历史。公开源文件采用 scripts/public-source.cjs 白名单；新开发文件须主动扩充清单及对应 .gitignore 条目。
 
 原私有仓库保留为历史档案，旧发布工作流已停用。原本机 Git 元数据备份在被忽略的 .private-source.git/；公共 origin 不包含这些 Git 对象。不要将此目录添加到公共 Git。
+
+## 更新资源与兼容性
+
+build:pages 为完整公共资源生成 update-manifest.json（文件大小与 SHA-256）、version.js 与版本化 sw.js，部署保持 main/dev 独立。只允许 GET 检查更新，不上传业务数据。更改原生桥能力且旧壳无法兼容时，必须同步提升 scripts/update-build.cjs 的 protocol，不能通过普通资源更新调用旧壳没有的能力。
+
+Electron 的 desktop/updater.cjs 只从固定公共 Pages 频道下载允许类型的资源，禁止原生代码、目录穿越、跨频道和摘要不匹配。更新不增加安装包压缩合集，Release 继续按平台独立提供 EXE / DMG。
+
+验证：npm run test:updates；npm run build:desktop 后可运行 npm run test:updates:browser。在本机设置 JX3_PRIVATE_QA=1 使用指定布局数据的只读副本，JX3_TEST_DESKTOP=1 同时验证实际 Electron 更新与重启；公共 CI 仅使用生成的示例数据。
