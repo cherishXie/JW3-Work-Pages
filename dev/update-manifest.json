@@ -1,9 +1,9 @@
 {
-  "id": "c1c4c46378611c1dfe65a1c8e38005921f6aca948263f9a279cdcb920cf08930",
-  "version": "0.2.1",
+  "id": "bb575ebd2e095b41b7cadc1d5283bc3f98eeb5ee52352aece1d54a878f734d31",
+  "version": "0.3.0-dev.11",
   "channel": "dev",
-  "sourceCommit": "a2f0994e1fa79c9d372549b343c6f0a91a2a1531",
-  "sourceTimestamp": 1793263686,
+  "sourceCommit": "da1be985450c9ef3c0106145662119ca1878c66a",
+  "sourceTimestamp": 1793280053,
   "protocol": 1,
   "files": [
     {
@@ -178,8 +178,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 252,
-      "sha256": "67a7a755d43ed05356742ff5ce0fc5038bf6353d9a8761b6be9176dbb0a4f11e"
+      "bytes": 259,
+      "sha256": "9994caae4864ae50daaa6c25629a3a7d1912394eed2f7d3221dafdf7cfb8b932"
     }
   ]
 }
