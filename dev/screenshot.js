@@ -1,5 +1,5 @@
 /* Local-only OCR for the Mingyi character statistics table. No screenshot leaves the browser. */
-(function(root,factory){const api=factory();if(typeof module==='object')module.exports=api;else root.WorkbenchScreenshot=api;})(typeof globalThis==='object'?globalThis:this,()=>{
+(function(root,factory){const api=factory(typeof module!=='undefined'&&module.exports?require('./model.js'):root.Workbench);if(typeof module==='object')module.exports=api;else root.WorkbenchScreenshot=api;})(typeof globalThis==='object'?globalThis:this,(M)=>{
   'use strict';
   const fields=['name','school','gold','tongbao','level','achievement','petCount','xiaxing','weeklyXiaxing'];
   const labels=['截图角色名','门派','金币（G）','通宝','等级','资历','宠物','侠行','侠行周'];
@@ -166,11 +166,11 @@
       const role=next.roles.find(r=>r.id===row.roleId);if(!role)throw new Error('请为选中行选择已有角色');if(seen.has(role.id))throw new Error('同一角色出现多次，请只保留一行');seen.add(role.id);
       const newer=role.resourceUpdatedAt&&Date.parse(role.resourceUpdatedAt)>Date.parse(capturedAt)||role.observedDate&&role.observedDate>date||role.screenshotCapturedAt&&Date.parse(role.screenshotCapturedAt)>Date.parse(capturedAt)||(state.balanceSnapshots||[]).some(x=>x.roleId===role.id&&Date.parse(x.capturedAt||x.date+'T00:00:00+08:00')>Date.parse(capturedAt));
       if(newer&&!allowHistorical)throw new Error(role.name+' 已有更新的快照，请取消选择旧数据');
-      const changed={};for(const key of numeric){const n=value(row[key],key);if(n==null)continue;const target=key==='gold'?'observedGold':key;changed[target]={before:role[target]??null,after:n};if(!newer)role[target]=n;}
+      let levelApplied=false;const changed={};for(const key of numeric){const n=value(row[key],key);if(n==null)continue;const target=key==='gold'?'observedGold':key;changed[target]={before:role[target]??null,after:n};if(!newer&&!(key==='level'&&date<'2026-10-29'&&role.level!=null&&role.level<=M.CURRENT_LEVEL_CAP)){role[target]=n;if(key==='level')levelApplied=true;}}
       if(!Object.keys(changed).length)throw new Error(role.name+' 没有可更新的数值');
       if(row.school?.trim()){changed.school={before:role.school??'',after:row.school.trim()};if(!newer)role.school=row.school.trim();}
       if(changed.observedGold){if(!newer){role.observedDate=date;role.observedGoldSource='茗伊角色统计截图';}next.balanceSnapshots??=[];next.balanceSnapshots.push({id:id+'_'+role.id,roleId:role.id,gold:changed.observedGold.after,date,source:'茗伊角色统计截图',importedAt:now,capturedAt});}
-      if(!newer){role.screenshotCapturedAt=capturedAt;role.updatedAt=now;}changes.push({roleId:role.id,historical:!!newer,sourceName:row.name,ocrNames:row.ocrNames||[row.name],sources:row.sourceNames||[],changes:changed});
+      if(!newer){if(levelApplied)M.migrateRoleLevel(role,date<'2026-10-29');role.screenshotCapturedAt=capturedAt;role.updatedAt=now;}changes.push({roleId:role.id,historical:!!newer,sourceName:row.name,ocrNames:row.ocrNames||[row.name],sources:row.sourceNames||[],changes:changed});
     }
     if(!changes.length)throw new Error('请至少选择一行有效角色');
     next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:allowReimport?'mingyi-role-screenshot-review-v1':incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,reviewedDigests:repeated.map(f=>f.sha256),issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。',...(repeated.length?['复核已导入截图：保留原导入档案，新建更正记录；观测余额不计收入。']:[])],updatedAt:now,capturedAt});
