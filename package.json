@@ -1,0 +1,28 @@
+{
+  "name": "jx3-workbench-html",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Shared offline-first JX3 workbench for web and Electron",
+  "scripts": {
+    "start": "node serve.cjs",
+    "test": "node scripts/verify.cjs",
+    "build": "node scripts/package-html.cjs",
+    "build:pages": "node scripts/prepare-ocr.cjs && node scripts/build-pages.cjs",
+    "publish:pages:public": "node scripts/push-dev.cjs",
+    "build:desktop": "node scripts/build-desktop.cjs",
+    "desktop": "npm run build:desktop && electron .desktop-stage",
+    "dist:desktop": "npm run build:desktop && electron-builder --config desktop/electron-builder.cjs --mac --win --publish never",
+    "dist:mac": "npm run build:desktop && electron-builder --config desktop/electron-builder.cjs --mac --publish never",
+    "dist:win": "npm run build:desktop && electron-builder --config desktop/electron-builder.cjs --win --publish never",
+    "test:desktop": "node scripts/desktop-verify.cjs",
+    "test:desktop:smoke": "node scripts/desktop-smoke.cjs",
+    "test:desktop:artifacts": "node scripts/desktop-artifact-verify.cjs",
+    "release:main": "node scripts/promote-main.cjs",
+    "setup": "node scripts/setup-git.cjs"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0",
+    "playwright": "1.56.1"
+  }
+}

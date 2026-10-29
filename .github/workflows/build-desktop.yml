@@ -1,0 +1,141 @@
+name: Build and release desktop applications
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+# Only the final publishing job can write releases or tags.
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      version: ${{ steps.metadata.outputs.version }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require version upgrade and release notes for main
+        if: github.ref_name == 'main' && github.event_name == 'push'
+        env:
+          PREVIOUS_MAIN_SHA: ${{ github.event.before }}
+        run: node scripts/stable-version.cjs "$PREVIOUS_MAIN_SHA"
+      - name: Validate source version and release trigger
+        id: metadata
+        run: node scripts/desktop-release.cjs metadata
+
+  pages:
+    needs: prepare
+    uses: ./.github/workflows/publish-public-pages.yml
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: win
+            arch: x64
+            target: win-x64
+            asset_os: Windows
+          - os: macos-15
+            platform: mac
+            arch: arm64
+            target: mac-arm64
+            asset_os: macOS
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+            target: mac-x64
+            asset_os: macOS
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build native desktop package
+        run: |
+          npm run build:desktop
+          npx --no-install electron-builder --config desktop/electron-builder.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Verify package allowlist and generate target checksums
+        run: npm run test:desktop:artifacts -- --target=${{ matrix.target }}
+      - name: Smoke test packaged application on its native OS
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            export JX3_ELECTRON_PATH="$PWD/release/win-unpacked/剑网三工作台.exe"
+          elif [ "${{ matrix.arch }}" = "arm64" ]; then
+            export JX3_ELECTRON_PATH="$PWD/release/mac-arm64/剑网三工作台.app/Contents/MacOS/剑网三工作台"
+          else
+            export JX3_ELECTRON_PATH="$PWD/release/mac/剑网三工作台.app/Contents/MacOS/剑网三工作台"
+          fi
+          npm run test:desktop:smoke
+      - name: Upload only verified distribution files
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            release/JW3-Workbench-${{ matrix.asset_os }}-${{ matrix.arch }}-v*.exe
+            release/JW3-Workbench-${{ matrix.asset_os }}-${{ matrix.arch }}-v*.dmg
+            release/BUILD-INFO-${{ matrix.target }}.json
+            release/SHA256SUMS-${{ matrix.target }}.txt
+
+  release:
+    needs: [prepare, build, pages]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+      - name: Validate all platform manifests and publish complete Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESKTOP_RELEASE_REPOSITORY: cherishXie/JW3-Work-Pages
+          DESKTOP_PUBLIC_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Missing PAGES_DEPLOY_TOKEN for public desktop Releases"
+            exit 1
+          fi
+          node scripts/publish-desktop-release.cjs release-assets

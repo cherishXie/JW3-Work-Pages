@@ -1,0 +1,71 @@
+name: Deploy independent main and dev Pages
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  publish:
+    if: github.repository == 'cherishXie/JW3-Work-Pages' && (github.ref_name == 'dev' || github.ref_name == 'main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Serialize the complete read/merge/deploy/verify transaction across both branches.
+    concurrency:
+      group: pages-channels
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build:pages
+      - name: Checkout shared deployment snapshots
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages-target
+      - name: Merge only the selected branch snapshot
+        env:
+          CHANNEL: ${{ github.ref_name }}
+        run: node scripts/pages-channels.cjs pages-target "$CHANNEL" "$GITHUB_SHA"
+      - name: Save both snapshots without changing the other channel
+        working-directory: pages-target
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if ! git diff --cached --quiet; then
+            git commit -m "Deploy ${GITHUB_REF_NAME} ${GITHUB_SHA:0:12}"
+            git push origin HEAD:gh-pages
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .pages-site
+      - name: Deploy both independent snapshots
+        id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Verify selected channel bytes and preserved channel
+        env:
+          CHANNEL: ${{ github.ref_name }}
+        run: node scripts/verify-live-pages.cjs
+      - name: Browser import/export, persistence, five themes and three widths
+        env:
+          CHANNEL: ${{ github.ref_name }}
+        run: |
+          npx playwright install --with-deps chromium
+          base="https://cherishxie.github.io/JW3-Work-Pages/"
+          if [ "$CHANNEL" = dev ]; then base="${base}dev/"; fi
+          JX3_BROWSER_PATH="$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux/chrome' -o -path '*/chrome-linux64/chrome' | head -1)" node scripts/platform-web-smoke.cjs "$base"
+          JX3_LIVE_URL="$base" node scripts/ocr-live-smoke.cjs
+          JX3_LIVE_URL="$base" node scripts/screenshot-batch-live.cjs

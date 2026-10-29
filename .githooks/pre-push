@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main)
+      if [ "${JX3_RELEASE_MAIN:-}" != 1 ]; then
+        echo '日常修改请推送 dev；大版本使用 npm run release:main。' >&2
+        exit 1
+      fi
+      ;;
+    refs/heads/dev) ;;
+    *) echo '只允许推送 dev 或显式发布 main。' >&2; exit 1 ;;
+  esac
+  node scripts/check-public-source.cjs "$local_sha"
+done

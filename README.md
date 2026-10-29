@@ -8,7 +8,9 @@
 
 无需安装，直接在浏览器访问即可使用。建议收藏上面的完整地址。
 
-公共站点仓库：[cherishXie/JW3-Work-Pages](https://github.com/cherishXie/JW3-Work-Pages)。该仓库提供可直接部署的静态网页及本说明；开发源码在独立的私有仓库维护。
+公共站点仓库：[cherishXie/JW3-Work-Pages](https://github.com/cherishXie/JW3-Work-Pages)。该仓库现在直接维护公开开发源码，默认使用 dev 分支；main 保留稳定版本。开发与大版本发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+[打开 dev 开发版](https://cherishxie.github.io/JW3-Work-Pages/dev/)；日常推送仅更新开发版，稳定页面只在 main 更新时发布。两个地址的浏览器本地存储共用，测试开发版请使用独立浏览器上下文或先备份。
 
 ## 桌面版本
 
@@ -16,7 +18,7 @@
 
 网页与桌面数据相互独立，目前没有云同步。首次迁移请从网页导出 JSON，再在桌面版「工作台设置 → 数据管理」导入。当前构建没有发布者签名、Apple 公证和应用内自动更新。
 
-推送私有源码仓库 main 后，GitHub Actions 自动在 Windows 与两种 Mac 原生环境构建和验证，并在[公共仓库 Releases](https://github.com/cherishXie/JW3-Work-Pages/releases)生成包含安装包、校验和及构建信息的开发版。推送与 package.json 版本一致的 v 标签时生成正式版。安装包可公开下载，无需私有源码仓库权限。每次推送生成独立构建编号，历史版本保留；全部平台验证成功且对应网页发布通过后才公开新版本。
+推送 dev 后自动在三平台构建并验证，生成可公开下载的开发版 [Releases](https://github.com/cherishXie/JW3-Work-Pages/releases)。大版本按 CONTRIBUTING.md 更新版本号和 CHANGELOG，再显式合入 main，发布稳定页面和正式客户端。
 
 安装包按平台与版本分别命名，直接下载适合此电脑的一项，无需下载合集压缩包：
 
@@ -67,11 +69,11 @@
 npm start
 ```
 
-打开 [本地工作台](http://127.0.0.1:4173)。公共站点仓库只有静态资源，没有 npm 脚本，可使用本地静态服务器打开其中的 `index.html`。
+打开 [本地工作台](http://127.0.0.1:4173)。dev 分支包含 npm 开发、验证与打包脚本。迁移期间 main 保留原稳定网页，下一次大版本发布时才合入开发工具。
 
 ## 桌面开发与构建
 
-需要 Node.js 22.12+，在私有源码项目执行：
+需要 Node.js 22.12+，在公共仓库 dev 分支执行：
 
 ```sh
 npm ci
@@ -84,14 +86,16 @@ npm run dist:win
 
 ## 开发与发布
 
-以下命令在开发源码仓库执行：
+以下命令在公共仓库 dev 分支执行：
 
 ```sh
 npm test                     # 运行规则与数据验证
 npm run build:pages          # 生成经过白名单检查的 .pages-dist 静态产物
-npm run publish:pages:public # 验证、构建并同步公共仓库（需要 GitHub CLI 登录与权限）
+npm run publish:pages:public # 验证并推送 dev，触发独立开发页面与客户端发布
 ```
 
 源码仓库推送到 `main` 也会触发自动发布流程，需预先配置受限的 `PAGES_DEPLOY_TOKEN`。公共仓库使用 `main` 分支根目录发布 GitHub Pages，部署成功后通过上面的在线地址访问。
 
 两仓库使用同一份 README，由安全构建统一复制，后续发布会持续同步。公共发布仅包含白名单静态资源与 README，不包含私有源码仓库的 Git 历史、个人数据、备份、凭据或 `data/`、`output/`、`docs/` 目录。
+
+正式版本的更新内容记录在 [CHANGELOG.md](CHANGELOG.md)。

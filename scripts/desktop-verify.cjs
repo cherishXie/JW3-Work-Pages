@@ -1,0 +1,31 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
+const {createStore}=require('../desktop/store.cjs'),{assetPath,trustedSender}=require('../desktop/security.cjs');
+const Platform=require('../platform.js'),Store=require('../storage.js'),M=require('../model.js');
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'jw3-desktop-verify-'));
+try{
+  let disk=createStore(directory);
+  const desktop=Platform.create({workbenchDesktop:{os:'darwin',storage:disk}}),browser=Platform.create({localStorage:disk});
+  assert.equal(desktop.kind,'electron');assert.equal(browser.kind,'web');
+  const state=M.blank();state.notes.push({id:'desktop-note',text:'独立测试数据'});
+  Store.write(desktop.storage,Store.withState(Store.empty(),state));
+  disk=createStore(directory);assert.deepEqual(Store.read(disk).store.active,state);
+  desktop.storage.setItem('jx3-workbench-theme-v1','jade-green');
+  assert.equal(createStore(directory).getItem('jx3-workbench-theme-v1'),'jade-green');
+  assert(fs.existsSync(disk.backup));
+  desktop.storage.setItem('jx3-workbench-experience-v1','demo');desktop.storage.removeItem('jx3-workbench-experience-v1');
+  assert.equal(desktop.storage.getItem('jx3-workbench-experience-v1'),null);
+  assert.throws(()=>disk.setItem('__proto__','x'));assert.throws(()=>disk.getItem('private-path'));assert.throws(()=>disk.setItem('jx3-default-page',{}));
+  const before=fs.readFileSync(disk.file,'utf8');
+  const broken=createStore(directory,{...fs,renameSync(){throw new Error('模拟磁盘写入失败');}});
+  assert.throws(()=>broken.setItem('jx3-default-page','task'),/模拟磁盘/);
+  assert.equal(fs.readFileSync(disk.file,'utf8'),before);assert.equal(broken.getItem('jx3-default-page'),null);
+  fs.writeFileSync(disk.file,'damaged');assert.throws(()=>createStore(directory));assert.equal(fs.readFileSync(disk.file,'utf8'),'damaged');
+  const blocked=Platform.create({get localStorage(){throw new Error('blocked');}});assert.throws(()=>blocked.storage.getItem('x'),/blocked/);
+  const allowed=new Set(['index.html','platform.js']);assert.equal(assetPath('workbench://app/',directory,allowed),path.join(directory,'index.html'));
+  for(const url of ['https://app/index.html','workbench://evil/','workbench://app/secret.json','workbench://app/%2e%2e%2fprivate','workbench://app/%5cindex.html','workbench://user@app/'])assert.equal(assetPath(url,directory,allowed),null);
+  const frame={url:'workbench://app/#task'};assert(trustedSender({senderFrame:frame,sender:{mainFrame:frame}}));assert(!trustedSender({senderFrame:{url:frame.url},sender:{mainFrame:frame}}));
+  for(const file of ['main.cjs','preload.cjs','store.cjs','security.cjs','electron-builder.cjs'])new vm.Script(fs.readFileSync(path.join(__dirname,'../desktop',file),'utf8'),{filename:file});
+  const {publicFiles}=require('./public-assets.cjs');assert(publicFiles.includes('platform.js'));assert(!publicFiles.some(p=>/^(data|desktop|docs|output)\//.test(p)));
+  console.log('PASS desktop: archive roundtrip/restart, preferences, demo isolation, invalid keys, atomic failure, corruption protection, blocked browser storage, protocol allowlist, IPC frame isolation.');
+}finally{fs.rmSync(directory,{recursive:true,force:true});}

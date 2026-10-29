@@ -1,0 +1,14 @@
+'use strict';
+const cp=require('node:child_process');
+const run=args=>cp.execFileSync('git',args,{encoding:'utf8'}).trim();
+if(run(['branch','--show-current'])!=='dev'||run(['status','--porcelain']))throw Error('请先在 dev 提交所有改动');
+if(run(['remote','get-url','origin'])!=='https://github.com/cherishXie/JW3-Work-Pages.git')throw Error('origin 不是指定公共仓库');
+cp.execFileSync('git',['fetch','origin','main','dev'],{stdio:'inherit'});
+if(run(['rev-parse','HEAD'])!==run(['rev-parse','origin/dev']))throw Error('请先将 dev 推送并与远端同步');
+cp.execFileSync('git',['merge-base','--is-ancestor','origin/main','HEAD']);
+require('./stable-version.cjs').check('origin/main');
+const runs=JSON.parse(cp.execFileSync('gh',['run','list','--repo','cherishXie/JW3-Work-Pages','--branch','dev','--commit',run(['rev-parse','HEAD']),'--workflow','build-desktop.yml','--limit','1','--json','status,conclusion'],{encoding:'utf8'}));
+if(runs[0]?.status!=='completed'||runs[0]?.conclusion!=='success')throw Error('当前 dev 提交的网页与三平台客户端 Actions 尚未全部通过');
+cp.execFileSync('npm',['test'],{stdio:'inherit'});
+cp.execFileSync('git',['push','origin','HEAD:main'],{stdio:'inherit',env:{...process.env,JX3_RELEASE_MAIN:'1'}});
+console.log('main 已更新，正式 Pages 和客户端 Release 将自动构建；本地继续留在 dev。');
