@@ -1461,8 +1461,8 @@
   function deleteIdentityForm(kind,id){
     const info=Ops.deletionInfo(state,kind,id),label=kind==='account'?'账号':'角色';
     const blocked=info.blockers.length>0;
-    modal('删除'+label+' / '+esc(info.entity.name),`<p>${kind==='account'?'此账号及所属 '+info.roleIds.length+' 个角色将一起删除。':'此角色将从当前工作空间删除。'}</p>${blocked?`<p class="mt">关联记录：${info.blockers.map(x=>esc(x.label)+' '+x.count+' 项').join(' / ')}。</p><p class="panel-sub mt">请先在对应模块处理关联记录后再删除，也可以停用档案并保留历史。</p>`:'<p class="panel-sub mt">同时清理任务与配方参与范围、周期进度、装备和资源快照；任务模板及其他日期档案保留。删除后可立即撤销。</p>'}`,()=>commit(()=>{
-      if(blocked){info.entity.enabled=false;for(const r of state.roles.filter(r=>info.roleIds.includes(r.id)))r.enabled=false;}
+    modal('删除'+label+' / '+esc(info.entity.name),`<p>${blocked?'此档案仍被排程或历史记录引用，暂不能直接删除。':kind==='account'?'此账号及所属 '+info.roleIds.length+' 个角色将一起删除。':'此角色将从当前工作空间删除。'}</p>${blocked?`<p class="mt">关联记录：${info.blockers.map(x=>esc(x.label)+' '+x.count+' 项').join(' / ')}。</p><p class="panel-sub mt">请先在对应模块处理关联记录后再删除，也可以停用档案并保留历史。</p>`:'<p class="panel-sub mt">同时清理任务与配方参与范围、周期进度、装备和资源快照；任务模板及其他日期档案保留。删除后可立即撤销。</p>'}`,()=>commit(()=>{
+      if(blocked){const at=new Date().toISOString();Object.assign(info.entity,{enabled:false,updatedAt:at});for(const r of state.roles.filter(r=>info.roleIds.includes(r.id)))Object.assign(r,{enabled:false,updatedAt:at});}
       else Ops.deleteIdentity(state,kind,id);
       clearScope();ui.generated=null;ui.selected.clear();ui.locks=[];ui.roiResult=null;ui.directoryPage=0;
     },blocked?'已停用，历史记录保留；可撤销':label+'已删除；可撤销'),blocked?'停用并保留历史':'确认删除');
