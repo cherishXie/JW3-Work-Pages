@@ -24,7 +24,7 @@ check('容量不足时无损去重，完整日期档案往返且各快照独立'
 });
 check('接近容量上限时删除排程，刷新和回收站恢复均保留历史',()=>{
   const D=require('../daily'),O=require('../operations'),state=fixture();state.partyRulesVersion=3;
-  state.roles=[{id:'r',accountId:'own_account',name:'角色',level:130,enabled:true}];
+  state.roles=[{id:'r',accountId:'own_account',name:'角色',level:50,enabled:true}];
   state.tasks=[{...O.defaults('sect',['r']),id:'t'}];state.plans=[{id:'p',taskId:'t',date:'2026-10-20',batches:[['r']]}];
   state.custom={text:'保留历史内容'.repeat(2000)};
   const before=S.withState(S.empty(),state,new Date('2026-10-19T00:00:00Z')),raw=JSON.stringify(before),storage=limited({[S.KEY]:raw},raw.length+10);
