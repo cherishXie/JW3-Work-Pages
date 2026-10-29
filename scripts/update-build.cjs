@@ -5,7 +5,7 @@ function generate(root,out,sourceFiles){
  const git=args=>cp.execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
  const channel=process.env.GITHUB_REF_NAME||git(['branch','--show-current']);
  if(!['main','dev'].includes(channel))throw Error('Updates require main or dev channel');
- const sourceCommit=process.env.GITHUB_SHA||git(['rev-parse','HEAD']),version=require(path.join(root,'package.json')).version;
+ const sourceCommit=process.env.GITHUB_SHA||git(['rev-parse','HEAD']),version=require('./desktop-release.cjs').channelVersion(require(path.join(root,'package.json')).version,channel,process.env.GITHUB_RUN_NUMBER||'0');
  const records=sourceFiles.map(name=>{const b=fs.readFileSync(path.join(out,name));return {name,bytes:b.length,sha256:hash(b)};});
  const id=hash(JSON.stringify({channel,sourceCommit,version,records}));
  const sourceTimestamp=Number(git(['show','-s','--format=%ct',sourceCommit]));

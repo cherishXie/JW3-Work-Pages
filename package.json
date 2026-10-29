@@ -1,6 +1,6 @@
 {
   "name": "jx3-workbench-html",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Shared offline-first JX3 workbench for web and Electron",
   "scripts": {

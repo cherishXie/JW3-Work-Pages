@@ -10,5 +10,5 @@ for(const file of publicFiles){const target=path.join(out,'web',file);fs.mkdirSy
 for(const file of ['main.cjs','preload.cjs','store.cjs','security.cjs','updater.cjs'])fs.copyFileSync(path.join(root,'desktop',file),path.join(out,file));
 fs.writeFileSync(path.join(out,'assets.json'),JSON.stringify(publicFiles));
 const pkg=require('../package.json');
-fs.writeFileSync(path.join(out,'package.json'),JSON.stringify({name:'jx3-workbench-desktop',version:pkg.version,description:'剑网三工作台',author:'JW3 Workbench',main:'main.cjs',private:true},null,2));
+fs.writeFileSync(path.join(out,'package.json'),JSON.stringify({name:'jx3-workbench-desktop',version:require('./desktop-release.cjs').currentVersion(),description:'剑网三工作台',author:'JW3 Workbench',main:'main.cjs',private:true},null,2));
 console.log('Desktop stage ready: shared business rules + platform port + isolated Electron host. No user data included.');

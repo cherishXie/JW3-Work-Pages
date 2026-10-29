@@ -18,15 +18,17 @@
 
 网页与桌面数据相互独立，目前没有云同步。首次迁移请从网页导出 JSON，再在桌面版「工作台设置 → 数据管理」导入。当前构建没有发布者签名和 Apple 公证。0.2.1 起，界面与业务资源支持应用内检查并点击更新；原生壳升级需安装对应平台的安装包。
 
-推送 dev 后自动在三平台构建并验证，生成可公开下载的开发版 [Releases](https://github.com/cherishXie/JW3-Work-Pages/releases)。大版本按 CONTRIBUTING.md 更新版本号和 CHANGELOG，再显式合入 main，发布稳定页面和正式客户端。
+当前正式版为 **0.3.0**：[正式版发布说明](https://github.com/cherishXie/JW3-Work-Pages/releases/tag/v0.3.0)。按系统选择安装包：
 
-安装包按平台与版本分别命名，直接下载适合此电脑的一项，无需下载合集压缩包：
-
-| 系统 | 文件名（以 0.2.0 为例） |
+| 系统 | 正式版下载 |
 | --- | --- |
-| Windows x64 | `JW3-Workbench-Windows-x64-v0.2.0.exe` |
-| macOS Apple Silicon | `JW3-Workbench-macOS-arm64-v0.2.0.dmg` |
-| macOS Intel | `JW3-Workbench-macOS-x64-v0.2.0.dmg` |
+| Windows x64 | [下载 EXE](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.3.0/JW3-Workbench-Windows-x64-v0.3.0.exe) |
+| macOS Apple Silicon | [下载 arm64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.3.0/JW3-Workbench-macOS-arm64-v0.3.0.dmg) |
+| macOS Intel | [下载 x64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.3.0/JW3-Workbench-macOS-x64-v0.3.0.dmg) |
+
+[下载 SHA-256 校验清单](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.3.0/SHA256SUMS.txt)。无需下载合集压缩包或 Source code。
+
+[开发版与历史版本](https://github.com/cherishXie/JW3-Work-Pages/releases)单独列出。dev 客户端版本为 `0.3.0-dev.<构建号>`，标记为预发布；main 正式客户端为 `0.3.0`。每次推送 dev 仅更新开发网页与开发客户端，正式发布按 [CONTRIBUTING.md](CONTRIBUTING.md) 执行。
 
 ## 主要功能
 
@@ -69,7 +71,7 @@
 npm start
 ```
 
-打开 [本地工作台](http://127.0.0.1:4173)。dev 分支包含 npm 开发、验证与打包脚本。迁移期间 main 保留原稳定网页，下一次大版本发布时才合入开发工具。
+打开 [本地工作台](http://127.0.0.1:4173)。dev 与 main 均包含 npm 开发、验证与打包脚本，日常开发在 dev 进行。
 
 ## 桌面开发与构建
 
@@ -94,15 +96,15 @@ npm run build:pages          # 生成经过白名单检查的 .pages-dist 静态
 npm run publish:pages:public # 验证并推送 dev，触发独立开发页面与客户端发布
 ```
 
-源码仓库推送到 `main` 也会触发自动发布流程，需预先配置受限的 `PAGES_DEPLOY_TOKEN`。公共仓库使用 `main` 分支根目录发布 GitHub Pages，部署成功后通过上面的在线地址访问。
+正式发布执行 `npm run release:main`，通过版本与构建检查后将 dev 快进至 main。GitHub Actions 将两个频道的静态快照合并部署，稳定版在根目录，开发版在 dev/，互不覆盖；客户端使用工作流的受限 GitHub token 发布。
 
-两仓库使用同一份 README，由安全构建统一复制，后续发布会持续同步。公共发布仅包含白名单静态资源与 README，不包含私有源码仓库的 Git 历史、个人数据、备份、凭据或 `data/`、`output/`、`docs/` 目录。
+公开源码与网页产物均使用显式白名单，不包含私有仓库历史、个人数据、备份、凭据或 `data/`、`output/`、`docs/` 目录。
 
 正式版本的更新内容记录在 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 安装与版本更新
 
-开发页支持 PWA：首次联网打开完成缓存后，可从支持的浏览器菜单安装到设备，并可离线重新打开及识别截图。PWA 安装入口由浏览器提供，不申请系统通知权限；更新通知显示在工作区顶部。
+网页支持 PWA：首次联网打开完成缓存后，可从支持的浏览器菜单安装到设备，并可离线重新打开及识别截图。PWA 安装入口由浏览器提供，不申请系统通知权限；更新通知显示在工作区顶部。
 
 网页和 0.2.1 起的 Electron 会在启动、返回前台、恢复网络时检查更新，使用期间每十分钟再检查。底部提供「检查更新」。发现新版本后可选择「立即更新」或「稍后」。更新先完整下载、校验资源，点击后切换并重新打开工作台；不会删除账号、角色、备份或主题。编辑窗口、未保存的排程或存储错误会阻止切换，请先保存或处理后重试。离线或校验失败时继续使用现有版本。
 

@@ -3,6 +3,15 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const TARGETS=['win-x64','mac-arm64','mac-x64'];
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+function channelVersion(version,channel,runNumber='0'){
+  if(!['main','dev'].includes(channel))throw new Error('版本必须使用 main 或 dev 频道');
+  if(!/^\d+$/.test(String(runNumber)))throw new Error('无效开发构建编号');
+  return channel==='dev'?version.split('-')[0]+'-dev.'+runNumber:version;
+}
+function currentVersion(){
+  const channel=process.env.GITHUB_REF_NAME||require('node:child_process').execFileSync('git',['branch','--show-current'],{cwd:path.join(__dirname,'..'),encoding:'utf8'}).trim();
+  return channelVersion(require('../package.json').version,channel,process.env.GITHUB_RUN_NUMBER||'0');
+}
 function artifactNames(version,target){
   if(!TARGETS.includes(target))throw new Error('未知桌面目标：'+target);
   const platform=target==='win-x64'?'Windows':'macOS',arch=target.split('-')[1],ext=target==='win-x64'?'exe':'dmg';
@@ -17,6 +26,7 @@ function metadata({version,ref,sha,runNumber}){
   if(!tagged&&!['refs/heads/main','refs/heads/dev'].includes(ref))throw new Error('仅 dev、main 或版本标签可以发布桌面版本');
   const stable=tagged||ref==='refs/heads/main';
   const prerelease=!stable||version.includes('-'),tag=stable?'v'+version:`desktop-dev-v${version}-build.${runNumber}`;
+  version=channelVersion(version,stable?'main':'dev',runNumber);
   return {version,sha,tag,prerelease,title:stable?`剑网三工作台 ${version}`:`剑网三工作台 ${version} 开发构建 #${runNumber}`};
 }
 function fileBytes(directory,name){
@@ -59,7 +69,7 @@ function prepare(directory,meta,electron,repository){
   fs.writeFileSync(path.join(directory,'RELEASE-NOTES.md'),notes.join('\n')+'\n');
   return [...manifest.artifacts.map(a=>a.name),'SHA256SUMS.txt','BUILD-INFO.json'];
 }
-module.exports={TARGETS,hash,artifactNames,metadata,collect,prepare};
+module.exports={channelVersion,currentVersion,TARGETS,hash,artifactNames,metadata,collect,prepare};
 if(require.main===module){
   const pkg=require('../package.json');
   if(process.argv[2]!=='metadata')throw new Error('Usage: node scripts/desktop-release.cjs metadata');

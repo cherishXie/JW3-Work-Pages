@@ -2,8 +2,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const R=require('./desktop-release.cjs'),{publish}=require('./publish-desktop-release.cjs');
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'jw3-release-test-'));
-const version='0.2.0',electron='45.0.0',sha='a'.repeat(40),repository='cherishXie/JW3-Work-Pages',publicSha='c'.repeat(40);
-const meta=R.metadata({version,ref:'refs/heads/dev',sha,runNumber:'12'});
+const sourceVersion='0.2.0',electron='45.0.0',sha='a'.repeat(40),repository='cherishXie/JW3-Work-Pages',publicSha='c'.repeat(40);
+const meta=R.metadata({version:sourceVersion,ref:'refs/heads/dev',sha,runNumber:'12'});
+const version=meta.version;
 function fixture(){
   for(const name of fs.readdirSync(directory))fs.rmSync(path.join(directory,name),{recursive:true,force:true});
   for(const target of R.TARGETS){
@@ -31,13 +32,14 @@ function fake(options={}){
   }};
 }
 try{
+  assert.equal(version,'0.2.0-dev.12');assert.equal(R.channelVersion(sourceVersion,'main',12),sourceVersion);assert.equal(R.channelVersion(sourceVersion,'dev'),'0.2.0-dev.0');
   assert.equal(meta.tag,'desktop-dev-v0.2.0-build.12');assert(meta.prerelease);
-  assert.equal(R.metadata({version,ref:'refs/heads/main',sha,runNumber:13}).tag,'v0.2.0');
-  assert.equal(R.metadata({version,ref:'refs/tags/v0.2.0',sha,runNumber:13}).prerelease,false);
+  assert.equal(R.metadata({version:sourceVersion,ref:'refs/heads/main',sha,runNumber:13}).tag,'v0.2.0');
+  assert.equal(R.metadata({version:sourceVersion,ref:'refs/tags/v0.2.0',sha,runNumber:13}).prerelease,false);
   assert(R.metadata({version:'0.3.0-beta.1',ref:'refs/tags/v0.3.0-beta.1',sha,runNumber:13}).prerelease);
   for(const ref of ['refs/heads/feature','refs/tags/v9.0.0'])assert.throws(()=>R.metadata({version,ref,sha,runNumber:12}));
-  assert.throws(()=>R.metadata({version,ref:'refs/heads/main',sha:'untrusted',runNumber:12}));
-  assert.deepEqual(R.TARGETS.flatMap(target=>R.artifactNames(version,target)),['JW3-Workbench-Windows-x64-v0.2.0.exe','JW3-Workbench-macOS-arm64-v0.2.0.dmg','JW3-Workbench-macOS-x64-v0.2.0.dmg']);
+  assert.throws(()=>R.metadata({version:sourceVersion,ref:'refs/heads/main',sha:'untrusted',runNumber:12}));
+  assert.deepEqual(R.TARGETS.flatMap(target=>R.artifactNames(version,target)),['JW3-Workbench-Windows-x64-v0.2.0-dev.12.exe','JW3-Workbench-macOS-arm64-v0.2.0-dev.12.dmg','JW3-Workbench-macOS-x64-v0.2.0-dev.12.dmg']);
   fixture();assert.equal(R.collect(directory,{version,electron,sha}).artifacts.length,3);
   const name=R.artifactNames(version,'win-x64')[0];fs.appendFileSync(path.join(directory,name),'tamper');assert.throws(()=>R.collect(directory,{version,electron,sha}),/摘要/);
   fixture();assert.throws(()=>R.collect(directory,{version,electron,sha:'b'.repeat(40)}),/源提交/);

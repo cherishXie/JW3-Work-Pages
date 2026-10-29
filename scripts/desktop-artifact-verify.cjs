@@ -25,7 +25,7 @@ if(!selected||selected==='win-x64'){
 const exe=fs.readFileSync(path.join(release,'win-unpacked/剑网三工作台.exe'));
 assert.equal(exe.subarray(0,2).toString(),'MZ');const pe=exe.readUInt32LE(0x3c);assert.equal(exe.readUInt32LE(pe),0x4550);assert.equal(exe.readUInt16LE(pe+4),0x8664);
 }
-const version=require('../package.json').version,names=(selected?[selected]:TARGETS).flatMap(target=>artifactNames(version,target));
+const version=require('./desktop-release.cjs').currentVersion(),names=(selected?[selected]:TARGETS).flatMap(target=>artifactNames(version,target));
 const artifacts=names.map(name=>{const bytes=fs.readFileSync(path.join(release,name));assert(bytes.length>1024*1024);return {name,bytes:bytes.length,sha256:hash(bytes)};});
 const suffix=selected?'-'+selected:'';
 fs.writeFileSync(path.join(release,'SHA256SUMS'+suffix+'.txt'),artifacts.map(x=>x.sha256+'  '+x.name).join('\n')+'\n');
