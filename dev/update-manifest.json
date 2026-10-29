@@ -1,9 +1,9 @@
 {
-  "id": "b27e560e5b2f1c832c992afed5c675f88d3ed1faee23e11a2b8a883c5fa74395",
+  "id": "6f83a418169701009aab6aaa59f5fc18a85bed11b9548f56dbaff7f87ce54ef2",
   "version": "0.2.1",
   "channel": "dev",
-  "sourceCommit": "04d4d268b2cdefde18d3178447787e80ae1b60c7",
-  "sourceTimestamp": 1793263035,
+  "sourceCommit": "0a0ef42b92c73bfe52297560863d8530550ee7f9",
+  "sourceTimestamp": 1793263147,
   "protocol": 1,
   "files": [
     {
@@ -173,13 +173,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 622442,
-      "sha256": "4ddb5b83d0d9842e5f165f217dc5a7a2180650deb39579005e28599dd6dbfcb5"
+      "bytes": 622616,
+      "sha256": "993ec9cf6363b75d3ceda03886ef0bcf9dc165e7ee966953147213abbdf387c6"
     },
     {
       "name": "version.js",
       "bytes": 252,
-      "sha256": "2d340e5c609cf71253d8877740434c0301818ad27a0e2c93224da443b4f965cb"
+      "sha256": "85f291c5f202f93705cc02473d59c2fddc2960957c27dff62f1145b4bc60508a"
     }
   ]
 }
