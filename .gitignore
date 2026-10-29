@@ -118,3 +118,5 @@
 !/app-icon-192.png
 !/app-icon-512.png
 !/.gitattributes
+
+!/scripts/directory-setup-browser-qa.cjs

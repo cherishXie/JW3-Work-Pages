@@ -42,10 +42,29 @@
  const planningFields=['roleIds','raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'];
  function planningState(s,overrides={}){const copy=JSON.parse(JSON.stringify(s));for(const [id,patch]of Object.entries(overrides)){const t=copy.tasks.find(t=>t.id===id);if(!t)continue;for(const key of planningFields)if(patch[key]!==undefined)t[key]=JSON.parse(JSON.stringify(patch[key]));M.validateTask(t,copy);}return copy;}
  function planningPatch(s,overrides,ids,roleIds,options){const copy=planningState(s,overrides);configureTasks(copy,ids,roleIds,{...options,enabled:undefined,autoIncludeRoles:undefined});const next={...overrides};for(const id of ids){const t=copy.tasks.find(t=>t.id===id);next[id]=Object.fromEntries(planningFields.filter(k=>t[k]!==undefined).map(k=>[k,t[k]]));}return next;}
+ // Historical accounting and shared schedules require the original identities.
+ function deletionInfo(s,kind,id){
+  if(!['account','role'].includes(kind))throw new Error('档案类型无效');
+  const entity=(kind==='account'?s.accounts:s.roles).find(x=>x.id===id);if(!entity)throw new Error('档案不存在');
+  const roleIds=kind==='account'?s.roles.filter(r=>r.accountId===id).map(r=>r.id):[id],ids=new Set([...roleIds,...(kind==='account'?[id]:[])]);
+  const references=value=>typeof value==='string'?ids.has(value):Array.isArray(value)?value.some(references):!!value&&typeof value==='object'&&Object.entries(value).some(([k,v])=>ids.has(k)||references(v));
+  const labels={plans:'排程',records:'实测',ledger:'流水',cash:'现金记录',wageClaims:'工资待收',wageReceipts:'工资到账',materials:'材料库存',materialSales:'材料出售',notes:'队伍或回收记录',roiComparisons:'收益组合快照'};
+  const blockers=Object.entries(labels).flatMap(([key,label])=>{const count=(s[key]||[]).filter(references).length;return count?[{key,label,count}]:[];});
+  return {entity,roleIds,blockers};
+ }
+ function deleteIdentity(s,kind,id){
+  const info=deletionInfo(s,kind,id);if(info.blockers.length)throw new Error('存在关联历史或排程，请先处理关联记录，或停用并保留历史');
+  const next=JSON.parse(JSON.stringify(s)),ids=new Set(info.roleIds);
+  next.roles=next.roles.filter(r=>!ids.has(r.id));if(kind==='account')next.accounts=next.accounts.filter(a=>a.id!==id);
+  for(const t of [...next.tasks,...(next.energyRecipes||[])])t.roleIds=(t.roleIds||[]).filter(id=>!ids.has(id));
+  for(const key of ['progress','equipment','balanceSnapshots'])if(next[key])next[key]=next[key].filter(row=>!ids.has(row.roleId));
+  for(const archive of next.sourceArchives||[])archive.rows=(archive.rows||[]).filter(row=>!ids.has(row.roleId));
+  M.validateState(next);Object.assign(s,next);return info;
+ }
  function syncRole(s,r){if(r.creationStatus==='planned')return;for(const t of s.tasks.filter(t=>t.autoIncludeRoles))if(!t.roleIds.includes(r.id))t.roleIds.push(r.id);}
  function toggle(s,t){t.enabled=!t.enabled;if(t.enabled&&t.presetKey==='mineral_trade')for(const v of s.tasks.filter(v=>['camp','trade'].includes(v.presetKey)))v.enabled=false;if(t.enabled&&['camp','trade'].includes(t.presetKey))for(const v of s.tasks.filter(v=>v.presetKey==='mineral_trade'))v.enabled=false;}
  function remaining(a,now=Date.now()){return a.billingType==='monthly'?(a.monthlyExpiresAt?Math.max(0,Math.floor((new Date(a.monthlyExpiresAt).getTime()-now)/1000)):null):(a.balance===undefined?null:Math.floor(a.balance*60));}
  function duration(seconds,monthly=false){if(seconds==null)return '待补';let n=Math.max(0,Math.floor(seconds));const d=Math.floor(n/86400);n%=86400;const h=Math.floor(n/3600);n%=3600;const m=Math.floor(n/60),sec=n%60;return monthly?`${d}天 ${h}小时 ${m}分 ${sec}秒`:`${Math.floor(seconds/3600)}小时 ${m}分`;}
  function insights(s,start,end,scope={}){const roles=s.roles.filter(r=>r.enabled!==false&&s.accounts.find(a=>a.id===r.accountId)?.enabled!==false&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)&&(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account));const accounts=s.accounts.filter(a=>a.enabled!==false&&(!scope.account||a.id===scope.account)&&(!scope.group||a.group===scope.group)&&(!scope.role||roles.some(r=>r.accountId===a.id))),fresh=r=>r.resourceUpdatedAt&&Date.now()-new Date(r.resourceUpdatedAt).getTime()<7*86400000;const energyRoles=roles.filter(r=>r.energy!=null),full=energyRoles.filter(r=>r.energyCap>0&&r.energy/r.energyCap>=.9);return {roles,accounts,knownEnergy:energyRoles.length,energy:energyRoles.reduce((n,r)=>n+r.energy,0),full,stale:roles.filter(r=>!fresh(r)),expiring:accounts.filter(a=>a.billingType==='monthly'&&remaining(a)!=null&&remaining(a)<3*86400),rows:roles.map(r=>({role:r,completion:M.completion(s,start,end,{role:r.id}),actual:M.summary(s,start,end,{role:r.id},'actual'),balance:M.balance(s,r),fresh:fresh(r)}))};}
- return {planningTasks,checkedAt,version,patch,servers,sources,templates,defaults,raidDefault,ensureDefaults,assignedTasks,configureTasks,planningState,planningPatch,syncRole,toggle,remaining,duration,insights};
+ return {deletionInfo,deleteIdentity,planningTasks,checkedAt,version,patch,servers,sources,templates,defaults,raidDefault,ensureDefaults,assignedTasks,configureTasks,planningState,planningPatch,syncRole,toggle,remaining,duration,insights};
 });
