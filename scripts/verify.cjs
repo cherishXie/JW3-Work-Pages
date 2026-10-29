@@ -4,6 +4,6 @@ for(const file of require('./public-assets.cjs').publicFiles.filter(f=>f.endsWit
 const results=require('../verification.js').run();
 for(const r of results)console.log(`${r.pass?'PASS':'FAIL'} ${r.id} ${r.name}${r.error?' — '+r.error:''}`);
 if(results.some(r=>!r.pass))process.exitCode=1;
-for(const test of ['storage-verify','desktop-verify','desktop-release-verify','screenshot-ocr-loader-verify','pages-channels-verify','updates-verify'])require('./'+test+'.cjs');
+for(const test of ['startup-verify','storage-verify','desktop-verify','desktop-release-verify','screenshot-ocr-loader-verify','pages-channels-verify','updates-verify'])require('./'+test+'.cjs');
 
 require('./check-public-source.cjs');

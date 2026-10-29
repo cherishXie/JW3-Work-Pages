@@ -160,7 +160,7 @@
     let id='screenshot_'+digest;
     if(allowReimport){id='screenshot_review_'+digest.slice(0,20)+'_'+Date.parse(now).toString(36);}
     if((state.sourceArchives||[]).some(x=>x.id===id))throw new Error('本次截图记录已存在，请稍后重试');
-    const next=structuredClone(state),seen=new Set(),changes=[],date=new Date(Date.parse(capturedAt)+8*3600000).toISOString().slice(0,10);
+    const next=M.clone(state),seen=new Set(),changes=[],date=new Date(Date.parse(capturedAt)+8*3600000).toISOString().slice(0,10);
     for(const row of rows.filter(x=>x.selected)){
       if(Object.keys(row.conflicts||{}).length&&!row.conflictsConfirmed)throw new Error(row.name+' 存在截图数据冲突，请逐项核对并勾选冲突确认');
       const role=next.roles.find(r=>r.id===row.roleId);if(!role)throw new Error('请为选中行选择已有角色');if(seen.has(role.id))throw new Error('同一角色出现多次，请只保留一行');seen.add(role.id);

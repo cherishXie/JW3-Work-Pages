@@ -62,6 +62,7 @@ module.exports=[
   "scripts/screenshot-batch-live.cjs",
   "scripts/screenshot-ocr-loader-verify.cjs",
   "scripts/setup-git.cjs",
+  "scripts/startup-verify.cjs",
   "scripts/stable-version.cjs",
   "scripts/storage-verify.cjs",
   "scripts/verify-live-pages.cjs",
