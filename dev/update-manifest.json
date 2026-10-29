@@ -1,9 +1,9 @@
 {
-  "id": "f79e0747162b4a623f9dfb98e07a58f12c2e89c3a4169966bc9c839d786f086e",
+  "id": "b27e560e5b2f1c832c992afed5c675f88d3ed1faee23e11a2b8a883c5fa74395",
   "version": "0.2.1",
   "channel": "dev",
-  "sourceCommit": "d54c5fbe192b0bc217c0ff2a1ff867db346d1270",
-  "sourceTimestamp": 1793261308,
+  "sourceCommit": "04d4d268b2cdefde18d3178447787e80ae1b60c7",
+  "sourceTimestamp": 1793263035,
   "protocol": 1,
   "files": [
     {
@@ -103,8 +103,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 272056,
-      "sha256": "ced81085aedcc4f2cf0cbb3671ccd8924db2dd56ac63fae1ec5af63a38bc393e"
+      "bytes": 273752,
+      "sha256": "0f39784d0352ee4a430f5297463355cc4f19c92afd7250b82e8cb7c0c5761b33"
     },
     {
       "name": "themes.js",
@@ -128,8 +128,8 @@
     },
     {
       "name": "operations.js",
-      "bytes": 13020,
-      "sha256": "09473f2020d21ada21a5a072ff5b04268ddbab5aa7176e4fbb66df02f0093555"
+      "bytes": 14976,
+      "sha256": "8592ebfc3948fb121e46aa303ceb077790c57db101c581c5274e1c6ee3d65e69"
     },
     {
       "name": "activity.js",
@@ -143,8 +143,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 22707,
-      "sha256": "2df0b0a720299a639191582f147f6276e1e1874c7eda178cd5f39ca42143744b"
+      "bytes": 24652,
+      "sha256": "75c4e733332c7dcba1325b6db769c32366709d5f3988f158a6277a3285b24b2c"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -173,13 +173,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 619410,
-      "sha256": "7ae82d3528768f106b1fb7b9a416c5cf84db4dee618e12582fe3b98be2525131"
+      "bytes": 622442,
+      "sha256": "4ddb5b83d0d9842e5f165f217dc5a7a2180650deb39579005e28599dd6dbfcb5"
     },
     {
       "name": "version.js",
       "bytes": 252,
-      "sha256": "9728d33dd46715cb651cbb506541e08dbf16b88483f184bf0bb00ef45e92f7d9"
+      "sha256": "2d340e5c609cf71253d8877740434c0301818ad27a0e2c93224da443b4f965cb"
     }
   ]
 }
