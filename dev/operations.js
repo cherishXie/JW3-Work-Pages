@@ -25,9 +25,9 @@
  }
  function planningTasks(s,date,kind='batches'){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||M.dateKey(new Date(date+'T12:00:00+08:00'))!==date)throw new Error('任务日期无效');
-  return s.tasks.filter(t=>t.enabled&&(kind==='teams'?t.partyRule==='raid10':t.partyRule!=='raid10')&&(!t.activeFrom||date>=t.activeFrom)&&(!t.activeUntil||date<=t.activeUntil)&&(kind==='teams'||t.days?.includes(M.weekday(date))));
+  return Raids.sortTasks(s.tasks).filter(t=>t.enabled&&(kind==='teams'?t.partyRule==='raid10':t.partyRule!=='raid10')&&(!t.activeFrom||date>=t.activeFrom)&&(!t.activeUntil||date<=t.activeUntil)&&(kind==='teams'||t.days?.includes(M.weekday(date))));
  }
- function assignedTasks(s,scope={}){return s.tasks.filter(t=>t.enabled&&t.roleIds.some(id=>{const r=s.roles.find(r=>r.id===id),a=r&&s.accounts.find(a=>a.id===r.accountId);return r?.enabled!==false&&r&&M.isMaxLevel(s,r)&&a?.enabled!==false&&a&&(!scope.role||r.id===scope.role)&&(!scope.group||a.group===scope.group)&&(!scope.account||a.id===scope.account);}));}
+ function assignedTasks(s,scope={}){return Raids.sortTasks(s.tasks).filter(t=>t.enabled&&t.roleIds.some(id=>{const r=s.roles.find(r=>r.id===id),a=r&&s.accounts.find(a=>a.id===r.accountId);return r?.enabled!==false&&r&&M.isMaxLevel(s,r)&&a?.enabled!==false&&a&&(!scope.role||r.id===scope.role)&&(!scope.group||a.group===scope.group)&&(!scope.account||a.id===scope.account);}));}
  function configureTasks(s,ids,roleIds,options={}){
   if(!ids.length)throw new Error('请至少选择一个任务');if(new Set(ids).size!==ids.length||ids.some(id=>!s.tasks.some(t=>t.id===id)))throw new Error('所选任务无效');if(new Set(roleIds).size!==roleIds.length||roleIds.some(id=>!s.roles.some(r=>r.id===id)))throw new Error('参与角色无效');if(options.assignmentMode&&!['keep','add','replace'].includes(options.assignmentMode))throw new Error('分配方式无效');
   const allowed=['raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'],at=new Date().toISOString();
