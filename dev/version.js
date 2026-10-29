@@ -1,1 +1,1 @@
-globalThis.WorkbenchVersion=Object.freeze({"id":"6f83a418169701009aab6aaa59f5fc18a85bed11b9548f56dbaff7f87ce54ef2","version":"0.2.1","channel":"dev","sourceCommit":"0a0ef42b92c73bfe52297560863d8530550ee7f9","sourceTimestamp":1793263147,"protocol":1});
+globalThis.WorkbenchVersion=Object.freeze({"id":"18412c7949a89ef8676a8e3ec4f4e448419c03c0fe8485a2db3cbc3eb2c9cab9","version":"0.2.1","channel":"dev","sourceCommit":"d43eefff1a51d57e4d2e35f6d44e2519a0a78a8f","sourceTimestamp":1793263411,"protocol":1});
