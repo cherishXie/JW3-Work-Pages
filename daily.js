@@ -94,12 +94,12 @@
  // and do not create execution income, completion facts or another CD.
  function transitionRaidTimer(s,planId,taskId,index,action,input={},now=new Date()){
   now=new Date(Math.floor(now.getTime()/1000)*1000);
-  const copy=structuredClone(s),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
+  const copy=M.clone(s),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
   const task=p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId);
   if(task?.partyRule!=='raid10'||!['start','pause','resume'].includes(action))throw new Error('请选择十人副本的计时操作');
   if((p.completionFacts||[]).some(f=>f.taskId===taskId&&f.planBatchIndices.includes(index)))throw new Error('本批已登记完成，不能继续计时');
   const saved=p.executionDrafts?.find(d=>d.taskId===taskId&&d.index===index&&JSON.stringify(d.roleIds)===JSON.stringify(p.batches[index]))?.values||{};
-  const values={...saved,...input,timerPauses:structuredClone(saved.timerPauses||[])},paused=values.timerPauses.at(-1)?.endedAt===null,at=now.toISOString(),day=M.dateKey(now),time=new Date(now.getTime()+8*3600000).toISOString().slice(11,19);
+  const values={...saved,...input,timerPauses:M.clone(saved.timerPauses||[])},paused=values.timerPauses.at(-1)?.endedAt===null,at=now.toISOString(),day=M.dateKey(now),time=new Date(now.getTime()+8*3600000).toISOString().slice(11,19);
   const start=executionTiming(values.date||p.date,values).startedAt;
   if(start)values.startedAt=start;
   if(action==='start'){
@@ -236,9 +236,9 @@
   if(timing.startedAt&&fact.startedAt&&fact.startedAt!==timing.startedAt)throw new Error('补录须沿用完成登记的开始时刻；需要改期请先撤销完成');
   if(timing.startedAt&&!fact.startedAt){if(M.cycle(fact.cycleSnapshot||fact.cdSnapshot||copy.tasks.find(t=>t.id===taskId),timing.startedAt)!==fact.cycle)throw new Error('开始时间属于另一刷新周期，请先撤销完成并改期');fact.startedAt=timing.startedAt;}
   if(timing.endedAt)fact.endedAt=timing.endedAt;
-  if(input.timerPauses)fact.timerPauses=structuredClone(input.timerPauses);
+  if(input.timerPauses)fact.timerPauses=M.clone(input.timerPauses);
   const executionTask=M.raidExecutionTask(fact.allocationTask||p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId),input.completedBossCount??fact.completedBossCount);
-  if(executionTask.partyRule==='raid10'){if(fact.completedBossCount!==(executionTask.completedBossCount??executionTask.bossCount))delete fact.merchantUnits;fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount;fact.allocationTask=structuredClone(executionTask);}
+  if(executionTask.partyRule==='raid10'){if(fact.completedBossCount!==(executionTask.completedBossCount??executionTask.bossCount))delete fact.merchantUnits;fact.completedBossCount=executionTask.completedBossCount??executionTask.bossCount;fact.allocationTask=M.clone(executionTask);}
   const previousMeasurements=fact.measurements||{},financialAllocation=input.financialAllocation||previousMeasurements.financialAllocation||'task',timeAllocation=input.timeAllocation||previousMeasurements.timeAllocation||'task';
   if(timeAllocation==='task'&&input.minutes!==undefined&&input.minutes!==''&&input.minutes!==null)input={...input,onlineMinutes:Number(input.minutes)*fact.roleIds.length};
   const measurements={...previousMeasurements,financialAllocation,timeAllocation,allocationVersion:2};
@@ -255,7 +255,7 @@
    if(pref.timeAllocation==='task'){record.roleOnlineMinutes=Object.fromEntries(fact.roleIds.map(id=>[id,record.onlineMinutes/n]));for(const id of fact.roleIds){const account=fact.roleAccounts[id];record.accountMinutes[account]=(record.accountMinutes[account]||0)+record.onlineMinutes/n;}}
    if(pref.timeAllocation==='attendance'||pref.financialAllocation==='attendance'){record.accountMinutes={};record.roleOnlineMinutes={};if(pref.financialAllocation==='attendance'){record.roleAllocations={};record.allocationMethod='attendance';}for(const id of fact.roleIds){const account=fact.roleAccounts[id],online=record.onlineMinutes/n;record.roleOnlineMinutes[id]=online;record.accountMinutes[account]=(record.accountMinutes[account]||0)+online;if(record.roleAllocations)record.roleAllocations[id]={gold:record.gold/n,minutes:record.minutes/n,onlineMinutes:online,otherCost:record.otherCost/n};}}
    record.allocationMethod=financialAllocation==='none'?'manual-none':financialAllocation==='attendance'?'manual':'task';
-   if(financialAllocation==='task'){record.allocationBatches=[...fact.planBatchIndices].map(i=>[...p.batches[i]]);record.allocationTask=structuredClone(executionTask);record.onlineAllocationMethod=timeAllocation==='task'?'batch-duration':'manual';Object.assign(record,M.allocatedRecord(copy,record));}
+   if(financialAllocation==='task'){record.allocationBatches=[...fact.planBatchIndices].map(i=>[...p.batches[i]]);record.allocationTask=M.clone(executionTask);record.onlineAllocationMethod=timeAllocation==='task'?'batch-duration':'manual';Object.assign(record,M.allocatedRecord(copy,record));}
    const pricingState={...copy,config:record.snapshot,accounts:fact.billingAccounts,roles:copy.roles.map(r=>fact.roleAccounts[r.id]?{...r,accountId:fact.roleAccounts[r.id]}:r)},billing=M.executionPricing(pricingState,record,[fact.roleIds]);record.snapshot=billing.config;record.billableAccountMinutes=billing.billableAccountMinutes;record.coveredAccountMinutes=billing.coveredAccountMinutes;record.roleBillableMinutes=billing.roleBillableMinutes;record.roleCoveredMinutes=billing.roleCoveredMinutes;record.billingWarnings=billing.billingWarnings;
    copy.records.push(record);copy.recordingPreferences=pref;
   }
@@ -266,7 +266,7 @@
   const name=String(input.name||'').trim();if(!name||name.length>80)throw new Error('请填写队伍名称（最多 80 字）');
   if(![10,25].includes(input.raidSize)||!Array.isArray(input.batches)||!input.batches.length)throw new Error('自定义队伍无效');
   const all=new Set();for(const batch of input.batches){if(!batch.length||batch.length>input.raidSize)throw new Error('队伍人数超出容量');const accounts=new Set(),servers=new Set();for(const id of batch){const role=s.roles.find(r=>r.id===id);if(!role||role.enabled===false)throw new Error('角色不存在或已停用');if(all.has(id))throw new Error('同一角色不能重复编入多个队伍');all.add(id);if(accounts.has(role.accountId))throw new Error('同账号角色不能同时组队');accounts.add(role.accountId);if(role.server)servers.add(role.server);}if(servers.size>1)throw new Error('同队角色必须在同一区服');}
-  const entry={id:input.id||M.id('raidteam'),kind:'raid-team-template',name,raidSize:input.raidSize,batches:structuredClone(input.batches),teamConfigs:input.batches.map((b,i)=>({...input.teamConfigs?.[i],name:input.teamConfigs?.[i]?.name||'第 '+(i+1)+' 队',playerSeats:b.length,tankMode:input.teamConfigs?.[i]?.tankMode||'auto'})),updatedAt:new Date().toISOString()};
+  const entry={id:input.id||M.id('raidteam'),kind:'raid-team-template',name,raidSize:input.raidSize,batches:M.clone(input.batches),teamConfigs:input.batches.map((b,i)=>({...input.teamConfigs?.[i],name:input.teamConfigs?.[i]?.name||'第 '+(i+1)+' 队',playerSeats:b.length,tankMode:input.teamConfigs?.[i]?.tankMode||'auto'})),updatedAt:new Date().toISOString()};
   const old=s.notes.find(n=>n.id===entry.id);if(old&&old.kind!==entry.kind)throw new Error('队伍编号冲突');if(old)Object.assign(old,entry,{deletedAt:undefined});else s.notes.push(entry);return entry;
  }
  function reuseRaidTeams(s,source,taskIds,date,{indices=null,startTime='',excludePlanId=null}={}){
@@ -358,7 +358,7 @@
     if(task.partyRule==='raid10'){
      const oldCount=oldTask.completedBossCount??oldTask.bossCount??1;r.completedBossCount=task.completedBossCount;r.allocationTask=task;
      if(r.allocationBasis&&task.dungeonRewardMode==='auto')for(const a of Object.values(r.allocationBasis)){a.sharedGold=oldCount?a.sharedGold*task.completedBossCount/oldCount:M.dungeonRewards(task,r.roleIds.map(id=>copy.roles.find(x=>x.id===id)),r.snapshot).shared/r.roleIds.length;a.directGold=M.dungeonRewards(task,[],r.snapshot).direct;a.gold=a.directGold+a.sharedGold;}
-     delete r.merchantUnits;if(fact){delete fact.merchantUnits;fact.completedBossCount=r.completedBossCount;fact.allocationTask=structuredClone(task);}
+     delete r.merchantUnits;if(fact){delete fact.merchantUnits;fact.completedBossCount=r.completedBossCount;fact.allocationTask=M.clone(task);}
     }
    }
    if(r.timerPauses?.length&&fact?.billingAccounts){

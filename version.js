@@ -1,0 +1,1 @@
+globalThis.WorkbenchVersion=Object.freeze({"id":"99a6bf799a66982d50c70d03742cc9675db51d6e9f50d38808ce1fc49df076a9","version":"0.3.0","channel":"main","sourceCommit":"da1be985450c9ef3c0106145662119ca1878c66a","sourceTimestamp":1793280053,"protocol":1});
