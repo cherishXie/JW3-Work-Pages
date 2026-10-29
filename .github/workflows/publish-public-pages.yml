@@ -67,5 +67,6 @@ jobs:
           base="https://cherishxie.github.io/JW3-Work-Pages/"
           if [ "$CHANNEL" = dev ]; then base="${base}dev/"; fi
           JX3_BROWSER_PATH="$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux/chrome' -o -path '*/chrome-linux64/chrome' | head -1)" node scripts/platform-web-smoke.cjs "$base"
+          JX3_BROWSER_PATH="$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux/chrome' -o -path '*/chrome-linux64/chrome' | head -1)" npm run test:updates:browser
           JX3_LIVE_URL="$base" node scripts/ocr-live-smoke.cjs
           JX3_LIVE_URL="$base" node scripts/screenshot-batch-live.cjs

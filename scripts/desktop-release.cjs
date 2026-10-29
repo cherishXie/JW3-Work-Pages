@@ -52,7 +52,7 @@ function prepare(directory,meta,electron,repository){
   const notes=[`源提交：${meta.sha}`,'发布前已通过三平台原生构建与校验。','',
     '## 按系统下载安装包','','| 平台 | 下载文件 |','| --- | --- |',...manifest.artifacts.map(a=>`| ${a.name.includes('Windows-x64')?'Windows x64':a.name.includes('macOS-arm64')?'macOS Apple Silicon (arm64)':'macOS Intel (x64)'} | [${a.name}](https://github.com/${repository}/releases/download/${meta.tag}/${a.name}) |`),'',
     '各系统独立下载：Windows 使用 EXE 安装器，macOS 按芯片选择 arm64（Apple Silicon）或 x64（Intel）的 DMG。无需下载合集压缩包。页面底部由 GitHub 自动提供的 Source code (zip / tar.gz) 是网页源码，不是客户端，请下载上表中的 EXE 或 DMG。SHA256SUMS.txt 与 BUILD-INFO.json 用于核对完整性和源版本。','',
-    '本版没有发布者签名、Apple 公证和自动更新。数据保存在本机，尚未实现云同步；首次迁移请在原网页导出 JSON，再在桌面版的「工作台设置 → 数据管理」导入。',
+    '本版没有发布者签名或 Apple 公证。0.2.1 起支持应用内提示并点击更新界面与业务资源；Electron 原生壳升级仍需安装对应平台的新安装包。0.2.0 及更旧客户端需先安装一次新版。数据保存在本机，尚未实现云同步；首次迁移请在原网页导出 JSON，再在桌面版的「工作台设置 → 数据管理」导入。',
     '各平台原生 runner 已完成应用启动、导入保存、重启恢复、离线 OCR 与资源隔离检查。安装向导和卸载流程仍需按实际系统人工验收。',
     '安装包不包含个人账号、角色、截图、测试夹具、备份或源仓库历史。'];
   if(!meta.prerelease){const changelog=fs.readFileSync(path.join(__dirname,'../CHANGELOG.md'),'utf8'),section=changelog.split('## ['+meta.version+']')[1]?.split('\n## ')[0];if(!section)throw Error('正式版本缺少更新记录');notes.push('','## 更新内容',section.trim());}

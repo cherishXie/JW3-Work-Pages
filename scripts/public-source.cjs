@@ -1,6 +1,9 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+".gitattributes",
+"app-icon-192.png","app-icon-512.png",
+"app-icon.png","manifest.webmanifest","pwa-worker.js","update.js","desktop/updater.cjs","scripts/update-build.cjs","scripts/updates-verify.cjs","scripts/updates-browser-qa.cjs",
   ".githooks/pre-push",
   ".github/workflows/build-desktop.yml",
   ".github/workflows/publish-public-pages.yml",

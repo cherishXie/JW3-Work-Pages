@@ -106,3 +106,15 @@
 /.desktop-cache/
 /release/
 /release-assets/
+
+!/app-icon.png
+!/manifest.webmanifest
+!/pwa-worker.js
+!/update.js
+!/desktop/updater.cjs
+!/scripts/update-build.cjs
+!/scripts/updates-verify.cjs
+!/scripts/updates-browser-qa.cjs
+!/app-icon-192.png
+!/app-icon-512.png
+!/.gitattributes

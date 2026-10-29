@@ -8,7 +8,7 @@ if(args.length>1||args.some(a=>!a.startsWith('--target=')))throw new Error('Usag
 const selected=args.length?args[0].slice('--target='.length):null;
 if(selected&&!TARGETS.includes(selected))throw new Error('未知桌面目标：'+selected);
 const web=require('./public-assets.cjs').publicFiles;
-const expected=['package.json','assets.json','main.cjs','preload.cjs','store.cjs','security.cjs',...web.map(p=>'web/'+p)];
+const expected=['package.json','assets.json','main.cjs','preload.cjs','store.cjs','security.cjs','updater.cjs',...web.map(p=>'web/'+p)];
 const targets=[['mac-arm64/剑网三工作台.app/Contents/Resources/app.asar','mac-arm64'],['mac/剑网三工作台.app/Contents/Resources/app.asar','mac-x64'],['win-unpacked/resources/app.asar','win-x64']];
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 // ASAR's API traverses with the host path separator, even though manifests use '/'.

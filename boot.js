@@ -5,7 +5,7 @@
   const label=()=>document.getElementById('boot-status');
   function stage(message){last=message;const el=label();if(el)el.textContent=message;}
   function tick(){const elapsed=document.getElementById('boot-elapsed');if(elapsed)elapsed.textContent='已等待 '+Math.floor((performance.now()-started)/1000)+' 秒';const retry=document.getElementById('boot-retry');if(retry&&performance.now()-started>15000)retry.hidden=false;}
-  function finish(){if(ready)return;ready=true;clearInterval(timer);const el=document.getElementById('workbench-boot');if(!el)return;stage('工作台已就绪');el.setAttribute('aria-busy','false');document.body.classList.add('workbench-ready');const cleanup=()=>el.remove();if(!motion.matches&&typeof el.animate==='function'){exit=el.animate([{opacity:1},{opacity:0}],{duration:320,easing:'ease-out'});exit.finished.catch(()=>{}).finally(cleanup);}else cleanup();}
+  function finish(){if(ready)return;ready=true;clearInterval(timer);document.dispatchEvent(new Event('workbench:ready'));const el=document.getElementById('workbench-boot');if(!el)return;stage('工作台已就绪');el.setAttribute('aria-busy','false');document.body.classList.add('workbench-ready');const cleanup=()=>el.remove();if(!motion.matches&&typeof el.animate==='function'){exit=el.animate([{opacity:1},{opacity:0}],{duration:320,easing:'ease-out'});exit.finished.catch(()=>{}).finally(cleanup);}else cleanup();}
   const modules=new Map(),globals={zip:'JSZip',ocr:'Tesseract',verification:'Verification'};
   function loadModule(name){
     if(!Object.hasOwn(globals,name))return Promise.reject(new Error('未知工作台组件'));

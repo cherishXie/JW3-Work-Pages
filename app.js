@@ -2426,6 +2426,10 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeWorkspace();});
   // A fresh opening stays blank. Migrate valid old data without creating a sample.
   try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=structuredClone(state);Store.write(localStorage,dataStore,KEY);}}catch(e){storageError='本机存储不可用：'+e.message;}
+  document.addEventListener('workbench:before-update',event=>{
+    if($('#dialog').open||ui.setup||ui.generated||($('#app .planning-wizard')&&planningStage()!=='kind')||storageError){event.preventDefault();return;}
+    try{if(dataStore.active)save(false);}catch{event.preventDefault();}
+  });
   let savedStorageRaw;try{savedStorageRaw=localStorage.getItem(KEY);}catch{}
   setInterval(()=>{for(const el of document.querySelectorAll('[data-account-time]')){const a=state.accounts.find(a=>a.id===el.dataset.accountTime);if(a)el.textContent=Ops.duration(Ops.remaining(a),a.billingType==='monthly');}},1000);
   globalThis.WorkbenchBoot?.stage('正在生成工作台视图');
