@@ -16,7 +16,7 @@
 
 网页与桌面数据相互独立，目前没有云同步。首次迁移请从网页导出 JSON，再在桌面版「工作台设置 → 数据管理」导入。当前构建没有发布者签名、Apple 公证和应用内自动更新。
 
-推送私有源码仓库 main 后，GitHub Actions 自动在 Windows 与两种 Mac 原生环境构建和验证，并在[源码仓库 Releases](https://github.com/cherishXie/JW3-Work/releases)生成包含安装包、校验和及构建信息的开发版。推送与 package.json 版本一致的 v 标签时生成正式版。下载需要源码仓库访问权限。
+推送私有源码仓库 main 后，GitHub Actions 自动在 Windows 与两种 Mac 原生环境构建和验证，并在[公共仓库 Releases](https://github.com/cherishXie/JW3-Work-Pages/releases)生成包含安装包、校验和及构建信息的开发版。推送与 package.json 版本一致的 v 标签时生成正式版。安装包可公开下载，无需私有源码仓库权限。每次推送生成独立构建编号，历史版本保留；全部平台验证成功且对应网页发布通过后才公开新版本。
 
 ## 主要功能
 
@@ -72,7 +72,7 @@ npm run dist:mac
 npm run dist:win
 ```
 
-产物在 `release/`，包括 Windows x64 `.exe`、macOS arm64 / x64 `.dmg` 与 `.zip`。桌面程序不上传到公共 Pages 仓库。
+产物在 `release/`，包括 Windows x64 `.exe`、macOS arm64 / x64 `.dmg` 与 `.zip`。安装包上传到公共仓库的 Releases 附件，不进入网页分支；公共仓库自动生成的 Source code 压缩包仅包含静态网页，不是桌面安装包。
 
 ## 开发与发布
 
