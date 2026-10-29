@@ -97,17 +97,26 @@
   // Fields are filled from the first nonblank candidate; discrepancies need explicit review.
   function mergeScreenshots(images,{roles=[]}={}){
     const groups=new Map();let rawRows=0;
+    // Two different visible rows cannot be the same existing character. Keep
+    // fuzzy collisions separate for review instead of losing one during merge.
+    const collisions=new Set();
+    for(const image of images){
+      const counts=new Map();
+      for(const row of image.rows||[]){const info=suggestRoles(roles,row.name,row.school,row);if(info.auto&&info.roleId)counts.set(info.roleId,(counts.get(info.roleId)||0)+1);}
+      for(const [id,count] of counts)if(count>1)collisions.add(id);
+    }
     for(const [imageIndex,image] of images.entries()){
       for(const [rowIndex,row] of (image.rows||[]).entries()){
         rawRows++;
         const name=clean(row.name),matchInfo=suggestRoles(roles,name,row.school,row);
         // suggestRoles already rejects known conflicting servers; OCR typos in an
         // unknown suffix may still refer to the same existing role.
-        const matched=matchInfo.auto&&!!matchInfo.roleId;
+        const requiresManualMatch=collisions.has(matchInfo.roleId)&&!matchInfo.exact;
+        const matched=matchInfo.auto&&!!matchInfo.roleId&&!requiresManualMatch;
         const key=matched?'matched:'+matchInfo.roleId:name?'role:'+name:'unknown:'+imageIndex+':'+rowIndex;
         let group=groups.get(key);
         if(!group){
-          group={name,roleId:matched?matchInfo.roleId:'',sourceNames:[],candidates:{},sources:[]};
+          group={name,roleId:matched?matchInfo.roleId:'',sourceNames:[],candidates:{},sources:[],requiresManualMatch};
           for(const field of fields.slice(1))group.candidates[field]=new Map();
           groups.set(key,group);
         }
@@ -127,7 +136,7 @@
     }
     const rows=[...groups.values()].map(group=>{
       const canonical=roles.find(r=>r.id===group.roleId);
-      const row={name:canonical?clean(canonical.name):group.name,roleId:group.roleId,sourceNames:group.sourceNames,sources:group.sources,ocrNames:[...new Set(group.sources.map(x=>x.recognizedName).filter(Boolean))],occurrences:group.sources.length,conflicts:{},nameCandidates:group.nameCandidates||[]};
+      const row={requiresManualMatch:group.requiresManualMatch,name:canonical?clean(canonical.name):group.name,roleId:group.roleId,sourceNames:group.sourceNames,sources:group.sources,ocrNames:[...new Set(group.sources.map(x=>x.recognizedName).filter(Boolean))],occurrences:group.sources.length,conflicts:{},nameCandidates:group.nameCandidates||[]};
       for(const field of fields.slice(1)){
         const choices=[...group.candidates[field].values()];
         row[field]=choices[0]?.value||'';
@@ -261,8 +270,11 @@
     let worker=sharedWorker;
     try{
       if(!worker)worker=await createOcrWorker(progress);
-      const scale=3,h=Math.round(bitmap.height*(bottom-top)/100)*scale,w=bitmap.width*scale;
-      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,bitmap.height*top/100,bitmap.width,h/scale,0,0,w,h);
+      // Normalize large uploads to the reference table geometry before OCR.
+      // Currency crops and OCR row spacing must share the same working scale.
+      const scale=3,workingWidth=Math.min(bitmap.width,978),workingHeight=bitmap.height*workingWidth/bitmap.width;
+      const h=Math.round(workingHeight*(bottom-top)/100)*scale,w=workingWidth*scale;
+      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,bitmap.height*top/100,bitmap.width,h/scale*bitmap.width/workingWidth,0,0,w,h);
       // Dark game UI: turn light glyphs into dark glyphs for OCR, retaining geometry.
       const cuts=[.014,.128,.178,.398,.491,.561,.628,.708,.792,.875],columns=[];
       // Color-aware name image: all colored glyphs on this UI become black text,

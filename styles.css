@@ -1245,22 +1245,7 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .task-center .tc-role-controls{gap:8px;flex-wrap:wrap}.tc-role-controls #progress-card-search{flex:1 1 180px;max-width:360px}.task-center .tc-v2-role-grid{max-height:70dvh;overflow:auto;overscroll-behavior:contain;align-items:start;padding:2px}.task-center .tc-v2-role{padding:10px;gap:6px}.task-center .tc-v2-role-tasks{max-height:260px;overflow:auto;overscroll-behavior:contain}.task-center .tc-v2-role-bulk{gap:8px;flex-wrap:wrap}
 @media(max-width:767px){.tc-heading-stats{gap:10px}.task-center .tc-command-top{padding:8px;flex-wrap:wrap}.task-center .tc-command-top>.tabs{width:100%}.task-center .tc-command-top>.flex{width:100%;justify-content:flex-end}.task-center .tc-command-filters{padding:8px}.history-record-tools>.flex{width:100%;justify-content:flex-end}.history-records>.tc-data-grid{max-height:65dvh}.task-center .tc-v2-role-grid{max-height:65dvh}.tc-role-controls #progress-card-search{max-width:none;flex-basis:100%}}
 .planning-wizard .wizard-actions .tc-plan-action-context[hidden]{display:none}.planning-wizard .wizard-actions:has(.tc-plan-action-context[hidden]){justify-content:flex-end}
-@media(min-width:1280px){
- .task-center:has(#calendar-task-panel){display:grid;grid-template-columns:minmax(380px,.8fr) minmax(0,1.2fr);gap:10px;align-items:start}
- .task-center:has(#calendar-task-panel)>.tc-heading,.task-center:has(#calendar-task-panel)>.tc-command{grid-column:1/-1;margin:0}
- .task-center:has(#calendar-task-panel)>.tc-calendar{grid-column:1;grid-row:3;display:flex;flex-direction:column;max-height:max(440px,calc(100dvh - 220px));margin:0;min-width:0;overflow:hidden}
- .task-center:has(#calendar-task-panel)>.task-content{grid-column:2;grid-row:3;min-width:0}
- .task-center #calendar-task-panel{position:relative;inset:auto;width:100%;height:max(440px,calc(100dvh - 220px));z-index:1;box-shadow:none;transform-origin:top center}
- .task-center:has(#calendar-task-panel) .tc-cal-body{min-height:0;overflow:auto;overscroll-behavior:contain}
- .task-center:has(#calendar-task-panel) .tc-cal-toolbar,.task-center:has(#calendar-task-panel) .tc-cal-selection{padding:8px;gap:6px}
- .task-center:has(#calendar-task-panel) .tc-cal-toolbar>.flex{flex-wrap:wrap;gap:6px}
- .task-center:has(#calendar-task-panel) .tc-cal-toolbar h2{font-size:14px}
- .task-center:has(#calendar-task-panel) .tc-cal-day{min-height:82px;padding:4px;gap:4px}
- .task-center:has(#calendar-task-panel) .tc-cal-day-head{flex-wrap:wrap;gap:2px}.task-center:has(#calendar-task-panel) .tc-cal-day-state{font-size:12px}
- .task-center:has(#calendar-task-panel) .tc-cal-event small{display:none}.task-center:has(#calendar-task-panel) .tc-cal-year{grid-template-columns:1fr;gap:10px}
- .task-center:has(#calendar-task-panel) .tc-cal-mini .tc-cal-day{min-height:30px}.task-center:has(#calendar-task-panel) .tc-cal-footer{padding:8px;gap:6px}
- .task-center #calendar-task-panel .tc-v2-focus-layout.has-guide{grid-template-columns:1fr}.task-center #calendar-task-panel .tc-cal-panel-head{flex-wrap:wrap;gap:6px}.task-center #calendar-task-panel .tc-cal-panel-head>.flex{margin-left:auto}
-}
+
 .task-center #calendar-task-panel .flow-batch:only-child{flex-basis:100%;min-height:0;align-items:center}.task-center #calendar-task-panel .flow-batch:only-child>span:last-child{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.task-center #calendar-task-panel .flow-batch-rail{padding-top:4px;padding-bottom:6px}
 
 /* 总览与收益分析：紧凑指标、完整图表和有边界的明细。 */
@@ -1292,3 +1277,8 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .report-text-summary{font-size:12px;color:var(--wb-text-muted);margin-top:6px}.report-text-summary>summary{cursor:pointer}.report-text-summary p{margin:6px 0;line-height:1.6;overflow-wrap:anywhere;max-height:160px;overflow:auto;overscroll-behavior:contain}
 
 .report-settings input[type="checkbox"],.report-settings input[type="radio"]{margin:0;width:14px;height:14px}.report-settings [data-report-option="report-trend"] .report-choice-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+/* Calendar detail overlays the unchanged calendar at every viewport width. */
+.tc-cal-panel{inset:12px 12px 12px auto;width:min(920px,calc(100vw - 36px));max-height:calc(100dvh - 24px)}
+@media(min-width:1100px){#calendar-task-panel{width:min(1120px,calc(100vw - 260px))}}
+@media(max-width:900px){.tc-cal-panel{inset:8px 8px 8px auto;width:calc(100vw - 16px);max-height:calc(100dvh - 16px);transform-origin:right center}}
