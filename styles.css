@@ -1336,3 +1336,28 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .global-multi-pages{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}.global-multi-pages small,.global-multi-panel>small{font-size:12px;color:var(--wb-text-secondary)}
 
 .recovery-page{max-width:600px;margin:10vh auto;padding:20px;display:grid;gap:12px}.recovery-page h1{font-size:24px;margin:0}.recovery-page p{margin:0;font-size:14px}.recovery-page button,.recovery-page a{justify-self:start}
+
+/* Character craft observations share existing theme tokens and compact form layout. */
+.life-skills-summary{margin:8px 0;gap:6px}
+.life-skills-editor{min-width:0;border-top:.5px solid var(--wb-border);padding-top:10px}
+.life-skills-editor>summary{font-weight:600;cursor:pointer}
+.life-skills-editor>summary small{font-weight:400;margin-left:6px}
+.life-skills-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0}
+.life-skill-edit{min-width:0;margin:0;padding:10px;border:.5px solid var(--wb-border);border-radius:8px}
+.life-skill-edit legend{padding:0 4px;font-weight:600;font-size:14px}
+.life-skill-edit legend small{font-weight:400}
+.life-skill-numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.life-skill-numbers .field{min-width:0}
+.life-skill-numbers input{width:100%;min-width:0}
+.life-skill-options{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
+.life-skill-options label{display:flex;align-items:center;gap:4px;padding:6px;border:.5px solid var(--wb-border);border-radius:6px;cursor:pointer;font-size:12px;min-height:36px}
+.life-skill-options label:has(input:checked){background:var(--wb-primary-soft);border-color:var(--wb-primary)}
+.life-skill-options label:focus-within{outline:2px solid var(--wb-primary);outline-offset:2px}
+.life-skill-options input{width:auto;margin:0;accent-color:var(--wb-primary)}
+.life-skill-edit details>summary{font-size:12px;cursor:pointer;margin-bottom:6px}
+.life-skill-read{display:flex;flex-direction:column;gap:6px;min-width:0;padding:8px;border:.5px solid var(--wb-border);border-radius:8px;overflow-wrap:anywhere}
+.life-skills-detail{margin:10px 0}
+@media(max-width:600px){.life-skills-grid{grid-template-columns:minmax(0,1fr)}}
+
+.life-skill-options label:hover{background:var(--wb-hover)}
+.life-skill-options label:has(input:checked){background:var(--wb-primary-soft);color:var(--wb-primary-label)}
