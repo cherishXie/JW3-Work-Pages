@@ -5,6 +5,25 @@
   else root.Workbench = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (Catalog,Raids) {
   'use strict';
+  // Current-season announcement confirms progression, but publishes no numeric cap
+  // or specialization quota. Store observed values without inferring either.
+  const lifeSkillCatalog=[['caijin','采金','采集'],['shennong','神农','采集'],['paoding','庖丁','采集'],['zhuzao','铸造','制造'],['yishu','医术','制造'],['pengren','烹饪','制造'],['fengren','缝纫','制造'],['zijiang','梓匠','制造']].map(([id,name,group])=>({id,name,group}));
+  const lifeSkillSource='https://jx3.xoyo.com/show-2458-7509-1.html';
+  function validateLifeSkills(value){
+    if(value==null)return;
+    if(typeof value!=='object'||Array.isArray(value))throw new Error('生活技艺资料格式无效');
+    if(value.season!==undefined&&typeof value.season!=='string')throw new Error('生活技艺版本无效');
+    if(value.observedAt&&(!/^\d{4}-\d{2}-\d{2}$/.test(value.observedAt)||!Number.isFinite(Date.parse(value.observedAt))))throw new Error('生活技艺采集日期无效');
+    if(value.skills===undefined)return;
+    if(!value.skills||typeof value.skills!=='object'||Array.isArray(value.skills))throw new Error('生活技艺明细格式无效');
+    for(const {id,name} of lifeSkillCatalog){const skill=value.skills[id];if(skill==null)continue;
+      if(typeof skill!=='object'||Array.isArray(skill))throw new Error(name+'资料格式无效');
+      for(const key of ['level','levelCap','proficiency'])if(skill[key]!=null){if(typeof skill[key]!=='number')throw new Error(name+'数值格式无效');number(skill[key],name+({level:'等级',levelCap:'等级上限',proficiency:'熟练度'}[key]),{integer:true,min:key==='levelCap'?1:0});}
+      if(skill.level!=null&&skill.levelCap!=null&&skill.level>skill.levelCap)throw new Error(name+'等级不能超过已登记上限');
+      if(skill.specialized!=null&&typeof skill.specialized!=='boolean')throw new Error(name+'专精状态无效');
+      for(const key of ['specialization','breakthrough','notes'])if(skill[key]!=null&&(typeof skill[key]!=='string'||skill[key].length>500))throw new Error(name+'备注须为500字以内的文字');
+    }
+  }
   // Workspace values are JSON data. Keep cloning available in older browsers
   // without changing or polyfilling the browser's structuredClone API.
   function clone(value){return typeof structuredClone==='function'?structuredClone(value):value===undefined?undefined:JSON.parse(JSON.stringify(value));}
@@ -53,7 +72,7 @@
     if(!['daily5','raid10'].includes(t.partyRule)||raidCapacity(t)===25||t.dungeonRewardMode!=='auto')return null;
     const r={...dungeonRewardDefaults,...c},raid=t.partyRule==='raid10',bosses=raid?(t.completedBossCount??t.bossCount??1):(t.bossCount??3),extra=players.some(p=>p.gongzhanBuff===true)?r.gongzhanExtraEquipment:0;
     return {direct:raid?(bosses>=raidClearBossCount(t)?(r.raidClearBoxes+(t.raidWeekly? r.raidWeeklyBoxes:0))*r.raidBoxEquipmentGold:0):t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,
-      shared:bosses*((raid?r.raidBossEquipment:r.dailyBossEquipment)+extra)*(raid?r.raidEquipmentGold:r.dailyEquipmentGold)+bosses*(raid?r.raidBossGold:r.dailyBossGold)};
+      shared:(externalParty(t)?players.length/(raid?raidCapacity(t):5):1)*(bosses*((raid?r.raidBossEquipment:r.dailyBossEquipment)+extra)*(raid?r.raidEquipmentGold:r.dailyEquipmentGold)+bosses*(raid?r.raidBossGold:r.dailyBossGold))};
   }
   function dungeonGold(t,batches,c){return batches.reduce((sum,players)=>{const r=dungeonRewards(t,players,c);return sum+(r?players.length*r.direct+r.shared:0);},0);}
   function blank() { return {version:VERSION, levelSeason:LEVEL_SEASON, dataKind:'actual', updatedAt:new Date().toISOString(), config:{...dungeonRewardDefaults,levelCap:CURRENT_LEVEL_CAP,goldUnit:10000,goldPrice:8.5,fee:0.02,saleRate:1,concurrency:3,cardPrice:30,cardMinutes:4000,discount:1,hourlyValue:20},accounts:[],roles:[],tasks:[],progress:[],records:[],ledger:[],cash:[],equipment:[],plans:[],imports:[],scenarios:[],notes:[],wageClaims:[],wageReceipts:[],materials:[],materialSales:[],sourceArchives:[],priceQuotes:[],energyRecipes:[],roiComparisons:[]}; }
@@ -116,6 +135,7 @@
   }
   function raidCapacity(t){return t?.raidSize===25||/^25/.test(t?.difficulty||'')?25:10;}
   function withPartyRule(t,rule=t.partyRule||'none'){
+    if(externalParty(t)&&['daily5','raid10'].includes(rule)){const base=withPartyRule({...t,raidMode:'legacy',participationMode:undefined},rule);return {...base,raidMode:t.raidMode,participationMode:t.participationMode,tank:0,heal:0,dps:0,allowCompanions:false,companionLimit:0,fillCompanionSlots:false};}
     if(rule==='daily5')return {...t,partyRule:rule,type:'role',teamSize:5,externalSeats:0,maxParallel:5,tank:1,heal:1,dps:1,allowCompanions:t.allowCompanions!==false,companionLimit:t.companionLimit??3,preferRanged:false};
     if(rule==='raid10'&&raidCapacity(t)===25){const seats=Number.isInteger(t.raidPlayerSeats)?t.raidPlayerSeats:1;return {...t,partyRule:rule,raidSize:25,type:'team',teamSize:seats,raidPlayerSeats:seats,externalSeats:25-seats,maxParallel:25,tank:t.tankMode==='player'?Math.max(1,t.tank||0):t.tank??0,heal:t.heal??0,dps:0,allowCompanions:false,companionLimit:0,fillCompanionSlots:false,dungeonRewardMode:'manual',preferRanged:t.preferRanged!==false};}
     if(rule==='raid10')return {...t,partyRule:rule,type:'team',teamSize:Number.isInteger(t.raidPlayerSeats)?t.raidPlayerSeats:8,raidPlayerSeats:t.raidPlayerSeats??'auto',externalSeats:0,maxParallel:10,tank:Math.max(1,t.tank||0),heal:Math.max(1,t.heal||0),dps:1,allowCompanions:t.allowCompanions!==false,companionLimit:t.companionLimit??3,preferRanged:t.preferRanged!==false,fillCompanionSlots:t.fillCompanionSlots===true};
@@ -125,9 +145,10 @@
     if(!c||typeof c.name!=='string'||!c.name.trim()||c.name.length>80)throw new Error('请填写团队名称（最多 80 字）');
     number(c.playerSeats,'团队玩家人数',{min:1,max:25,integer:true});
     if(!['auto','player','companion'].includes(c.tankMode))throw new Error('团队坦克来源无效');
+    if(c.participationMode!==undefined&&c.participationMode!=='external')throw new Error('外部团队类型无效');
     return c;
   }
-  function partyTask(task,config){return config?withPartyRule({...task,raidPlayerSeats:config.playerSeats,tankMode:config.tankMode},task.partyRule):withPartyRule(task);}
+  function partyTask(task,config){return config?withPartyRule({...task,raidPlayerSeats:config.playerSeats,tankMode:config.tankMode,participationMode:config.participationMode||task.participationMode},task.partyRule):withPartyRule(task);}
   function upgradeState(s){
     for(const r of s.roles)if(r.gongzhanBuff==null||['unknown','待确认'].includes(r.gongzhanBuff))r.gongzhanBuff=false;
     if(s.levelSeason!==LEVEL_SEASON){
@@ -145,6 +166,7 @@
     s.partyRulesVersion=3;return s;
   }
   function companionAssignments(task,players,totalSlots){
+    if(externalParty(task))return [];
     if(task.partyRule==='raid10'&&raidCapacity(task)===25)return players.length<=25?[]:null;
     // Small daily tails join a world party; only 3–4 players use companions.
     if(task.partyRule==='daily5'&&players.length>=1&&players.length<=2)return [];
@@ -173,6 +195,7 @@
     if(new Set(players.map(r=>r.id)).size!==players.length)throw new Error('同队玩家角色重复');
     if(players.some(r=>!r.server)||new Set(players.map(r=>r.server)).size!==1)throw new Error('队伍区服缺失或不兼容');
     if(players.some(r=>r.creationStatus==='planned'||t.levelCap&&r.level!==t.levelCap||r.enabled===false||(r.level??0)<t.minLevel||(r.score??0)<t.minScore))throw new Error('成员资格失效');
+    if(externalParty(t)){if(!players.length||players.length>(t.partyRule==='daily5'?5:raidCapacity(t)))throw new Error('自有角色人数超出团队容量');if(companions.length)throw new Error('外部团队不安排自有侠客');return true;}
     if(t.partyRule==='raid10'&&raidCapacity(t)===25){
       if(!players.length||players.length!==t.raidPlayerSeats||players.length>25)throw new Error('25 人本自有角色人数与队伍配置不一致');
       if(companions.length)throw new Error('25 人本不使用十人本侠客补位规则');
@@ -200,11 +223,13 @@
   }
   // Called for new allocations and roster edits, never retroactively on history.
   function validateDailyGongzhan(task,players,batches=[players]){
+    if(externalParty(task))return true;
     const max=task.gongzhanMaxPerTeam??gongzhanAllocationPolicy(batches).maxPerTeam;
     if(raidGongzhanStatus(players).count>max)throw new Error('共战不足以覆盖所有队伍时，每队最多安排一名共战江湖角色，请分散到其他队伍');
     return true;
   }
   function validateGongzhanBatches(task,batches){
+    if(externalParty(task))return true;
     const policy=gongzhanAllocationPolicy(batches);for(const players of batches)validateDailyGongzhan({...task,gongzhanMaxPerTeam:policy.maxPerTeam},players,batches);
     if(policy.sufficient&&batches.some(b=>b.length&&!raidGongzhanStatus(b).covered))throw new Error('共战角色足够，请先为每个队伍至少安排一名共战江湖角色');
     return true;
@@ -299,7 +324,8 @@
     }
     return parties;
   }
-  const raidModes=['output','balanced','mentor'];
+  const raidModes=['output','balanced','mentor','external'];
+  function externalParty(t){return (t?.participationMode||t?.raidMode)==='external'&&(!t?.partyRule||['daily5','raid10'].includes(t.partyRule));}
   function raidGongzhanStatus(players){const count=players.filter(r=>r?.gongzhanBuff===true&&r.enabled!==false&&r.creationStatus!=='planned').length;return {count,covered:count>0,extraEquipmentPerBoss:count>0?1:0};}
   function raidGongzhanWarnings(batches){return batches.flatMap((players,i)=>raidGongzhanStatus(players).covered?[]:['第 '+(i+1)+' 队缺少共战江湖：当前资格、CD、账号、职责或固定成员限制下，未能配置有效共战角色。']);}
   function raidPowerBasis(roles){
@@ -344,9 +370,10 @@
     return parties.map(p=>({...p,powerStats:raidPartyStats(p.players,basis),strongDps:p.players.filter(r=>Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold).map(r=>r.id),noviceIds:p.players.filter(r=>Number.isFinite(r.score)&&r.score>0&&r.score<=lowThreshold&&!(Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold)).map(r=>r.id)}));
   }
   // New candidate plans require full raids; legacy templates and saved plans keep their own rules.
-  function planningTask(task){return task.partyRule==='raid10'?{...task,fillCompanionSlots:true}:task;}
-  function savedPartyTask(task,plan){const snapshot=plan.taskSnapshots?.[task.id];if(snapshot)task={...task,...Object.fromEntries(['partyRule','difficulty','dungeonId','dungeonName','raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'].filter(k=>snapshot[k]!==undefined).map(k=>[k,snapshot[k]])),...(snapshot.partyRule==='raid10'?{raidSize:raidCapacity(snapshot)}:{})};return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
+  function planningTask(task){return task.partyRule==='raid10'&&!externalParty(task)?{...task,fillCompanionSlots:true}:task;}
+  function savedPartyTask(task,plan){const snapshot=plan.taskSnapshots?.[task.id];if(snapshot)task={...task,...Object.fromEntries(['raidMode','partyRule','difficulty','dungeonId','dungeonName','raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'].filter(k=>snapshot[k]!==undefined).map(k=>[k,snapshot[k]])),...(snapshot.partyRule==='raid10'?{raidSize:raidCapacity(snapshot)}:{})};if(externalParty(plan.rulesSnapshot)||plan.teamConfigs?.length&&plan.teamConfigs.every(externalParty))task={...task,raidMode:'external'};return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
   function optimizeTaskBatches(task,batches,capacity,parties=[],locked=[]){
+    if(externalParty(task))return {batches,parties};
     const policy=gongzhanAllocationPolicy(batches),cache=new Map(),hasParty=['daily5','raid10'].includes(task.partyRule);
     const rebuild=(p,relaxGongzhan=false)=>{
       if(!p.players.length||p.players.length>Math.min(capacity,task.maxParallel??Infinity))return null;
@@ -380,7 +407,24 @@
     return {teams:optimized.map(p=>p.players),parties:optimized,reasons,powerBasis:raidPowerBasis(roles),unassigned:roles.filter(r=>!optimized.some(p=>p.players.some(v=>v.id===r.id)))};
   }
   function partyCompanions(task,players,saved=[]){return raidCapacity(task)===25?[]:saved.length?saved:companionAssignments(task,players,task.partyRule==='daily5'?5:10);}
+  function externalCandidates(task,roles,locked,capacity,coverAll){
+    const t=withPartyRule(task),total=t.partyRule==='daily5'?5:raidCapacity(t),seats=number(t.externalPlayerSeats??1,'外部团队自有角色上限',{min:1,max:total,integer:true}),parties=[],reasons=[];
+    let pool=[...new Map(roles.map(r=>[r.id,r])).values()].filter(r=>r.accountId&&r.server&&r.enabled!==false&&r.creationStatus!=='planned'&&(!t.levelCap||r.level===t.levelCap)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));
+    if(locked.length>Math.min(seats,capacity)||locked.some(id=>!pool.some(r=>r.id===id)))return {teams:[],parties:[],unassigned:roles,reasons:['首队锁定成员超过自有角色上限或不在可用范围']};
+    while(pool.length&&(coverAll||parties.length<t.runs)){
+      const required=parties.length?[]:locked,players=required.map(id=>pool.find(r=>r.id===id)),limit=Math.min(seats,capacity,t.maxParallel);
+      if(!players.length)players.push(pool[0]);
+      for(const r of pool)if(players.length<limit&&!players.includes(r)&&r.server===players[0].server&&!players.some(x=>x.accountId===r.accountId))players.push(r);
+      const teamConfig={name:'团队 '+(parties.length+1),playerSeats:players.length,tankMode:'auto',participationMode:t.participationMode||t.raidMode};
+      try{validateParty(partyTask(t,teamConfig),players,[],capacity);}catch(e){reasons.push(e.message);break;}
+      parties.push({players,companions:[],totalSlots:total,capacity:total,externalSeats:total-players.length,teamConfig,teamIndex:parties.length});pool=pool.filter(r=>!players.includes(r));
+    }
+    if(!coverAll&&parties.length<t.runs)reasons.push('目标 '+t.runs+' 队，仅生成 '+parties.length+' 队；请检查可用角色、账号、区服与 CD。');
+    reasons.push('仅记录自有角色参与；外部成员、职责和共战待游戏内确认，外部成员不计入收益、点卡或 CD。');
+    return {teams:parties.map(p=>p.players),parties,reasons,unassigned:roles.filter(r=>!parties.some(p=>p.players.includes(r)))};
+  }
   function partyCandidates(task,roles,locked=[],capacity=Infinity,coverAll=task.partyRule==='daily5'){
+    if(externalParty(task))return externalCandidates(task,roles,locked,capacity,coverAll);
     if(task.partyRule==='raid10'&&raidCapacity(task)===25)return raid25Candidates(task,roles,locked,capacity);
     const t=withPartyRule(task),total=t.partyRule==='daily5'?5:10,cap=Math.min(capacity,t.maxParallel),reasons=[],seen=new Set();
     const available=roles.filter(r=>{const okay=!seen.has(r.id)&&r.accountId&&r.server&&r.creationStatus!=='planned'&&(!t.levelCap||r.level===t.levelCap)&&r.enabled!==false&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0);seen.add(r.id);if(!okay)reasons.push(r.name+'：账号 / 区服 / 等级 / 装备信息不足或资格不满足');return okay;});
@@ -609,7 +653,7 @@
     if(t.partyRule==='daily5'){
       const generated=t.enabled===false||!roles.length||!rounds?{teams:[],parties:[],reasons:[],unassigned:[]}:partyCandidates(t,roles,[],c.concurrency,true),batches=generated.teams,covered=batches.flat(),duration=t.minutes/t.efficiency,accountMinutes={};
       for(const r of covered)accountMinutes[r.accountId]=(accountMinutes[r.accountId]||0)+rounds*(duration+t.onlineExtra);
-      const perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,shared=t.sharedMode==='person'?covered.length*rounds*t.shared:batches.length*rounds*t.shared;
+      const perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold,shared=t.sharedMode==='person'?covered.length*rounds*t.shared:(externalParty(t)?covered.length/5:batches.length)*rounds*t.shared;
       return {...costs((dungeonRewards(t,[],c)?dungeonGold(t,batches,c)*rounds:covered.length*rounds*perGold+shared),batches.length*rounds*duration+(batches.length?t.prepare:0),covered.length*rounds*(duration+t.onlineExtra),c,batches.length?t.otherCost:0,accountMinutes),batches,parties:generated.parties,accountMinutes,reasons:generated.reasons,unassigned:generated.unassigned,executions:covered.length*rounds};
     }
     const batches=t.enabled===false||!roles.length||!rounds?[]:splitBatches(roles,Math.min(c.concurrency,t.maxParallel));
@@ -652,21 +696,22 @@
     const active=t.enabled===false?[]:teams,k=active.length,players=active.flat(),duration=t.minutes/t.efficiency;
     const accountMinutes={};for(const r of players)accountMinutes[r.accountId]=(accountMinutes[r.accountId]||0)+duration+t.onlineExtra;
     const perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold;
-    const shared=(t.sharedMode==='person'?players.length:k)*(t.shared||0);
-    return {...costs(dungeonRewards(t,[],c)?dungeonGold(t,active,c):(t.rewardPerRole?players.length:k)*perGold+shared,k*duration+(k?t.prepare:0),Object.values(accountMinutes).reduce((a,b)=>a+b,0),c,k?t.otherCost:0,accountMinutes),batches:active,accountMinutes,executions:k};
+    const shared=(t.sharedMode==='person'?players.length:externalParty(t)?players.length/raidCapacity(t):k)*(t.shared||0);
+    return {...costs(dungeonRewards(t,[],c)?dungeonGold(t,active,c):(t.rewardPerRole?players.length:externalParty(t)?players.length/raidCapacity(t):k)*perGold+shared,k*duration+(k?t.prepare:0),Object.values(accountMinutes).reduce((a,b)=>a+b,0),c,k?t.otherCost:0,accountMinutes),batches:active,accountMinutes,executions:k};
   }
   function calculateBatches(t,batches,c){
     if(t.enabled===false)batches=[];
     if(t.type==='team')return calculateTeam(t,batches,c);
     const duration=t.minutes/t.efficiency,accountMinutes={},players=batches.flat(),perGold=t.components?.length?t.components.reduce((n,x)=>n+x.quantity*x.price,0):t.gold;
     for(const r of players)accountMinutes[r.accountId]=(accountMinutes[r.accountId]||0)+duration+t.onlineExtra;
-    const shared=t.sharedMode==='person'?players.length*t.shared:batches.length*t.shared;
+    const shared=(t.sharedMode==='person'?players.length:externalParty(t)?players.length/(t.partyRule==='daily5'?5:raidCapacity(t)):batches.length)*t.shared;
     return {...costs(dungeonRewards(t,[],c)?dungeonGold(t,batches,c):players.length*perGold+shared,batches.length*duration+(batches.length?t.prepare:0),players.length*(duration+t.onlineExtra),c,batches.length?t.otherCost:0,accountMinutes),batches,accountMinutes,executions:players.length};
   }
   function levelCap(s){return s.config.levelCap??CURRENT_LEVEL_CAP;}
   function isMaxLevel(s,r){return r.creationStatus!=='planned'&&r.level===levelCap(s);}
   function taskForVersion(s,t){return {...t,levelCap:levelCap(s),minLevel:Math.min(t.minLevel||0,levelCap(s))};}
-  function eligible(s,t,scope={}) {t=taskForVersion(s,t);return s.roles.filter(r=>r.enabled!==false&&isMaxLevel(s,r)&&t.roleIds.includes(r.id)&&s.accounts.some(a=>a.id===r.accountId&&a.enabled!==false)&&(!t.requiresCamp||['hao','e'].includes(r.camp))&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)&&(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));}
+  function scopeMatches(id,selected){if(Array.isArray(selected))return !selected.length||selected.includes(id);return !selected||id===selected;}
+  function eligible(s,t,scope={}) {t=taskForVersion(s,t);return s.roles.filter(r=>r.enabled!==false&&isMaxLevel(s,r)&&t.roleIds.includes(r.id)&&s.accounts.some(a=>a.id===r.accountId&&a.enabled!==false)&&(!t.requiresCamp||['hao','e'].includes(r.camp))&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)&&scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));}
   function cdKey(t){return t.dungeonId?'raid_'+t.dungeonId+'_'+(t.difficulty||'10人普通'):t.id;}
   function getProgress(s,t,r,date) {const key=cdKey(t),period=cycle(t,date);return s.progress.find(p=>p.roleId===r.id&&(p.cdKeySnapshot||cdKey(s.tasks.find(x=>x.id===p.taskId)||{}))===key&&p.cycle===period);}
   // Completion facts consume targets/CD, but never enter income or timing samples.
@@ -756,8 +801,8 @@
     const total=sum(results,s.config),ordered=optimizeTaskBatches(t,results.flatMap(x=>x.batches),s.config.concurrency,results.flatMap(x=>x.parties||[]));return pricePrediction(s,t,{...total,...ordered,executions:results.reduce((n,x)=>n+x.executions,0),reasons:[...new Set(results.flatMap(x=>x.reasons||[]))],unassigned:results.flatMap(x=>x.unassigned||[])},date);
   }
   function scheduled(t,date){if(t.activeFrom&&date<t.activeFrom||t.activeUntil&&date>t.activeUntil)return false;if(!t.days.includes(weekday(date)))return false;if(t.period==='daily')return true;const start=cycle(t,date);for(let d=start;d<date;d=addDays(d,1))if(t.days.includes(weekday(d)))return false;return true;}
-  function routePlan(s,taskIds,date,locks=[],scope={},excludePlanId=null,{fullRaid=false,raidMode='legacy'}={}){
-    const tasks=taskIds.map(id=>{const t=s.tasks.find(t=>t.id===id);return t&&{...(fullRaid?planningTask(taskForVersion(s,t)):taskForVersion(s,t)),raidMode};});
+  function routePlan(s,taskIds,date,locks=[],scope={},excludePlanId=null,{fullRaid=false,raidMode='legacy',externalPlayerSeats=1}={}){
+    const tasks=taskIds.map(id=>{const t=s.tasks.find(t=>t.id===id);return t&&{...(fullRaid?planningTask(taskForVersion(s,t)):taskForVersion(s,t)),raidMode,externalPlayerSeats};});
     if(!tasks.length||tasks.some(t=>!t||!t.enabled||t.partyRule!=='raid10'))throw new Error('串本路线只能选择启用的副本任务');
     if(new Set(tasks.map(cdKey)).size!==tasks.length)throw new Error('同一路线不能重复选择相同副本 CD');
     const available=availableRoles(s,tasks[0],date,scope,excludePlanId).filter(r=>tasks.every(t=>availableRoles(s,t,date,scope,excludePlanId).some(x=>x.id===r.id)));
@@ -802,10 +847,10 @@
     const config=recordPricing(r,currentConfig),goldCost=r.goldCost||0,result=costs(r.gold,r.minutes,r.onlineMinutes,config,(r.otherCost||0)+goldCost*r.snapshot.goldPrice/r.snapshot.goldUnit,r.accountMinutes||{});
     if(r.incompleteMeasurement)for(const k of ['net','timeNet','netGold','hourly','hourlyGold','roi'])result[k]=null;return {...result,incompleteMeasurement:!!r.incompleteMeasurement,goldCost,accountMinutes:r.accountMinutes||{},...(r.billableAccountMinutes?{billableAccountMinutes:r.billableAccountMinutes,coveredAccountMinutes:r.coveredAccountMinutes||{}}:{}),billingWarnings:[...(r.billingWarnings||[]),...(currentConfig?.discount>0&&r.snapshot.discount===0&&!r.billableAccountMinutes&&r.snapshot.accountBillingRates?['原记录为零折扣且缺少计费分钟，月卡覆盖无法还原，暂按计时单价估算']:[]),...(r.pricingSource?[r.pricingSource]:[])]};
   }
-  function selectedRecordRoles(s,r,scope={}){return r.roleIds.filter(id=>{const role=s.roles.find(x=>x.id===id);return role&&(!scope.role||id===scope.role)&&(!scope.account||recordAccount(s,r,id)===scope.account)&&(!scope.group||(r.roleGroups?.[id]??s.accounts.find(a=>a.id===recordAccount(s,r,id))?.group)===scope.group);});}
+  function selectedRecordRoles(s,r,scope={}){return r.roleIds.filter(id=>{const role=s.roles.find(x=>x.id===id);return role&&scopeMatches(id,scope.role)&&scopeMatches(recordAccount(s,r,id),scope.account)&&(!scope.group||(r.roleGroups?.[id]??s.accounts.find(a=>a.id===recordAccount(s,r,id))?.group)===scope.group);});}
   function scopedRecord(s,r,scope={}){
     r=allocatedRecord(s,r);
-    if(r.unallocated&&(scope.role||scope.account||scope.group))return null;const ids=selectedRecordRoles(s,r,scope);if(!ids.length&&!r.unallocated)return null;
+    if(r.unallocated&&[scope.role,scope.account,scope.group].some(v=>Array.isArray(v)?v.length:!!v))return null;const ids=selectedRecordRoles(s,r,scope);if(!ids.length&&!r.unallocated)return null;
     if(ids.length===r.roleIds.length)return r;
     if(!r.roleAllocations||ids.some(id=>!r.roleAllocations[id]))return null;
     const amounts={gold:0,minutes:0,onlineMinutes:0,otherCost:0},accountMinutes={};
@@ -831,7 +876,7 @@
         if(p.taskSnapshots?.[id])continue;
         const archive=sources.find(row=>row.data?.plans?.some(old=>old.id===p.id)&&row.data.tasks?.some(t=>t.id===id));
         const task=(archive?.data||s).tasks.find(t=>t.id===id);if(!task)continue;
-        p.taskSnapshots??={};p.taskSnapshots[id]={...JSON.parse(JSON.stringify(task)),roleIds:[...new Set(p.batches?.flat()||task.roleIds)]};changed=true;
+        p.taskSnapshots??={};p.taskSnapshots[id]={...JSON.parse(JSON.stringify(savedPartyTask(task,p))),roleIds:[...new Set(p.batches?.flat()||task.roleIds)]};changed=true;
       }
     }
     return changed;
@@ -878,7 +923,7 @@
         }
         const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
         const result=scopedPrediction(pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches),selectedIds);
-        if(taskDate>=start&&taskDate<=end){rows.get(taskId).push(result);if(!scope.role&&!scope.account&&!scope.group&&fullBatches.length)participation.push({planId:p.id,taskId,date:taskDate,startedAt:new Date(when).toISOString(),prepare:t.prepare||0,batchMinutes:t.minutes/t.efficiency,batchIndices:fullBatchIndices,onlinePerVisit:t.minutes/t.efficiency+t.onlineExtra,batches:fullBatches.map(batch=>batch.map(r=>({roleId:r.id,accountId:r.accountId}))),result});}
+        if(taskDate>=start&&taskDate<=end){rows.get(taskId).push(result);if(![scope.role,scope.account,scope.group].some(v=>Array.isArray(v)?v.length:!!v)&&fullBatches.length)participation.push({planId:p.id,taskId,date:taskDate,startedAt:new Date(when).toISOString(),prepare:t.prepare||0,batchMinutes:t.minutes/t.efficiency,batchIndices:fullBatchIndices,onlinePerVisit:t.minutes/t.efficiency+t.onlineExtra,batches:fullBatches.map(batch=>batch.map(r=>({roleId:r.id,accountId:r.accountId}))),result});}
       }
     }
     const tasks=s.tasks.filter(t=>t.enabled||rows.get(t.id)?.length).map(task=>({task,...sum(rows.get(task.id)||[],s.config),hasData:true}));
@@ -934,7 +979,7 @@
   // Resource observations are facts; differences are derived and never booked as income.
   function resourceBatches(s,scope={}) {
     const validDate=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&Number.isFinite(Date.parse(d+'T12:00:00+08:00'))&&dateKey(new Date(d+'T12:00:00+08:00'))===d;
-    const roles=s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)),ids=new Set(s.roles.map(r=>r.id)),observations=[];
+    const roles=s.roles.filter(r=>scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)),ids=new Set(s.roles.map(r=>r.id)),observations=[];
     const add=(x,order)=>{if(!ids.has(x.roleId)||x.gold==null||!Number.isFinite(Number(x.gold))||Number(x.gold)<0||!validDate(x.date))return;const at=x.capturedAt||x.date+'T12:00:00+08:00';if(!Number.isFinite(Date.parse(at)))return;observations.push({...x,gold:Number(x.gold),at,time:Date.parse(at),order,precision:x.capturedAt?'instant':'date'});};
     // Import archives retain all recognized numeric resources, not only gold.
     for(const [i,a]of (s.sourceArchives||[]).entries())for(const row of a.rows||[]){const values=Object.fromEntries(Object.entries(row.changes||{}).map(([k,v])=>[k,v.after]));if(values.observedGold!=null)add({id:a.id+'_'+row.roleId,roleId:row.roleId,gold:values.observedGold,date:a.date,capturedAt:a.capturedAt,importedAt:a.updatedAt,source:'截图',resources:values},i);}
@@ -947,7 +992,7 @@
   // Period reports use observed balances, never task forecasts or inferred income.
   function resourceRange(s,start,end,scope={}) {
     const batches=resourceBatches(s,scope),observations=batches.flatMap(b=>b.observations).sort((a,b)=>a.time-b.time);
-    const rows=s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)).map(role=>{
+    const rows=s.roles.filter(r=>scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)).map(role=>{
       const history=observations.filter(x=>x.roleId===role.id),before=history.filter(x=>x.date<=start).at(-1),now=history.filter(x=>x.date>=start&&x.date<=end).at(-1),comparable=!!before&&!!now&&now.time>before.time;
       return {role,before,now,comparable,delta:comparable?now.gold-before.gold:null,status:!now?'期内未采集':!before?'缺少期初观测':!comparable?'仅一次观测':''};
     });
@@ -978,7 +1023,7 @@
   function resourcePeriod(s,scope={},batchId='',sort='delta',range=null) {
     if(range)range=resourceDateRange('custom',range.start,range.end);
     const batches=resourceBatches(s,scope),index=range?batches.findLastIndex(b=>b.date<=range.end):batchId?batches.findIndex(b=>b.id===batchId):batches.length-1,current=batches[index],previous=batches[index-1],events=confirmedGoldEvents(s);
-    const roles=s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));
+    const roles=s.roles.filter(r=>scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));
     const histories=new Map();if(range)for(const b of batches)for(const x of b.observations){if(!histories.has(x.roleId))histories.set(x.roleId,[]);histories.get(x.roleId).push(x);}
     const rows=roles.map(role=>{const history=histories.get(role.id)||[],now=range?history.filter(x=>x.date>=range.start&&x.date<=range.end).at(-1):current?.observations.find(x=>x.roleId===role.id),before=range?history.filter(x=>x.date<range.start).at(-1):previous?.observations.find(x=>x.roleId===role.id),older=range?undefined:batches.slice(0,index).flatMap(b=>b.observations).filter(x=>x.roleId===role.id).at(-1),baseline=before||older,comparable=!!now&&!!before&&now.time>before.time,delta=now&&baseline?now.gold-baseline.gold:null,intervalApprox=!!now&&!!baseline&&(now.precision==='date'||baseline.precision==='date'),days=now&&baseline?(intervalApprox?(Date.parse(now.date)-Date.parse(baseline.date))/86400000:(now.time-baseline.time)/86400000):null;
       // Date-only events on boundary dates are ambiguous; keep them separate.
@@ -1013,7 +1058,7 @@
     return {start:first,end:last,startTime,endTime,precise:first.includes('T')||last.includes('T')};
   }
   function goldAssetReport(s,{scope={},mode='batch',batchId='',baselineId='',range=null}={}) {
-    const roles=s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));
+    const roles=s.roles.filter(r=>scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));
     // Keep the global collection nodes when narrowing scope. Filtering an account
     // must not silently replace the user's chosen collection interval.
     const ids=new Set(roles.map(r=>r.id)),batches=resourceBatches(s).map(b=>({...b,observations:b.observations.filter(x=>ids.has(x.roleId))}));
@@ -1095,7 +1140,7 @@
     if(s.version!==VERSION)throw new Error('不支持的数据版本 '+s.version+'；当前支持 version: 1');
     validateConfig(s.config);if(s.recordingPreferences&&(!['none','attendance','task'].includes(s.recordingPreferences.financialAllocation)||!['none','attendance','task'].includes(s.recordingPreferences.timeAllocation)))throw new Error('执行分摊偏好无效');
     for(const key of ['accounts','roles','tasks','progress','records','ledger','cash','equipment','plans','imports','scenarios','notes']){if(!Array.isArray(s[key]))throw new Error('缺少数组字段 '+key);const ids=s[key].map(x=>x.id);if(ids.some(x=>typeof x!=='string'||!x||!/^[-_a-zA-Z0-9]+$/.test(x))||new Set(ids).size!==ids.length)throw new Error(key+' 包含缺失、非法或重复 ID（仅字母、数字、下划线与连字符）');}
-    for(const r of s.roles){if(r.referenceDps!=null){if(typeof r.referenceDps!=='number')throw new Error('参考 DPS 必须为数字');number(r.referenceDps,'参考 DPS');}if(r.gongzhanBuff!=null&&typeof r.gongzhanBuff!=='boolean')throw new Error('共战江湖状态必须为有或无');if(r.creationStatus!==undefined&&!['planned','created'].includes(r.creationStatus))throw new Error('角色创建状态无效');for(const k of ['energy','energyCap','weeklyEnergy','contribution','chivalry','prestige','achievement','equipmentScore','stage','huashang','homeSeason','tongbao','petCount','xiaxing','weeklyXiaxing'])if(r[k]!=null)number(r[k],k);if(r.energy!=null&&r.energyCap!=null&&r.energy>r.energyCap)throw new Error('角色精力不能超过上限');if(r.resourceUpdatedAt&&!Number.isFinite(new Date(r.resourceUpdatedAt).getTime()))throw new Error('资源采集时间无效');if(!s.accounts.some(a=>a.id===r.accountId))throw new Error('角色 '+r.name+' 的账号不存在');if(!r.name?.trim())throw new Error('角色名不能为空');for(const k of ['level','score','openingGold','observedGold'])if(r[k]!=null)number(r[k],k);if(r.companionIds!==undefined&&(!Array.isArray(r.companionIds)||r.companionIds.some(id=>!Catalog.companions.some(c=>c.id===id))||new Set(r.companionIds).size!==r.companionIds.length))throw new Error('角色侠客 ID 无效或重复');if(r.companionDutyOverrides)for(const [id,duties]of Object.entries(r.companionDutyOverrides))if(!Catalog.companions.some(c=>c.id===id)||!Array.isArray(duties)||duties.some(d=>!['tank','heal','dps'].includes(d)))throw new Error('侠客职责覆盖无效');}
+    for(const r of s.roles){validateLifeSkills(r.lifeSkills);if(r.referenceDps!=null){if(typeof r.referenceDps!=='number')throw new Error('参考 DPS 必须为数字');number(r.referenceDps,'参考 DPS');}if(r.gongzhanBuff!=null&&typeof r.gongzhanBuff!=='boolean')throw new Error('共战江湖状态必须为有或无');if(r.creationStatus!==undefined&&!['planned','created'].includes(r.creationStatus))throw new Error('角色创建状态无效');for(const k of ['energy','energyCap','weeklyEnergy','contribution','chivalry','prestige','achievement','equipmentScore','stage','huashang','homeSeason','tongbao','petCount','xiaxing','weeklyXiaxing'])if(r[k]!=null)number(r[k],k);if(r.energy!=null&&r.energyCap!=null&&r.energy>r.energyCap)throw new Error('角色精力不能超过上限');if(r.resourceUpdatedAt&&!Number.isFinite(new Date(r.resourceUpdatedAt).getTime()))throw new Error('资源采集时间无效');if(!s.accounts.some(a=>a.id===r.accountId))throw new Error('角色 '+r.name+' 的账号不存在');if(!r.name?.trim())throw new Error('角色名不能为空');for(const k of ['level','score','openingGold','observedGold'])if(r[k]!=null)number(r[k],k);if(r.companionIds!==undefined&&(!Array.isArray(r.companionIds)||r.companionIds.some(id=>!Catalog.companions.some(c=>c.id===id))||new Set(r.companionIds).size!==r.companionIds.length))throw new Error('角色侠客 ID 无效或重复');if(r.companionDutyOverrides)for(const [id,duties]of Object.entries(r.companionDutyOverrides))if(!Catalog.companions.some(c=>c.id===id)||!Array.isArray(duties)||duties.some(d=>!['tank','heal','dps'].includes(d)))throw new Error('侠客职责覆盖无效');}
     for(const a of s.accounts){if(!a.name?.trim())throw new Error('账号别名不能为空');number(a.balance??0,'点卡余额');if(a.region&&!['电信区','双线区','无界区'].includes(a.region))throw new Error('账号大区无效');if(a.billingType&&!['point','monthly'].includes(a.billingType))throw new Error('计费类型无效');if(a.monthlyExpiresAt&&!Number.isFinite(new Date(a.monthlyExpiresAt).getTime()))throw new Error('月卡到期时间无效');for(const k of ['tongbao','points','activityScore','sharedEnergy','sharedEnergyCap'])if(a[k]!=null)number(a[k],k);}
     for(const t of s.tasks)validateTask(t,s);
     for(const p of s.progress){if(!s.roles.some(r=>r.id===p.roleId)||!s.tasks.some(t=>t.id===p.taskId))throw new Error('进度引用不存在的角色或任务');number(p.completed,'完成次数',{integer:true});number(p.target??0,'任务目标',{integer:true});}
@@ -1225,5 +1270,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

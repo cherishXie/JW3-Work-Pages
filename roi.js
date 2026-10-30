@@ -19,7 +19,7 @@
     return {material:m,sales,sold,left,quote:q,reference,estimate:accepted?reference*(1+adjust)*ratio*(1-fee):null,excluded:!tradable?'不可交易':!q?'报价缺失':q.stale&&!options.includeStale?'报价过期':null,realized:sales.reduce((n,x)=>n+x.quantity*x.unitGold-x.feeGold,0)};
   }
   function inventory(s,when=new Date(),scope={},options={}){
-    const rows=(s.materials||[]).filter(m=>(!scope.role||m.roleId===scope.role)&&(!scope.account||s.roles.find(r=>r.id===m.roleId)?.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===s.roles.find(r=>r.id===m.roleId)?.accountId)?.group===scope.group)).map(m=>stock(s,m,when,options));
+    const rows=(s.materials||[]).filter(m=>M.scopeMatches(m.roleId,scope.role)&&M.scopeMatches(s.roles.find(r=>r.id===m.roleId)?.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===s.roles.find(r=>r.id===m.roleId)?.accountId)?.group===scope.group)).map(m=>stock(s,m,when,options));
     return {rows,reference:rows.reduce((n,x)=>n+(x.reference||0),0),estimate:rows.reduce((n,x)=>n+(x.estimate||0),0),valued:rows.filter(x=>x.left>0&&x.estimate!==null).length,unknown:rows.filter(x=>x.left>0&&!x.quote&&x.material.tradable!==false).length,stale:rows.filter(x=>x.left>0&&x.quote?.stale).length,bound:rows.filter(x=>x.left>0&&x.material.tradable===false).length,unassigned:rows.filter(x=>x.left>0&&!x.material.roleId).length,options:{...options},when:new Date(at(when)).toISOString()};
   }
   function energy(s,r,when,includeStale=false){
@@ -28,7 +28,7 @@
     if(time-observed>7*86400000&&!includeStale)return {available:null,warning:'角色精力快照超过 7 天'};
     return {available:r.energy,warning:time-observed>7*86400000?'采用过期精力快照':null};
   }
-  function recipeRoles(s,r,scope={}){return s.roles.filter(x=>r.roleIds.includes(x.id)&&x.enabled!==false&&x.creationStatus!=='planned'&&s.accounts.some(a=>a.id===x.accountId&&a.enabled!==false)&&((x.server||'')===r.server)&&(!scope.role||x.id===scope.role)&&(!scope.account||x.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===x.accountId)?.group===scope.group));}
+  function recipeRoles(s,r,scope={}){return s.roles.filter(x=>r.roleIds.includes(x.id)&&x.enabled!==false&&x.creationStatus!=='planned'&&s.accounts.some(a=>a.id===x.accountId&&a.enabled!==false)&&((x.server||'')===r.server)&&M.scopeMatches(x.id,scope.role)&&M.scopeMatches(x.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===x.accountId)?.group===scope.group));}
   function inputStocks(s,recipe,role,item,when){const date=M.dateKey(new Date(at(when)));return (s.materials||[]).filter(m=>m.date<=date&&itemMatch(m,item)&&serverFor(s,m)===recipe.server&&(!m.roleId||m.roleId===role.id)).map(m=>({material:m,left:stock(s,m,when).left})).filter(x=>x.left>EPS).sort((a,b)=>(!!b.material.roleId)-(!!a.material.roleId)||a.material.date.localeCompare(b.material.date)||a.material.id.localeCompare(b.material.id));}
   function recipe(s,r,roleId,when=new Date(),options={}){
     const role=s.roles.find(x=>x.id===roleId),warnings=[],prices=[];if(!r.enabled||!role||!recipeRoles(s,r).some(x=>x.id===roleId))return {valid:false,warnings:['配方停用或角色资格 / 区服未确认'],maxRuns:0};
