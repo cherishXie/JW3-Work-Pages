@@ -41,9 +41,9 @@ git push
 
 ## 私人文件与迁移边界
 
-data/、output/、docs/、本机截图和备份、.private-source.git/、.public-migration/ 全部忽略。不要公开私人文件或私有仓库历史。公开源文件采用 scripts/public-source.cjs 白名单；新开发文件须主动扩充清单及对应 .gitignore 条目。
+data/、output/、docs/、本机截图和备份、.private-source.git/、.public-migration/ 全部忽略。不要公开私人文件。公开源文件采用 scripts/public-source.cjs 白名单；新开发文件须主动扩充清单及对应 .gitignore 条目。
 
-原私有仓库保留为历史档案，旧发布工作流已停用。原本机 Git 元数据备份在被忽略的 .private-source.git/；公共 origin 不包含这些 Git 对象。不要将此目录添加到公共 Git。
+本机 Git 元数据备份目录 .private-source.git/ 不得添加、推送或删除。
 
 ## 更新资源与兼容性
 

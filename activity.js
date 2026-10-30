@@ -1,7 +1,7 @@
 /* Weekly activity and financial dimensions; unknown attribution stays unknown. */
 (function(root,factory){const api=factory(typeof module!=='undefined'&&module.exports?require('./model.js'):root.Workbench,typeof module!=='undefined'&&module.exports?require('./raid-catalog.js'):root.JX3Raids);if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.WorkbenchActivity=api;})(typeof globalThis!=='undefined'?globalThis:this,function(M,R){
   'use strict';
-  function roles(s,scope={}){return s.roles.filter(r=>(!scope.role||r.id===scope.role)&&(!scope.account||r.accountId===scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));}
+  function roles(s,scope={}){return s.roles.filter(r=>M.scopeMatches(r.id,scope.role)&&M.scopeMatches(r.accountId,scope.account)&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group));}
   function attribution(s,record,roleId){const scoped=M.scopedRecord(s,record,{role:roleId});return scoped?M.recordResult(scoped,s.config):null;}
   function online(s,record,roleId){
     record=M.allocatedRecord(s,record);
@@ -56,7 +56,7 @@
     const forecast=M.confirmedForecast(s,start,end),remaining={start,end,onlineMinutes:0,accountMinutes:{},billableAccountMinutes:{},coveredAccountMinutes:{}};
     const roleRows=new Map(s.roles.map(role=>[role.id,{role,minutes:0,billable:0,covered:0,card:0,gross:0,net:0,gold:0,netGold:0,hasIncome:false,missingTime:0,unallocated:0,accountIds:new Set()}]));
     const accountRows=new Map(s.accounts.map(account=>[account.id,{account,minutes:0,billable:0,covered:0,card:0,gross:0,net:0,gold:0,netGold:0,hasIncome:false,missingTime:0,unallocated:0}]));
-    const matches=(roleId,accountId,group)=>{const a=s.accounts.find(a=>a.id===accountId);return (!scope.role||scope.role===roleId)&&(!scope.account||scope.account===accountId)&&(!scope.group||(group??a?.group)===scope.group);};
+    const matches=(roleId,accountId,group)=>{const a=s.accounts.find(a=>a.id===accountId);return M.scopeMatches(roleId,scope.role)&&M.scopeMatches(accountId,scope.account)&&(!scope.group||(group??a?.group)===scope.group);};
     const visitUsage=(entry,member,batchIndex)=>{const account=s.accounts.find(a=>a.id===member.accountId),minutes=entry.onlinePerVisit,at=Date.parse(entry.startedAt)+(entry.prepare+batchIndex*entry.batchMinutes)*60000,expiry=account?.monthlyExpiresAt?Date.parse(account.monthlyExpiresAt):null;
       const covered=account?.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-at)/60000)):0,billable=minutes-covered;return {minutes,billable,covered,card:billable*s.config.cardPrice*s.config.discount/s.config.cardMinutes};};
     const pendingRoles=new Map();

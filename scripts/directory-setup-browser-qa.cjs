@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require('playwright'),M=require('../model.js');
 const root=path.resolve(__dirname,'..'),base=process.argv[2]||'http://127.0.0.1:4173/',privateQA=process.env.JX3_PRIVATE_QA==='1',baseline=process.env.JX3_BASELINE==='1';
 if(privateQA&&new URL(base).hostname!=='127.0.0.1')throw Error('Private fixture allowed only on loopback');
-const file=path.join(root,'data/JX3_Workbench_2026-10-23.json'),bytes=privateQA?fs.readFileSync(file):null,fixture=bytes?JSON.parse(bytes):M.demo(),out=path.join(root,'output/playwright/directory-setup');fs.mkdirSync(out,{recursive:true});
+const file=path.join(root,'data/JX3_Workbench_2026-10-30.json'),bytes=privateQA?fs.readFileSync(file):null,fixture=bytes?JSON.parse(bytes):M.demo(),out=path.join(root,'output/playwright/directory-setup');fs.mkdirSync(out,{recursive:true});
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.JX3_BROWSER_PATH});
 try{
  const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce',serviceWorkers:'block'}),page=await context.newPage(),errors=[],metrics=[];page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));

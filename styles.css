@@ -1308,3 +1308,24 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .setup-task-row small{font-size:12px;color:var(--wb-text-muted)}
 .setup-task-row button{flex-shrink:0}
 @media(max-width:767px){.setup-layer{padding:8px}.setup-shell{max-height:calc(100dvh - 16px);padding:10px;gap:8px}.setup-shell .page-head h1{font-size:24px}.setup-steps button{padding:6px}.setup-steps li span{width:22px;height:22px}.setup-content>.card{padding:10px}.account-archive-heading{flex-wrap:wrap}.setup-content .summary-strip{flex-wrap:wrap}}
+
+/* Participation labels retain text as well as semantic color across themes. */
+.participation-tag{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:2px 6px;border:0.5px solid currentColor;border-radius:4px;font-size:12px;line-height:1.5;font-weight:600}
+.participation-tag.external{color:var(--wb-cue-efficiency);background:var(--wb-cue-efficiency-bg)}
+
+.tc-planning .raid-mode-picker .task-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.raid-mode-picker>.participation-tag{justify-self:start}
+
+.team-auto-layout.is-external{display:block}
+.raid-mode-picker.is-external{grid-template-columns:repeat(2,minmax(0,1fr))}
+.raid-mode-picker.is-external>label[for="raid-mode"],.raid-mode-picker.is-external>[data-choice-for],.raid-mode-picker.is-external>.participation-tag,.raid-mode-picker.is-external>p,.raid-mode-picker.is-external>small{grid-column:1/-1}
+@media(max-width:767px){.raid-mode-picker.is-external{grid-template-columns:1fr}}
+
+.global-multi{align-self:flex-start;min-width:160px;max-width:100%}.global-multi-trigger{width:100%;justify-content:space-between}
+.global-multi:has(.global-multi-panel){flex:1 1 340px;max-width:560px}
+.global-multi-panel{display:grid;gap:8px;padding:10px;margin-top:6px;border:.5px solid var(--wb-border);border-radius:8px;background:var(--wb-surface)}
+.global-multi-panel>input{width:100%;min-width:0}.global-multi-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:288px;overflow:auto;padding:3px}
+#global-controls .global-multi-option{display:flex;flex-direction:row;align-items:start;gap:6px;min-width:0;padding:6px;border:.5px solid var(--wb-border);border-radius:5px;background:var(--wb-surface-2);cursor:pointer}
+.global-multi-option>input{flex:none;margin-top:3px;min-width:0}.global-multi-option>span{min-width:0;overflow-wrap:anywhere}.global-multi-option strong{font-size:12px}.global-multi-option small{display:block;font-size:12px;color:var(--wb-text-secondary)}
+#global-controls .global-multi-option.is-selected{border-color:var(--wb-primary);background:var(--wb-primary-soft)}
+.global-multi-pages{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}.global-multi-pages small,.global-multi-panel>small{font-size:12px;color:var(--wb-text-secondary)}

@@ -9,7 +9,7 @@ const server=http.createServer((req,res)=>{requests.push({method:req.method,url:
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/dev/`;
  const browser=await chromium.launch({headless:true,...(process.env.JX3_BROWSER_PATH?{executablePath:process.env.JX3_BROWSER_PATH}:{channel:'chrome'})});let app;
- const fixturePath=path.join(root,'data/JX3_Workbench_2026-10-23.json'),bytes=process.env.JX3_PRIVATE_QA?fs.readFileSync(fixturePath):null,fixture=bytes?JSON.parse(bytes):require('../model.js').demo();
+ const fixturePath=path.join(root,'data/JX3_Workbench_2026-10-30.json'),bytes=process.env.JX3_PRIVATE_QA?fs.readFileSync(fixturePath):null,fixture=bytes?JSON.parse(bytes):require('../model.js').demo();
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1000},timezoneId:'Asia/Shanghai',reducedMotion:'reduce'});
   await context.addInitScript(s=>{if(!localStorage.getItem('jx3-workbench-data-v2'))localStorage.setItem('jx3-workbench-data-v2',JSON.stringify({storeVersion:1,active:s,snapshots:[]}));},fixture);

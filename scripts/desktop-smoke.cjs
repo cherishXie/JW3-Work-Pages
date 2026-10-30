@@ -40,7 +40,7 @@ async function launch(){
     await page.screenshot({path:path.join(out,'tasks.png')});
     const checks=await page.evaluate(async()=>{
       let rejected=false;try{workbenchDesktop.storage.getItem('arbitrary-file');}catch{rejected=true;}
-      const privateStatus=(await fetch('workbench://app/data/JX3_Workbench_2026-10-23.json')).status;
+      const privateStatus=(await fetch('workbench://app/data/JX3_Workbench_2026-10-30.json')).status;
       let networkBlocked=false;try{await fetch('https://example.com');}catch{networkBlocked=true;}
       return {rejected,privateStatus,networkBlocked};
     });
