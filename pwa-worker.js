@@ -29,11 +29,20 @@ self.addEventListener('fetch',event=>{
  const relative=url.pathname.slice(base.pathname.length);
  // A root stable worker must never capture the independent dev channel.
  if(relative.startsWith('dev/'))return;
- if(['update-manifest.json','version.json','sw.js'].includes(relative)){event.respondWith(fetch(event.request,{cache:'no-store'}));return;}
+ if(['update-manifest.json','version.json','sw.js','recover.html','recovery.js'].includes(relative)){event.respondWith(fetch(event.request,{cache:'no-store'}));return;}
  const navigation=event.request.mode==='navigate'&&(relative===''||relative==='index.html');
  event.respondWith((async()=>{
-  if(navigation){await pin(event.resultingClientId||event.clientId,BUILD.id);return(await caches.open(CACHE)).match(new URL('index.html',BASE).href);}
-  const cache=await caches.open(await clientCache(event.clientId));
-  return await cache.match(url.origin+url.pathname)||fetch(event.request);
+  // CacheStorage can be evicted independently of the service worker registration.
+  // Never resolve a navigation with undefined, or mix network HTML with an old
+  // partial snapshot. Cache and pin failures must not prevent an online visit.
+  try{
+   const cache=await caches.open(navigation?CACHE:await clientCache(event.clientId));
+   const index=await cache.match(new URL('index.html',BASE).href);
+   if(index){
+    if(navigation){await pin(event.resultingClientId||event.clientId,BUILD.id).catch(()=>{});return index;}
+    const response=await cache.match(url.origin+url.pathname);if(response)return response;
+   }
+  }catch{}
+  return fetch(event.request,{cache:'no-store'});
  })());
 });

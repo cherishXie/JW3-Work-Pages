@@ -122,3 +122,7 @@
 !/scripts/directory-setup-browser-qa.cjs
 
 !/scripts/startup-verify.cjs
+
+!/recover.html
+!/recovery.js
+!/scripts/pwa-navigation-verify.cjs

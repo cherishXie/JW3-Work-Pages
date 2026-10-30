@@ -1,6 +1,7 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+"recover.html","recovery.js","scripts/pwa-navigation-verify.cjs",
 "scripts/directory-setup-browser-qa.cjs",
 ".gitattributes",
 "app-icon-192.png","app-icon-512.png",

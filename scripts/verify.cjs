@@ -7,3 +7,5 @@ if(results.some(r=>!r.pass))process.exitCode=1;
 for(const test of ['startup-verify','storage-verify','desktop-verify','desktop-release-verify','screenshot-ocr-loader-verify','pages-channels-verify','updates-verify'])require('./'+test+'.cjs');
 
 require('./check-public-source.cjs');
+
+require('./pwa-navigation-verify.cjs');
