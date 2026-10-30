@@ -1,15 +1,25 @@
 {
-  "id": "f3f0881403c4822bf8dd3d4ee77649c1c64b7dcfca55c6c675592c9fb8611dec",
-  "version": "0.3.0-dev.14",
+  "id": "db4c21ec3d00c29cc053b9d896e984c59983ff68962d8cd8ddae61b1ed4a60b6",
+  "version": "0.3.0-dev.15",
   "channel": "dev",
-  "sourceCommit": "77cc2e83b680ac50e3fce0c84f1fc8d3cad682ca",
-  "sourceTimestamp": 1793324339,
+  "sourceCommit": "013c8926faa437edfb037adfee50f0665b0ad399",
+  "sourceTimestamp": 1793325896,
   "protocol": 1,
   "files": [
     {
+      "name": "recover.html",
+      "bytes": 792,
+      "sha256": "01446ebc275a21641514d9636c1b65a01d7e853a4fa43c5f8d2d9d5b02de0cbb"
+    },
+    {
+      "name": "recovery.js",
+      "bytes": 1005,
+      "sha256": "1cffe7d6ec962be656f6b88f2d2741d0a1f4111a14f697d6978d8e87ab256c15"
+    },
+    {
       "name": "update.js",
-      "bytes": 5403,
-      "sha256": "1fbf121a86a9cd5871255d680690f1736f784a670df76c50252c7795c4fe3c54"
+      "bytes": 5663,
+      "sha256": "ba6e1a0eb7ba6e81b0589b52152258b2da9ce9340224e0a28cc0554a63cb3c26"
     },
     {
       "name": "manifest.webmanifest",
@@ -88,8 +98,8 @@
     },
     {
       "name": "index.html",
-      "bytes": 6240,
-      "sha256": "09dcc8652e3c7618562072916c6659b6cd242f7a5397dd3958bd5b12343b9399"
+      "bytes": 6330,
+      "sha256": "0a485267850570411ccdf3496cfdf3573c92cc9ffaabe89830fab6a21dd4c728"
     },
     {
       "name": "boot.js",
@@ -103,8 +113,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 276055,
-      "sha256": "4557de47faa2689d9f117fd087d6787e2890e27c879e2baace38860acd28f175"
+      "bytes": 277214,
+      "sha256": "5f6858a5f93fb14b2c8a92961ddbcff6d2927de1772d4a8ca841623c70270339"
     },
     {
       "name": "themes.js",
@@ -179,7 +189,7 @@
     {
       "name": "version.js",
       "bytes": 259,
-      "sha256": "169c6935ea4a1bb255b894abf2a7d6dfe278e3c7ab18b8e05f778ce39d12bc43"
+      "sha256": "2800f59e1fa0885ce15582ce09787bcf3d4fafac95642b1ffa20b3266b9bccdc"
     }
   ]
 }

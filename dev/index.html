@@ -22,10 +22,10 @@
 <body>
   <section id="workbench-boot" aria-label="工作台启动" aria-busy="true"><div class="boot-content"><div class="boot-mark" aria-hidden="true"><svg viewBox="0 0 96 96" fill="none"><rect x="9" y="9" width="78" height="78" rx="8" stroke="currentColor" stroke-width=".5"/><rect x="19" y="19" width="58" height="58" rx="2" stroke="currentColor" stroke-width=".5"/><path d="M53 24L34 51h17l-5 21 20-29H49z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div><h1>剑网三工作台</h1><div class="boot-features"><span>账号与角色</span><span>任务排程</span><span>收益分析</span></div><div class="boot-track" aria-hidden="true"><span></span></div><p id="boot-status" role="status" aria-live="polite">正在加载工作台</p><small id="boot-elapsed">已等待 0 秒</small><button id="boot-retry" type="button" hidden>重新加载</button><p id="boot-hint" hidden></p><details id="boot-error" hidden><summary>错误详情</summary><pre id="boot-error-detail"></pre></details><div id="boot-recovery" hidden><button id="boot-backup" type="button">导出原始备份</button><button id="boot-repair" type="button">重新下载应用</button></div><p class="boot-caption" data-storage-label>数据保存在此浏览器</p></div></section>
 
+<section id="app-update" class="app-update" aria-label="版本更新" hidden><div><div class="update-heading"><span id="update-tag" class="update-tag">有新版本</span><strong id="update-message" role="status" aria-live="polite"></strong></div><p id="update-detail"></p></div><div class="update-actions"><button id="update-apply" class="primary" type="button">立即更新</button><button id="update-dismiss" type="button">稍后</button></div></section>
   <aside id="sidebar" class="sidebar"></aside>
   <div class="workspace">
     <header id="topbar" class="topbar"></header>
-    <section id="app-update" class="app-update" aria-label="版本更新" hidden><div><strong id="update-message" role="status" aria-live="polite"></strong><p id="update-detail"></p></div><div class="update-actions"><button id="update-apply" class="primary" type="button">立即更新</button><button id="update-dismiss" type="button">稍后</button></div></section>
     <main id="app" tabindex="-1"></main>
     <footer class="footer"><span id="app-version">剑网三工作台</span><button id="update-check" type="button" class="small">检查更新</button><span data-storage-label>数据保存在此浏览器</span></footer>
   </div>
