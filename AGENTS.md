@@ -4,7 +4,7 @@
 
 - origin 为 cherishXie/JW3-Work-Pages，默认工作与推送分支 dev。所有日常变更推送 dev，不自动更新 main。
 - main 仅在用户明确要求大版本发布时使用 `npm run release:main` 更新；先升级 major/minor 版本，并在 CHANGELOG.md 写出具体变更。不要将任意日常修改自动晋升 main。
-- 发布前运行 npm test 与相关检查；推送后等待网页与三平台客户端 Actions 成功，再校验对应线上内容与下载。
+- 推送前运行 npm test 与相关检查。日常 dev 推送仅进行网页验证：等待网页 Actions 成功并校验 dev 线上内容，不进行三平台客户端校验或下载验收。只有推送正式版（main）时，才等待网页与三平台客户端 Actions 成功，并校验正式线上内容及三平台客户端下载。
 - dev 页面为 https://cherishxie.github.io/JW3-Work-Pages/dev/ ，main 稳定页面保持原地址 https://cherishxie.github.io/JW3-Work-Pages/ 。dev 发布不得覆盖稳定版，反之亦然。
 - 公共源码迁移仅允许 scripts/public-source.cjs 中的显式白名单。禁止公开 data/、output/、docs/、真实账号和角色数据、截图、凭据、备份与私有 Git 历史。
 - .private-source.git/ 是本机历史备份，不得添加、推送或删除。后续在 dev 开发。

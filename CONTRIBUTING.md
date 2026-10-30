@@ -27,9 +27,9 @@ git push
 
 1. 在 dev 完成并验证本次版本，更新 package.json 和 package-lock.json 的版本号。main 只接收 major 或 minor 升级，例如 0.2.0 → 0.3.0 或 1.0.0。
 2. 在 CHANGELOG.md 增加 `## [新版本号]`，记录新增、改进、修复及需要用户注意的迁移事项，至少有一条具体更新。
-3. 提交并推送 dev，等待该提交的 Actions 全部通过。
+3. 提交并推送 dev，等待该提交的网页 Actions 与 dev 线上网页验证通过。日常 dev 仅验证网页，不进行三平台客户端校验或下载验收。
 4. 执行 `npm run release:main`。它检查工作区干净、已同步 dev、main 是当前提交祖先、版本升级及更新记录，通过测试后才将当前 dev 提交快进至 main。本地仍留在 dev。不要默认执行此命令或自动合入 main。
-5. main 的 Actions 更新稳定页面，保留开发页面；生成正式客户端 Release，并附上此次 CHANGELOG。验证失败的构建不会公开客户端 Release。
+5. main 的 Actions 更新稳定页面，保留开发页面；生成正式客户端 Release，并附上此次 CHANGELOG。仅正式版发布时，等待网页与三平台客户端 Actions 成功，并校验稳定页面及三平台下载。验证失败的构建不会公开客户端 Release。
 
 本地 pre-push hook 阻止普通 main 推送；只有显式发布命令才放行。GitHub main 工作流也独立检查版本及更新记录。历史正式版本不覆盖，后续日常改动仍进入 dev。
 
