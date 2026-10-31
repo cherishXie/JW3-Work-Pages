@@ -21,6 +21,30 @@ const base=process.argv[2]||'http://127.0.0.1:4173/',online=base.startsWith('htt
       }
     }
     await page.setViewportSize({width:1440,height:1000});
+    await page.locator('nav [data-page="roles"]').click();
+    assert(await page.locator('.directory-account-list button').count()<=6);
+    const selectedId=await page.locator('.directory-account-list button').first().getAttribute('data-id');
+    await page.locator('.directory-account-list button').first().click();
+    if(await page.locator('[aria-label="下一页账号"]').isEnabled()){
+      await page.locator('[aria-label="下一页账号"]').press('Enter');
+      assert.equal(await page.locator('.account-archive').getAttribute('data-account-id'),selectedId);
+      await page.locator('[data-action="directory-account-current"]').click();
+      assert.equal(await page.locator('.directory-account-list button.active').getAttribute('data-id'),selectedId);
+    }
+    const last=fixture.accounts.at(-1);await page.locator('#directory-account-search').fill(last.name);
+    await page.locator('.directory-account-list [data-id="'+last.id+'"]').press('Enter');
+    assert.equal(await page.locator('.account-archive').getAttribute('data-account-id'),last.id);
+    await page.locator('#directory-account-search').fill('');await page.locator('.account-tree>[data-action="account-filter"]').click();
+    await page.locator('nav [data-page="task"]').click();
+    const storedBeforeHover=await page.evaluate(()=>WorkbenchPlatform.storage.getItem('jx3-workbench-data-v2'));
+    const day=page.locator('.tc-cal-day[aria-haspopup="dialog"]').first();await day.hover();
+    await page.locator('#calendar-day-preview').waitFor();
+    assert.equal(await page.locator('.calendar-preview-list li').count(),Number((await day.getAttribute('aria-label')).match(/，(\d+) 项任务/)[1]));
+    assert.equal(await page.locator('#calendar-task-panel').count(),0);
+    await day.focus();await page.keyboard.press('ArrowDown');assert(await page.locator('.calendar-preview-list').evaluate(el=>el===document.activeElement));
+    await page.keyboard.press('Escape');assert.equal(await page.locator('#calendar-day-preview').count(),0);
+    const emptyDay=page.locator('.tc-cal-day:not([aria-haspopup])').first();if(await emptyDay.count()){await emptyDay.hover();assert.equal(await page.locator('#calendar-day-preview').count(),0);}
+    assert.equal(await page.evaluate(()=>WorkbenchPlatform.storage.getItem('jx3-workbench-data-v2')),storedBeforeHover);
     await page.locator('nav [data-page="settings"]').click();await page.locator('[data-action="settings-tab"][data-value="data"]').click();
     const imported=structuredClone(fixture);imported.roles[0].name+='网页验证';
     await page.locator('#import-file').setInputFiles({name:'platform-test-copy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(imported))});
