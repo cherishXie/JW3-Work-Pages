@@ -1,9 +1,9 @@
 {
-  "id": "e40119eff2a467d13072b5287c6cc150954ac068399e44b67b0e0c3fd9ba0887",
-  "version": "0.4.0-dev.20",
+  "id": "aecd1cd48f49b020047e8610a7e1cc2d9631e8bfb8afc7c90e53d82544e71114",
+  "version": "0.4.0-dev.21",
   "channel": "dev",
-  "sourceCommit": "d6ad9fcec1d58e4f23c5cb228562fe6d183d0101",
-  "sourceTimestamp": 1793445203,
+  "sourceCommit": "0784e95a9035ce4064632178401481f4f49a2649",
+  "sourceTimestamp": 1793446184,
   "protocol": 1,
   "files": [
     {
@@ -113,8 +113,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 283534,
-      "sha256": "e310b90b5850e3874dfd8027e640228b564503705f6bfa5a4567bccc50eae410"
+      "bytes": 286318,
+      "sha256": "55640814edc9f9df8662b1e4c0f880bc7f4ad4e78e0bb6d1031d576261c7aa57"
     },
     {
       "name": "themes.js",
@@ -183,13 +183,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 642898,
-      "sha256": "bf45e394e8d331560cdec0fe2e263a209d6e3e24af52fedd828bf48fdd1a026e"
+      "bytes": 650792,
+      "sha256": "546c61d17de9ac5f8772701344ede67947ed2335f6429d2eb7eef553194034f2"
     },
     {
       "name": "version.js",
       "bytes": 259,
-      "sha256": "3d800f00ce2ce123143698b37bda65463f905a979bb2558ac6d9d00a311dd2a8"
+      "sha256": "f9a193da438f1123c5100c65644ee965d66980950a070a9c6ee61e28b8b84c6c"
     }
   ]
 }
