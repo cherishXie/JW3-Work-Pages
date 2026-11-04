@@ -109,5 +109,49 @@
    M.validateState(next);
    return {next,stats,balances};
  }
- return {readXLSX,migrate,excelDate,stable,csvRows,operationsCSV,roleJSON};
+ const mingyiFile='dungeon_stat.v3.db';
+ async function mingyiDirectory(directory){
+   const tail=['interface','my#data','!all-users@zhcn_hd','userdata','role_statistics'];
+   for(const prefix of [[],['bin','zhcn_hd'],['JX3','bin','zhcn_hd'],['Game','JX3','bin','zhcn_hd']]){
+     try{
+       let folder=directory;
+       for(const name of [...prefix,...tail])folder=await folder.getDirectoryHandle(name);
+       return await (await folder.getFileHandle(mingyiFile)).getFile();
+     }catch(e){if(e.name!=='NotFoundError'&&e.name!=='TypeMismatchError')throw e;}
+   }
+   try{return await (await directory.getFileHandle(mingyiFile)).getFile();}
+   catch(e){if(e.name!=='NotFoundError')throw e;throw new Error('所选目录没有找到茗伊秘境统计。可直接选择 '+mingyiFile);}
+ }
+ const mingyiSchools={0:'',1:'少林',2:'万花',3:'天策',4:'纯阳',5:'七秀',6:'五毒',7:'唐门',8:'藏剑',9:'丐帮',10:'明教',21:'苍云',22:'长歌',23:'霸刀',24:'蓬莱',25:'凌雪阁',211:'衍天宗',212:'北天药宗',213:'刀宗',214:'万灵山庄',215:'段氏'};
+ async function mingyiJSON(file,loadSQLite,crypto=globalThis.crypto){
+   if(file.name.toLowerCase()!==mingyiFile)throw new Error('请选择茗伊的 '+mingyiFile);
+   if(file.size>32*1024*1024)throw new Error('茗伊数据库超过 32 MB');
+   const bytes=new Uint8Array(await file.arrayBuffer());
+   if(new TextDecoder().decode(bytes.subarray(0,16))!=='SQLite format 3\0')throw new Error('该文件不是有效的 SQLite 数据库');
+   const SQLite=await loadSQLite();
+   const db=new SQLite.Database(bytes);
+   const s=M.blank(),accounts=new Map();
+   try{
+     db.run('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF');
+     if(!db.exec("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='DungeonInfo'")[0]?.values.length)throw new Error('数据库缺少茗伊角色表 DungeonInfo');
+     const values=db.exec('SELECT CAST(guid AS TEXT), account, region, server, name, force, level, equip_score, time FROM DungeonInfo ORDER BY time DESC, guid LIMIT 1001')[0]?.values||[];
+     if(!values.length||values.length>1000)throw new Error('茗伊数据库应包含 1 至 1000 个角色');
+     for(const [guid,account,region,server,name,force,level,score,time] of values){
+       if(!/^\d{1,20}$/.test(guid)||![account,region,server,name].every(v=>typeof v==='string'&&v.length<=255)||!account.trim()||!server.trim()||!name.trim()||
+         ![force,level,score,time].every(Number.isSafeInteger)||level<1||level>200||score<0||time<=0||time*1000>Date.now()+300000)throw new Error('茗伊数据库含有无效的角色记录');
+       let owner=accounts.get(account);
+       const observed=new Date(time*1000).toISOString();
+       if(!owner){
+         const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('jx3-mingyi-account:'+account.trim().toLowerCase()));
+         const id='mingyi_account_'+Array.from(new Uint8Array(digest).slice(0,12),b=>b.toString(16).padStart(2,'0')).join('');
+         owner=s.accounts.find(a=>a.id===id)||{id,name:'茗伊账号 '+(s.accounts.length+1),enabled:true,updatedAt:observed};
+         if(!s.accounts.includes(owner))s.accounts.push(owner);
+         accounts.set(account,owner);
+       }
+       s.roles.push({id:'mingyi_role_'+guid,accountId:owner.id,name,region,server,school:mingyiSchools[force]||'',level,score,equipmentScore:score,mingyiGuid:guid,mingyiName:name,mingyiObservedAt:observed,scoreObservedAt:observed,updatedAt:observed,enabled:true,creationStatus:'created'});
+     }
+     return M.validateState(s);
+   }finally{db.close();}
+ }
+ return {readXLSX,migrate,excelDate,stable,csvRows,operationsCSV,roleJSON,mingyiDirectory,mingyiJSON};
 });

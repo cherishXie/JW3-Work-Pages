@@ -11,13 +11,13 @@ const root = path.resolve(__dirname, '..');
 const out = path.join(root, '.pages-dist');
 
 // Explicit, reviewed public source allowlist. Do not add any personal data files.
-const {ocrAssets,sourceFiles,generatedFiles,runtimeFiles,publicFiles,publicDocuments}=require('./public-assets.cjs');
+const {pinnedAssets,sourceFiles,generatedFiles,runtimeFiles,publicFiles,publicDocuments}=require('./public-assets.cjs');
 const allowed = new Set(publicFiles);
 
 function assertSafeSource(relative) {
   if (!/^[a-zA-Z0-9_.\/-]+$/.test(relative) ||
       path.isAbsolute(relative) || relative.split('/').includes('..') ||
-      !/\.(?:html|css|js|webmanifest|png)$/.test(relative) && !Object.hasOwn(ocrAssets, relative) && !publicDocuments.includes(relative)) {
+      !/\.(?:html|css|js|webmanifest|png)$/.test(relative) && !Object.hasOwn(pinnedAssets, relative) && !publicDocuments.includes(relative)) {
     throw new Error('Unsafe public source: ' + relative);
   }
   let current = root;
@@ -27,7 +27,7 @@ function assertSafeSource(relative) {
     if (stat.isSymbolicLink()) throw new Error('Symlink not allowed: ' + relative);
   }
   if (!fs.statSync(current).isFile()) throw new Error('Not a regular file: ' + relative);
-  if (ocrAssets[relative] && require('node:crypto').createHash('sha256').update(fs.readFileSync(current)).digest('hex') !== ocrAssets[relative]) throw new Error('OCR asset checksum mismatch: '+relative);
+  if (pinnedAssets[relative] && require('node:crypto').createHash('sha256').update(fs.readFileSync(current)).digest('hex') !== pinnedAssets[relative]) throw new Error('Pinned asset checksum mismatch: '+relative);
   return current;
 }
 
@@ -46,7 +46,7 @@ function validateDependencies() {
     referenced.add(file);
   }
   for (const file of publicFiles) {
-    if (file !== 'index.html' && !runtimeFiles.includes(file) && !Object.hasOwn(ocrAssets,file) && !referenced.has(file)) {
+    if (file !== 'index.html' && !runtimeFiles.includes(file) && !Object.hasOwn(pinnedAssets,file) && !referenced.has(file)) {
       throw new Error('Public asset is not referenced by index.html: ' + file);
     }
   }
@@ -57,7 +57,7 @@ function validateDependencies() {
   if (/@import\b|url\s*\(/i.test(css)) {
     throw new Error('CSS imports/URLs require review before publishing');
   }
-  for (const file of sourceFiles.filter(name => name.endsWith('.js') && !Object.hasOwn(ocrAssets,name) && name!=='update.js')) {
+  for (const file of sourceFiles.filter(name => name.endsWith('.js') && !Object.hasOwn(pinnedAssets,name) && name!=='update.js')) {
     const js = fs.readFileSync(assertSafeSource(file), 'utf8');
     if (/\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\s*\(/i.test(js)) {
       throw new Error('Network API introduced in public script; review privacy: ' + file);
