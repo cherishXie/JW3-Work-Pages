@@ -1,9 +1,9 @@
 {
-  "id": "4a04270f11266836d65ba0bf9d3e3d6726233ac3d953a5aa7f583fc367ad6d6d",
-  "version": "0.5.0-dev.24",
+  "id": "dc854ef8fd8d6219b51b1023500dcade0b6e850002f4d0a56f1606cdc0ff5a47",
+  "version": "0.5.0-dev.25",
   "channel": "dev",
-  "sourceCommit": "09f892b2d416d83d6718c462f93eae812d350553",
-  "sourceTimestamp": 1793808437,
+  "sourceCommit": "059635adc504021f856f5e6ce8a9c059d7646ce6",
+  "sourceTimestamp": 1793810143,
   "protocol": 1,
   "files": [
     {
@@ -97,6 +97,21 @@
       "sha256": "38645599043239c0eb6db08a6504a92dcdc292200535f3e9339cd77c4443b842"
     },
     {
+      "name": "vendor/sql-wasm.js",
+      "bytes": 48788,
+      "sha256": "694ca5b36aa3e6e71f417819d7df390b65343665fcfa5c69015ca33d93d291b3"
+    },
+    {
+      "name": "vendor/sql-wasm.wasm",
+      "bytes": 659806,
+      "sha256": "0734155c83e493983d1f2ff5b09a4fab6e35a32e9449c7e4e545756439f62d73"
+    },
+    {
+      "name": "vendor/sql-js-LICENSE.txt",
+      "bytes": 2199,
+      "sha256": "60a3f6e4d7b29b4321359e683b36cf198d24f58e24582070f56e6fa89d5ee2be"
+    },
+    {
       "name": "index.html",
       "bytes": 6330,
       "sha256": "0a485267850570411ccdf3496cfdf3573c92cc9ffaabe89830fab6a21dd4c728"
@@ -173,8 +188,8 @@
     },
     {
       "name": "importer.js",
-      "bytes": 18959,
-      "sha256": "4c1a152ccd58a0a460785171c0673fe3fb7894d28ef92b3065dac53778395576"
+      "bytes": 22561,
+      "sha256": "9136160c7ca23c054757e308bba47b0e864194e054d3f846a53bc21ce087098f"
     },
     {
       "name": "roi.js",
@@ -183,13 +198,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 653205,
-      "sha256": "46bc3339171af269aa465f0261aef176f619c77c022fbff054ca936cdb08b314"
+      "bytes": 656607,
+      "sha256": "6020f92f4833a112b8a6b95cfb17fc7ba97548f07d94fae9d3af3f3dd0a4edf2"
     },
     {
       "name": "version.js",
       "bytes": 259,
-      "sha256": "f423325bc1f28af3d090a87ef8fc156a8f209ea3600f693564e8e472690ec507"
+      "sha256": "a4262341fc16c2fc62e7fdbb4be482c5025c78e839587c4b264040212a9df0d0"
     }
   ]
 }

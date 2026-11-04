@@ -1162,7 +1162,7 @@
   }
   function rolesPage(){
     const roles=state.roles.filter(r=>directoryMatch(r,state.accounts.find(a=>a.id===r.accountId))),q=ui.directoryQuery.trim().toLowerCase(),inGroup=state.accounts,matches=inGroup.filter(a=>roles.some(r=>r.accountId===a.id)||(ui.directoryStatus==='all'&&(!q||[a.name,a.region,a.group].join(' ').toLowerCase().includes(q)))),accounts=matches.filter(a=>!ui.directoryAccount||a.id===ui.directoryAccount),pages=Math.max(1,Math.ceil(accounts.length/6));ui.directoryPage=Math.max(0,Math.min(ui.directoryPage,pages-1));
-    return pageHead('ACCOUNTS & CHARACTERS','账号与角色档案',`${state.accounts.length} 个账号 / ${state.roles.length} 个角色`,button(icon('plus')+'新建账号','new-account')+button(icon('plus')+'新建角色','new-role','primary')+button('上传角色截图','screenshot-import')+button('导入角色 JSON','role-json-import'))+`<div class="directory-toolbar"><label>查找档案<input id="directory-search" name="directoryQuery" type="search" autocomplete="off" placeholder="账号、角色、门派、心法…" value="${esc(ui.directoryQuery)}"></label><div class="segmented wrap" aria-label="角色档案状态">${[['all','全部'],['enabled','启用'],['disabled','停用'],['planned','计划创建'],['incomplete','信息待补']].map(([v,l])=>button(l,'directory-status',ui.directoryStatus===v?'active':'',`data-value="${v}" aria-pressed="${ui.directoryStatus===v}"`)).join('')}</div></div><div class="account-layout">${directoryAccountPicker(matches,roles)}<div class="account-content"><p class="account-hint">账号共享资源与角色独立资源分别记录。任务要求满级 ${M.levelCap(state)} 级；计划创建与停用角色保留档案。</p>${ui.directoryAccount?`<div class="directory-scope">当前账号：${esc(state.accounts.find(a=>a.id===ui.directoryAccount)?.name||'待补')}${button('显示全部账号','account-filter','small','data-id=""')}</div>`:''}${directoryAnalysis(accounts,roles)}${directoryPager(ui.directoryPage,accounts.length,'directory-page')}<div class="account-archive-list">${accounts.length?accounts.slice(ui.directoryPage*6,(ui.directoryPage+1)*6).map(a=>accountArchiveCard(a,roles.filter(r=>r.accountId===a.id))).join(''):empty(state.accounts.length?'筛选条件无结果':'尚未创建账号','调整查找条件，或新建账号与角色。',button('新建账号','new-account','primary'))}</div></div></div>`;
+    return pageHead('ACCOUNTS & CHARACTERS','账号与角色档案',`${state.accounts.length} 个账号 / ${state.roles.length} 个角色`,button(icon('plus')+'新建账号','new-account')+button(icon('plus')+'新建角色','new-role','primary')+button('上传角色截图','screenshot-import')+button('导入角色 JSON','role-json-import')+(Platform.kind==='web'&&location.protocol!=='file:'?button('从茗伊读取','mingyi-import'):''))+`<div class="directory-toolbar"><label>查找档案<input id="directory-search" name="directoryQuery" type="search" autocomplete="off" placeholder="账号、角色、门派、心法…" value="${esc(ui.directoryQuery)}"></label><div class="segmented wrap" aria-label="角色档案状态">${[['all','全部'],['enabled','启用'],['disabled','停用'],['planned','计划创建'],['incomplete','信息待补']].map(([v,l])=>button(l,'directory-status',ui.directoryStatus===v?'active':'',`data-value="${v}" aria-pressed="${ui.directoryStatus===v}"`)).join('')}</div></div><div class="account-layout">${directoryAccountPicker(matches,roles)}<div class="account-content"><p class="account-hint">账号共享资源与角色独立资源分别记录。任务要求满级 ${M.levelCap(state)} 级；计划创建与停用角色保留档案。</p>${ui.directoryAccount?`<div class="directory-scope">当前账号：${esc(state.accounts.find(a=>a.id===ui.directoryAccount)?.name||'待补')}${button('显示全部账号','account-filter','small','data-id=""')}</div>`:''}${directoryAnalysis(accounts,roles)}${directoryPager(ui.directoryPage,accounts.length,'directory-page')}<div class="account-archive-list">${accounts.length?accounts.slice(ui.directoryPage*6,(ui.directoryPage+1)*6).map(a=>accountArchiveCard(a,roles.filter(r=>r.accountId===a.id))).join(''):empty(state.accounts.length?'筛选条件无结果':'尚未创建账号','调整查找条件，或新建账号与角色。',button('新建账号','new-account','primary'))}</div></div></div>`;
   }
   function goldContext(){return ui.page==='assets'&&['period','gold'].includes(ui.assetTab);}
   const goldSigned=n=>n==null?'—':(n>0?'+':'')+num(n,2);
@@ -2099,6 +2099,58 @@
     const summary=$('#screenshot-match-summary');
     if(summary){summary.textContent=pending?'有 '+pending+' 行待匹配，已高亮标出；请选择已有角色，或取消勾选以跳过。':'所有角色均已匹配，请核对数值后勾选更新。';summary.classList.toggle('has-pending',pending>0);}
   }
+  function roleJSONPreview(incoming,name,generated=false){
+    const before=state,raw=savedStorageRaw;
+    const {next,stats,balances}=Importer.roleJSON(state,incoming);
+    const accountCount=next.accounts.length-before.accounts.length;
+    const changes=stats.added+stats.updated+balances;
+    const hint=generated?'茗伊数据库提供角色等级和装分。金币、通宝、资历、宠物和侠行可通过角色截图补充。':'角色按已有 ID、茗伊 ID 或同服角色名匹配。金币记为余额观测。';
+    let details='';
+    if(generated&&stats.added+stats.updated){
+      const oldRoles=new Map(before.roles.map(r=>[r.id,r]));
+      const rows=next.roles.filter(r=>JSON.stringify(r)!==JSON.stringify(oldRoles.get(r.id)));
+      details=`<details class="mt"><summary>核对角色变更</summary><div class="list-detail">${rows.map(r=>`<div><span>${esc(r.name)} <small>${esc(r.server)}</small></span><b>${oldRoles.has(r.id)?'更新':'新增'} / ${esc(r.level??'待补')} 级 / 装分 ${esc(r.score??'待补')}</b></div>`).join('')}</div></details>`;
+    }
+    modal('角色导入预览',`<p class="panel-sub">${esc(name)}</p><div class="list-detail mt"><div><span>新增账号</span><b>${accountCount}</b></div><div><span>新增角色</span><b>${stats.added}</b></div><div><span>更新角色</span><b>${stats.updated}</b></div><div><span>跳过角色</span><b>${stats.skipped+stats.old}</b></div><div><span>新增余额快照</span><b>${balances}</b></div></div>${details}<p class="panel-sub mt">${hint}</p>${generated?'<button type="button" id="mingyi-download">下载生成的 JSON</button>':''}`,changes?()=>{
+      if(state!==before||localStorage.getItem(KEY)!==raw)throw new Error('当前档案已变化，请重新打开导入预览');
+      commit(()=>{
+        const oldIds=new Set(state.roles.map(r=>r.id));
+        state=next;
+        for(const r of state.roles)if(!oldIds.has(r.id))Ops.syncRole(state,r);
+        state.imports.push({id:M.id('import'),name,date:M.dateKey(),stats});
+      },'角色 JSON 已导入');
+    }:null,'确认合并');
+    $('#mingyi-download')?.addEventListener('click',()=>download(name,new Blob([JSON.stringify(incoming,null,2)],{type:'application/json'})));
+  }
+  let mingyiSQLite;
+  function loadMingyiSQLite(){
+    mingyiSQLite??=new Promise((resolve,reject)=>{
+      const base=new URL('vendor/',document.baseURI),script=document.createElement('script');
+      script.src=new URL('sql-wasm.js',base).href;
+      script.onload=()=>Promise.resolve().then(()=>globalThis.initSqlJs({locateFile:name=>new URL(name,base).href})).then(resolve,reject);
+      script.onerror=()=>reject(new Error('SQLite 组件加载失败，请刷新后重试'));
+      document.head.append(script);
+    }).catch(e=>{mingyiSQLite=null;throw e;});
+    return mingyiSQLite;
+  }
+  function mingyiDialog(){
+    const supportsPicker=typeof window.showDirectoryPicker==='function';
+    modal('从茗伊读取',`<p class="panel-sub">选择剑网三安装目录，或直接选择茗伊秘境统计数据库。文件只在此浏览器读取。</p>${supportsPicker?'<button type="button" id="mingyi-directory" class="primary mt">选择剑网三目录</button>':''}<label class="field mt">选择 dungeon_stat.v3.db<input id="mingyi-file" type="file" accept=".db"></label><p class="panel-sub">文件位于 bin/zhcn_hd/interface/my#data/!all-users@zhcn_hd/userdata/role_statistics。</p><p id="mingyi-status" role="status" aria-live="polite"></p>`);
+    const chooser=$('#mingyi-file'),directory=$('#mingyi-directory'),status=$('#mingyi-status');
+    async function read(getFile){
+      chooser.disabled=true;if(directory)directory.disabled=true;
+      status.textContent='正在读取茗伊角色档案…';
+      try{
+        const file=await getFile();
+        if(!file||!chooser.isConnected||!$('#dialog').open)return;
+        const incoming=await Importer.mingyiJSON(file,loadMingyiSQLite);
+        if(chooser.isConnected&&$('#dialog').open)roleJSONPreview(incoming,'JX3_茗伊角色统计_'+M.dateKey()+'.json',true);
+      }catch(e){status.textContent=e.name==='AbortError'?'':'无法读取：'+e.message;}
+      finally{chooser.disabled=false;chooser.value='';if(directory)directory.disabled=false;}
+    }
+    directory?.addEventListener('click',()=>read(async()=>Importer.mingyiDirectory(await window.showDirectoryPicker({id:'jx3-mingyi',mode:'read'}))));
+    chooser.addEventListener('change',()=>{const file=chooser.files[0];if(file)read(()=>file);});
+  }
   function roleJSONDialog(){
     modal('导入角色 JSON','<p class="panel-sub">选择茗伊转换文件或工作台 JSON，预览账号与角色的合并结果。</p><label class="field mt">选择 JSON 文件<input id="role-json-file" type="file" accept=".json,application/json"></label><p id="role-json-status" role="status" aria-live="polite"></p>');
     const chooser=$('#role-json-file'),status=$('#role-json-status');
@@ -2110,19 +2162,7 @@
         const parsed=JSON.parse(await file.text());
         if(!chooser.isConnected||!$('#dialog').open)return;
         const incoming=parsed?.storeVersion!==undefined?Store.validate(parsed).active:parsed;
-        const before=state,raw=savedStorageRaw;
-        const {next,stats,balances}=Importer.roleJSON(state,incoming);
-        const accountCount=next.accounts.length-before.accounts.length;
-        const changes=stats.added+stats.updated+balances;
-        modal('角色导入预览',`<p class="panel-sub">${esc(file.name)}</p><div class="list-detail mt"><div><span>新增账号</span><b>${accountCount}</b></div><div><span>新增角色</span><b>${stats.added}</b></div><div><span>更新角色</span><b>${stats.updated}</b></div><div><span>跳过角色</span><b>${stats.skipped+stats.old}</b></div><div><span>新增余额快照</span><b>${balances}</b></div></div><p class="panel-sub mt">角色按已有 ID、茗伊 ID 或同服角色名匹配。金币记为余额观测。</p>`,changes?()=>{
-          if(state!==before||localStorage.getItem(KEY)!==raw)throw new Error('当前档案已变化，请重新打开导入预览');
-          commit(()=>{
-            const oldIds=new Set(state.roles.map(r=>r.id));
-            state=next;
-            for(const r of state.roles)if(!oldIds.has(r.id))Ops.syncRole(state,r);
-            state.imports.push({id:M.id('import'),name:file.name,date:M.dateKey(),stats});
-          },'角色 JSON 已导入');
-        }:null,'确认合并');
+        roleJSONPreview(incoming,file.name);
       }catch(e){status.textContent='无法导入：'+e.message;}
       finally{chooser.disabled=false;chooser.value='';}
     });
@@ -2251,6 +2291,7 @@
     'operations-csv-template':()=>download('JX3_运营_CSV模板.csv',new Blob(['\uFEFFkind,id,date,task_id,role_ids,role_id,status,completed,target,gold,minutes,online_minutes,batches,other_cost,dungeon_id,record_id,name,quantity,unit_price,price_date,tradable,note\r\n'],{type:'text/csv;charset=utf-8'})),
     'screenshot-import':()=>screenshotDialog(),
     'role-json-import':()=>roleJSONDialog(),
+    'mingyi-import':()=>mingyiDialog(),
     'screenshot-remove':b=>{if(screenshotBusy)return;const i=Number(b.dataset.index);if(!Number.isInteger(i)||i<0||i>=screenshotQueue.length)return;URL.revokeObjectURL(screenshotQueue[i].url);screenshotQueue.splice(i,1);renderScreenshotQueue();},
     'screenshot-auto-select':()=>{for(const sel of $('#dialog').querySelectorAll('select[name^="shot-role-"]')){const index=sel.name.replace('shot-role-','');const hint=$('#shot-match-hint-'+index);if(sel.value&&hint?.textContent.includes('姓名准确匹配')){const checkbox=$('#dialog').querySelector('[name="shot-pick-'+index+'"]');if(checkbox)checkbox.checked=true;}}},
     'screenshot-recognize':b=>screenshotRecognize(b),
