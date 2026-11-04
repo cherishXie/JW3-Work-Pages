@@ -35,5 +35,79 @@
  function csvRows(text){const rows=[];let row=[],v='',quoted=false;text=text.replace(/^\uFEFF/,'');for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){v+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(v);v='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(v);if(row.some(v=>v.trim()))rows.push(row);row=[];v='';}else v+=c;}if(quoted)throw new Error('CSV 引号未闭合');row.push(v);if(row.some(v=>v.trim()))rows.push(row);return rows;}
  function operationsCSV(text,current){const rows=csvRows(text),headers=rows.shift()?.map(x=>x.trim());if(!headers?.includes('kind'))return null;if(!rows.length)throw new Error('CSV 没有数据行');if(new Set(headers).size!==headers.length)throw new Error('CSV 表头重复');const s=M.blank();s.config={...current.config};for(const k of ['accounts','roles','tasks','records','materials','plans','priceQuotes'])s[k]=M.clone(current[k]||[]);for(const [i,values]of rows.entries()){try{const r=Object.fromEntries(headers.map((h,j)=>[h,(values[j]||'').trim()])),roleIds=(r.role_ids||r.role_id||'').split('|').filter(Boolean),task=s.tasks.find(t=>t.id===r.task_id);if(!r.id||!r.date)throw new Error('必须提供稳定 id 和 date');const source='运营 CSV 第 '+(i+2)+' 行';if(r.kind==='progress'){if(Number(r.completed)>Number(r.target))throw new Error('完成次数超过目标');if(!task||roleIds.length!==1)throw new Error('状态需已有 task_id 和单个 role_id');const cycle=M.cycle(task,r.date),old=current.progress.find(p=>p.roleId===roleIds[0]&&p.taskId===task.id&&p.cycle===cycle);if(!['planned','progressing','completed','skipped','unknown','ready'].includes(r.status))throw new Error('状态不受支持');s.progress.push({id:old?.id||r.id,taskId:task.id,roleId:roleIds[0],date:r.date,cycle,status:r.status,completed:M.number(r.completed,'完成次数',{integer:true}),target:M.number(r.target,'目标次数',{integer:true}),source,updatedAt:r.date+'T12:00:00+08:00'});}else if(r.kind==='record'){if(current.records.some(x=>x.id===r.id))continue;if(!task||!roleIds.length)throw new Error('实测需已有 task_id 和 role_ids（以 | 分隔）');const record={id:r.id,taskId:task.id,taskName:task.name,date:r.date,roleIds,gold:M.number(r.gold,'已到账金币'),minutes:M.number(r.minutes,'操作分钟'),onlineMinutes:M.number(r.online_minutes,'在线分钟'),batches:M.number(r.batches,'批次',{min:1,integer:true}),otherCost:r.other_cost?M.number(r.other_cost,'经营成本'):0,accountMinutes:{},snapshot:{...current.config},source,note:r.note||'',incomeKind:'salary'};if(task.dungeonId){if(r.dungeon_id&&r.dungeon_id!==task.dungeonId)throw new Error('dungeon_id 与当前任务不一致');record.dungeonId=task.dungeonId;record.difficulty=task.difficulty;record.cycle=M.cycle(task,r.date);record.cdSnapshot={period:task.period,resetDays:task.resetDays,resetDay:task.resetDay,resetHour:task.resetHour};}if(s.records.some(x=>x.id===r.id)){const old=s.records.find(x=>x.id===r.id);if(JSON.stringify(old)!==JSON.stringify(record))throw new Error('实测 ID 已存在，请用备份合并或保留原事件');}else s.records.push(record);}else if(r.kind==='material'){if((current.materials||[]).some(x=>x.id===r.id))continue;s.materials.push({id:r.id,date:r.date,recordId:r.record_id||null,roleId:r.role_id||null,name:r.name,quantity:M.number(r.quantity,'材料数量',{min:.000001}),unitPrice:r.unit_price===''||r.unit_price===undefined?null:M.number(r.unit_price,'参考价'),priceDate:r.price_date||null,tradable:r.tradable!=='false',source});}else throw new Error('kind 仅支持 progress、record、material');M.validateState(s);}catch(e){throw new Error('CSV 第 '+(i+2)+' 行：'+e.message);}}return M.validateState(s);}
  function column(s){return [...s].reduce((n,c)=>n*26+c.charCodeAt(0)-64,0);}
- return {readXLSX,migrate,excelDate,stable,csvRows,operationsCSV};
+ function roleJSON(current,incoming){
+   M.validateState(incoming);
+   if(incoming.dataKind==='simulated'||!incoming.roles.length)throw new Error('请选择包含实际角色档案的工作台 JSON');
+   incoming=M.upgradeState(M.clone(incoming));
+   const next=M.clone(current),stats={added:0,updated:0,skipped:0,old:0},accounts=new Map(),seen=new Set(),sourceGuids=new Set();
+   const matches=incoming.roles.map(row=>{
+     if(row.mingyiGuid){
+       if(sourceGuids.has(row.mingyiGuid))throw new Error('文件中存在重复的茗伊角色 ID：'+row.name);
+       sourceGuids.add(row.mingyiGuid);
+     }
+     const candidates=current.roles.filter(role=>role.id===row.id||
+       row.mingyiGuid&&role.mingyiGuid===row.mingyiGuid||
+       row.server&&role.server===row.server&&[role.name,role.mingyiName].filter(Boolean).some(name=>name===row.name||name===row.mingyiName));
+     if(candidates.length>1)throw new Error('角色匹配不唯一：'+row.name);
+     const role=candidates[0];
+     if(role){
+       if(seen.has(role.id)||role.mingyiGuid&&row.mingyiGuid&&role.mingyiGuid!==row.mingyiGuid||
+         role.server&&row.server&&role.server!==row.server)throw new Error('角色身份冲突：'+row.name);
+       seen.add(role.id);
+       const mapped=accounts.get(row.accountId);
+       if(mapped&&mapped!==role.accountId)throw new Error('同一来源账号匹配到多个工作台账号：'+row.name);
+       accounts.set(row.accountId,role.accountId);
+     }
+     return {row,role};
+   });
+   const scoreFields=['level','score','equipmentScore','scoreObservedAt','mingyiObservedAt'];
+   const resourceFields=['achievement','tongbao','petCount','xiaxing','weeklyXiaxing','screenshotCapturedAt'];
+   const balanceFields=['observedGold','observedDate','observedGoldSource','observedGoldDateBasis'];
+   const accountFields=['name','region'];
+   const timestamp=(...values)=>values.reduce((latest,value)=>Math.max(latest,Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(value)?value+'T00:00:00+08:00':value)||0),0);
+   const transfer=(row,target,fields)=>{for(const field of fields)if(row[field]!=null&&row[field]!=='')target[field]=row[field];};
+   const roles=new Map();
+   const now=new Date().toISOString();
+   for(const {row,role} of matches){
+     if(!role){
+       const accountId=accounts.get(row.accountId)||row.accountId;
+       if(!next.accounts.some(a=>a.id===accountId)){
+         const source=incoming.accounts.find(a=>a.id===row.accountId);
+         const account={id:accountId,enabled:true,updatedAt:now};
+         transfer(source,account,accountFields);next.accounts.push(account);
+       }
+       const added={id:row.id,accountId,name:row.name,enabled:row.creationStatus!=='planned'&&row.enabled!==false,creationStatus:row.creationStatus||'created',duty:'unknown',updatedAt:now};
+       transfer(row,added,['server','region','school','mingyiGuid','mingyiName',...scoreFields,...resourceFields,...balanceFields]);
+       next.roles.push(added);roles.set(row.id,added.id);stats.added++;continue;
+     }
+     roles.set(row.id,role.id);
+     const target=next.roles.find(item=>item.id===role.id);
+     const scoreTime=timestamp(row.scoreObservedAt,row.mingyiObservedAt)||timestamp(row.updatedAt);
+     const resourcesTime=timestamp(row.screenshotCapturedAt,row.resourceUpdatedAt)||timestamp(row.updatedAt);
+     const balanceTime=timestamp(row.screenshotCapturedAt,row.observedDate)||timestamp(row.updatedAt);
+     const latestScore=timestamp(role.scoreObservedAt,role.mingyiObservedAt)||timestamp(role.updatedAt);
+     const latestResources=timestamp(role.screenshotCapturedAt,role.resourceUpdatedAt)||timestamp(role.updatedAt);
+     const latestBalance=timestamp(role.screenshotCapturedAt,role.observedDate,...(current.balanceSnapshots||[]).filter(x=>x.roleId===role.id).map(x=>x.capturedAt||x.date))||timestamp(role.updatedAt);
+     if(scoreTime>=latestScore){
+       transfer(row,target,scoreFields);
+       if(row.level!=null&&scoreTime>latestScore&&target.levelCompression)target.levelCompression.needsReview=false;
+     }
+     if(resourcesTime>=latestResources)transfer(row,target,resourceFields);
+     if(balanceTime>=latestBalance)transfer(row,target,balanceFields);
+     for(const key of ['server','region','school','mingyiGuid','mingyiName'])if(!target[key])transfer(row,target,[key]);
+     if(JSON.stringify(target)!==JSON.stringify(role)){target.updatedAt=now;stats.updated++;}
+     else if(scoreTime<latestScore||resourcesTime<latestResources||balanceTime<latestBalance)stats.old++;
+     else stats.skipped++;
+   }
+   next.balanceSnapshots??=[];
+   const ids=new Set(next.balanceSnapshots.map(x=>x.id));
+   let balances=0;
+   for(const item of incoming.balanceSnapshots||[]){
+     const roleId=roles.get(item.roleId);
+     if(roleId&&!ids.has(item.id)){next.balanceSnapshots.push({...item,roleId});ids.add(item.id);balances++;}
+   }
+   M.validateState(next);
+   return {next,stats,balances};
+ }
+ return {readXLSX,migrate,excelDate,stable,csvRows,operationsCSV,roleJSON};
 });
