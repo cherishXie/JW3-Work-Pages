@@ -1,9 +1,9 @@
 {
-  "id": "355f0cf317c5d77dad0eb552cdb4764089ac4e96b5f7aa26de4a5ea14e827ca8",
-  "version": "0.5.0-dev.22",
+  "id": "4a04270f11266836d65ba0bf9d3e3d6726233ac3d953a5aa7f583fc367ad6d6d",
+  "version": "0.5.0-dev.24",
   "channel": "dev",
-  "sourceCommit": "d97672fbdb0952ea2c8defb0cddc2ad676943afc",
-  "sourceTimestamp": 1793503355,
+  "sourceCommit": "09f892b2d416d83d6718c462f93eae812d350553",
+  "sourceTimestamp": 1793808437,
   "protocol": 1,
   "files": [
     {
@@ -173,8 +173,8 @@
     },
     {
       "name": "importer.js",
-      "bytes": 14036,
-      "sha256": "91c348def8735d424d7ac58b406a299da502aec71f922773fa80d49d2715e82c"
+      "bytes": 18959,
+      "sha256": "4c1a152ccd58a0a460785171c0673fe3fb7894d28ef92b3065dac53778395576"
     },
     {
       "name": "roi.js",
@@ -183,13 +183,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 650792,
-      "sha256": "546c61d17de9ac5f8772701344ede67947ed2335f6429d2eb7eef553194034f2"
+      "bytes": 653205,
+      "sha256": "46bc3339171af269aa465f0261aef176f619c77c022fbff054ca936cdb08b314"
     },
     {
       "name": "version.js",
       "bytes": 259,
-      "sha256": "7ec7cad8c260b1aa0ba2f71bf6cde6531d4b7f556a0cd14a9ac069d1eca69a40"
+      "sha256": "f423325bc1f28af3d090a87ef8fc156a8f209ea3600f693564e8e472690ec507"
     }
   ]
 }
