@@ -4,18 +4,71 @@ const {chromium}=require('playwright'),M=require('../model.js');
 const root=path.resolve(__dirname,'..'),base=process.argv[2]||'http://127.0.0.1:4173/',privateQA=process.env.JX3_PRIVATE_QA==='1',baseline=process.env.JX3_BASELINE==='1';
 if(privateQA&&new URL(base).hostname!=='127.0.0.1')throw Error('Private fixture allowed only on loopback');
 const file=path.join(root,'data/JX3_Workbench_2026-10-30.json'),bytes=privateQA?fs.readFileSync(file):null,fixture=bytes?JSON.parse(bytes):M.demo(),out=path.join(root,'output/playwright/directory-setup');fs.mkdirSync(out,{recursive:true});
+async function verifyMingyiSetup(browser,errors){
+ const SQLite=await require('../vendor/sql-wasm.js')({locateFile:name=>path.join(root,'vendor',name)}),db=new SQLite.Database();
+ let buffer;
+ try{
+  db.run('CREATE TABLE DungeonInfo (guid TEXT, account TEXT, region TEXT, server TEXT, name TEXT, force INTEGER, level INTEGER, equip_score INTEGER, time INTEGER)');
+  db.run('INSERT INTO DungeonInfo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', ['90071992547409931','synthetic-account','电信区','梦江南','引导测试角色',3,50,98000,Math.floor(Date.now()/1000)]);
+  buffer=Buffer.from(db.export());
+ }finally{db.close();}
+ const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce',serviceWorkers:'block'}),page=await context.newPage();
+ page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});
+  const start=page.locator('#setup-layer [data-action="mingyi-import"]');
+  assert.equal(await start.count(),1);
+  assert.equal(await page.locator('#setup-mingyi-hint').textContent(),'开启茗伊插件角色统计后生效。');
+  await start.focus();await page.keyboard.press('Enter');
+  assert(await page.locator('#dialog').getByText('开启茗伊插件角色统计后生效。',{exact:true}).isVisible());
+  const initial=await page.evaluate(()=>localStorage.getItem('jx3-workbench-data-v2'));
+  await page.locator('#modal-form [data-action="close"]').last().click();
+  assert.equal(await page.locator('.setup-steps [aria-current="step"]').textContent(),'1选择开始方式');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('jx3-workbench-data-v2')),initial);
+  await start.click();
+  await page.locator('#mingyi-file').setInputFiles({name:'dungeon_stat.v3.db',mimeType:'application/octet-stream',buffer:Buffer.from('invalid database')});
+  await page.getByText('无法读取：该文件不是有效的 SQLite 数据库',{exact:true}).waitFor();
+  assert(await page.locator('#mingyi-file').isEnabled());
+  const upload=()=>page.locator('#mingyi-file').setInputFiles({name:'dungeon_stat.v3.db',mimeType:'application/octet-stream',buffer});
+  await upload();await page.getByRole('heading',{name:'角色导入预览',exact:true}).waitFor();
+  await page.locator('#modal-form [data-action="close"]').last().click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('jx3-workbench-data-v2')),initial);
+  await start.click();await upload();await page.getByRole('button',{name:'确认合并',exact:true}).click();
+  await page.locator('#dialog').waitFor({state:'hidden'});
+  assert.equal(await page.locator('.setup-steps [aria-current="step"]').textContent(),'2账号与角色');
+  const saved=await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active);
+  assert.equal(saved.accounts.length,1);assert.equal(saved.roles.length,1);
+  assert.equal(saved.roles[0].mingyiGuid,'90071992547409931');
+  assert.equal(saved.roles[0].score,98000);assert.equal(saved.roles[0].duty,'unknown');
+  assert(saved.tasks.some(t=>t.roleIds.includes(saved.roles[0].id)));
+  await page.locator('#setup-layer [data-action="setup-next"]').click();
+  assert.equal(await page.locator('.setup-steps [aria-current="step"]').textContent(),'3任务与参数');
+  await page.locator('[data-action="setup-back"]').click();
+  assert(await page.getByRole('heading',{name:'先添加账号，再添加角色',exact:true}).isVisible());
+  await page.reload();await page.locator('#workbench-boot').waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active.roles.length),1);
+  await page.locator('[data-action="setup"]').first().click();await start.click();await upload();
+  await page.getByRole('heading',{name:'角色导入预览',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'确认合并',exact:true}).count(),0);
+  await page.locator('#modal-form [data-action="close"]').last().click();
+  assert.equal(await page.locator('.setup-steps [aria-current="step"]').textContent(),'1选择开始方式');
+  await page.locator('[data-action="setup-skip"]').click();await page.locator('nav [data-page="roles"]').click();
+  assert(await page.getByRole('button',{name:'从茗伊读取',exact:true}).isVisible());
+ }finally{await context.close();}
+}
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.JX3_BROWSER_PATH});
 try{
  const context=await browser.newContext({viewport:{width:1440,height:900},reducedMotion:'reduce',serviceWorkers:'block'}),page=await context.newPage(),errors=[],metrics=[];page.setDefaultTimeout(60000);page.on('pageerror',e=>errors.push(e.message));
  if(baseline)for(const name of ['app.js','styles.css'])await page.route('**/'+name+'*',route=>route.fulfill({body:cp.execFileSync('git',['show','HEAD:'+name]),contentType:name.endsWith('.js')?'text/javascript':'text/css'}));
  await context.addInitScript(s=>{if(!localStorage.getItem('jx3-workbench-data-v2'))localStorage.setItem('jx3-workbench-data-v2',JSON.stringify({storeVersion:1,active:s,snapshots:[]}));},fixture);
  await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});
- await page.locator('[data-action="setup"]').first().click();await page.locator('[data-action="setup-step"][data-step="2"]').click();
+ await page.locator('[data-action="setup"]').first().click();
+ for(const step of [0,2]){await page.locator('[data-action="setup-step"][data-step="'+step+'"]').click();
  for(const theme of ['deep-ocean','cloud-blue','jade-green','warm-sand','amethyst-night']){await page.locator('#theme-select').selectOption(theme,{force:true});for(const width of [1440,1024,390]){
   await page.setViewportSize({width,height:900});
-  const metric=await page.evaluate(()=>{const next=document.querySelector('#setup-layer [data-action="setup-next"]'),shell=document.querySelector('.setup-shell'),body=document.querySelector('.setup-content');return {nextBottom:next.getBoundingClientRect().bottom,shellHeight:shell.scrollHeight,scroll:body?body.scrollHeight-body.clientHeight:0,overflow:document.documentElement.scrollWidth>innerWidth};});metrics.push({theme,width,...metric});
-  if(!baseline){assert(metric.nextBottom<=900);assert(!metric.overflow);assert(await page.locator('.setup-task-row').count()<=6);if(width===390||theme==='deep-ocean')await page.screenshot({path:path.join(out,`${theme}-${width}.png`)});}
- }}
+  const metric=await page.evaluate(()=>{const next=document.querySelector('#setup-layer [data-action="setup-next"]'),shell=document.querySelector('.setup-shell'),body=document.querySelector('.setup-content');return {nextBottom:next.getBoundingClientRect().bottom,shellHeight:shell.scrollHeight,scroll:body?body.scrollHeight-body.clientHeight:0,overflow:document.documentElement.scrollWidth>innerWidth};});metrics.push({step,theme,width,...metric});
+  if(!baseline){assert(metric.nextBottom<=900);assert(!metric.overflow);assert(await page.locator('.setup-task-row').count()<=6);if(step===0){assert(await page.locator('#setup-mingyi-hint').isVisible());assert(await page.locator('#setup-layer [data-action="mingyi-import"]').isVisible());}if(width===390||theme==='deep-ocean')await page.screenshot({path:path.join(out,`step-${step}-${theme}-${width}.png`)});}
+ }}}
  if(!baseline){await page.setViewportSize({width:1440,height:900});const first=await page.locator('.setup-task-row strong').first().textContent();await page.locator('#setup-task-search').fill('不存在的任务_xyz');assert.equal(await page.locator('.setup-task-row').count(),0);await page.locator('#setup-task-search').fill(first);assert(await page.locator('.setup-task-row').count()>0);await page.locator('#setup-task-search').fill('');await page.locator('[data-action="setup-task-page"][data-value="1"]').click();assert.notEqual(await page.locator('.setup-task-row strong').first().textContent(),first);await page.locator('#setup-layer [data-action="setup-next"]').click();assert(await page.getByText('工作空间已准备好',{exact:true}).isVisible());await page.locator('[data-action="setup-back"]').click();await page.locator('[data-action="edit-task"]').first().click();await page.locator('#modal-form button[type="submit"]').click();await page.locator('#dialog').waitFor({state:'hidden'});
  await page.locator('[data-action="setup-skip"]').click();await page.locator('nav [data-page="roles"]').click();
  const linked=await page.evaluate(()=>{const s=WorkbenchStorage.read(WorkbenchPlatform.storage).store.active;return s.roles.find(r=>WorkbenchOperations.deletionInfo(s,'role',r.id).blockers.length)?.id;});
@@ -23,6 +76,7 @@ try{
  }
  await context.close();
  if(!baseline){
+  await verifyMingyiSetup(browser,errors);
   // Independent synthetic data exercises destructive operations, cancel, undo and reload.
   const s=M.blank();s.accounts=[{id:'qa_account',name:'删除验证账号',balance:0}];s.roles=[{id:'qa_role',accountId:'qa_account',name:'删除验证角色',level:50}];
   require('../operations.js').ensureDefaults(s);const template=s.tasks[0];s.tasks=Array.from({length:240},(_,i)=>({...template,id:'qa_task_'+i,name:'批量任务'+String(i).padStart(3,'0'),roleIds:['qa_role']}));
