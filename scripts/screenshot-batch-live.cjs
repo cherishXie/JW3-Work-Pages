@@ -19,7 +19,7 @@ const {chromium}=require('playwright'),M=require('../model');
       return [S.suggestRoles(roles,'测试填','纯阳').roleId,S.suggestRoles(short,'测式','藏剑').roleId,S.suggestRoles(short,'测式','藏剑',{gold:'12345.6789'}).roleId,S.suggestRoles(short,'测式','藏剑',{gold:'999.1234'}).roleId];
     });
     assert.deepEqual(identityChecks,['live','','short','']);
-    await page.locator('nav').getByRole('button',{name:'账号与角色',exact:true}).click();
+    await page.locator('nav [data-page="roles"]').click();
     await page.getByRole('button',{name:'上传角色截图',exact:true}).click();
     const fileInput=page.locator('#screenshot-file');
     assert.ok(await fileInput.evaluate(el=>el.multiple));
@@ -79,7 +79,7 @@ const {chromium}=require('playwright'),M=require('../model');
     },saved);
     const correction=await correctionContext.newPage();
     await correction.goto(process.env.JX3_QA_URL||(process.env.JX3_LIVE_URL||'https://cherishxie.github.io/JW3-Work-Pages/dev/'),{waitUntil:'load'});
-    await correction.locator('nav').getByRole('button',{name:'账号与角色',exact:true}).click();
+    await correction.locator('nav [data-page="roles"]').click();
     await correction.getByRole('button',{name:'上传角色截图',exact:true}).click();
     await correction.evaluate(()=>{
       WorkbenchScreenshot.createWorker=async()=>({terminate:async()=>{}});
