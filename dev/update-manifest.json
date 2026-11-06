@@ -1,10 +1,10 @@
 {
-  "id": "88f2ed0eedfb7b69f84813d9e79d3e6b668a872510e7a88bad5b81fab14810eb",
-  "version": "0.5.0-dev.27",
+  "id": "29bcb780b31fc1a987947ba45691b5eaf989dcf065cf8da16480aeb74d6c1a0a",
+  "version": "0.5.0-dev.28",
   "channel": "dev",
-  "sourceCommit": "39941cb2857051956681b9cd56f6370c5996fdf5",
-  "sourceTimestamp": 1793848325,
-  "protocol": 1,
+  "sourceCommit": "da8369ea4622136e5f4e88931e039f6df44946d7",
+  "sourceTimestamp": 1793926583,
+  "protocol": 2,
   "files": [
     {
       "name": "recover.html",
@@ -18,8 +18,8 @@
     },
     {
       "name": "update.js",
-      "bytes": 5663,
-      "sha256": "ba6e1a0eb7ba6e81b0589b52152258b2da9ce9340224e0a28cc0554a63cb3c26"
+      "bytes": 5697,
+      "sha256": "f30643df6b63b4e3d1ad903f88a4bcfcb8b840251d0e9593972f032a49946ef7"
     },
     {
       "name": "manifest.webmanifest",
@@ -128,8 +128,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 286318,
-      "sha256": "55640814edc9f9df8662b1e4c0f880bc7f4ad4e78e0bb6d1031d576261c7aa57"
+      "bytes": 289892,
+      "sha256": "ee6ec0bd32cc8e2a0530cab575c2d3ce5b084a7861bd4d4398c8ddd754f840ce"
     },
     {
       "name": "themes.js",
@@ -148,8 +148,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 180427,
-      "sha256": "c5cf8b69c25f941cba5eb1ff3940562314180c55e5c9c35129eaa6ce99fdda8c"
+      "bytes": 184649,
+      "sha256": "83478d7cfd0668ee504279d86200acbd79ee2be7bd3bda733caac3da84500abe"
     },
     {
       "name": "operations.js",
@@ -168,8 +168,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 32800,
-      "sha256": "4227948e596c4bd0b36a66f797e0d4d0af6e3d589a25d1ed455d455621b82707"
+      "bytes": 34941,
+      "sha256": "03f5fa1e274c30bd6fb8bdfa086d9ce3ed6d835d85d744995d1ef9698780825b"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -198,13 +198,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 657100,
-      "sha256": "cf0b6ea01d2fefd419a6a22e69b3bfd20032a30810977955266b867d2606ab60"
+      "bytes": 667297,
+      "sha256": "8e36b4be8dafdcef5a8a7fb12349ad276f5bbdf4e735e4c50737a846b660b6d3"
     },
     {
       "name": "version.js",
       "bytes": 259,
-      "sha256": "810b7fb076265503e9702145bd414a192c81cf2c642fdd0fac29903efdb8546e"
+      "sha256": "d4a6a31ca1aee2669010c7f6dca4aecb7d44a9022aec794db0a6100e0f03130e"
     }
   ]
 }
