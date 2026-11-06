@@ -18,17 +18,17 @@
 
 网页与桌面数据相互独立，目前没有云同步。首次迁移请从网页导出 JSON，再在桌面版「工作台设置 → 数据管理」导入。当前构建没有发布者签名和 Apple 公证。0.2.1 起，界面与业务资源支持应用内检查并点击更新；原生壳升级需安装对应平台的安装包。
 
-当前正式版为 **0.5.0**：[正式版发布说明](https://github.com/cherishXie/JW3-Work-Pages/releases/tag/v0.5.0)。安装包由自动发布工作流生成；生成前可在[已发布版本](https://github.com/cherishXie/JW3-Work-Pages/releases/latest)选择可用安装包。按系统选择：
+当前正式版为 **0.6.0**：[正式版发布说明](https://github.com/cherishXie/JW3-Work-Pages/releases/tag/v0.6.0)。安装包由自动发布工作流生成；生成前可在[已发布版本](https://github.com/cherishXie/JW3-Work-Pages/releases/latest)选择可用安装包。按系统选择：
 
 | 系统 | 正式版下载 |
 | --- | --- |
-| Windows x64 | [下载 EXE](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.5.0/JW3-Workbench-Windows-x64-v0.5.0.exe) |
-| macOS Apple Silicon | [下载 arm64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.5.0/JW3-Workbench-macOS-arm64-v0.5.0.dmg) |
-| macOS Intel | [下载 x64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.5.0/JW3-Workbench-macOS-x64-v0.5.0.dmg) |
+| Windows x64 | [下载 EXE](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/JW3-Workbench-Windows-x64-v0.6.0.exe) |
+| macOS Apple Silicon | [下载 arm64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/JW3-Workbench-macOS-arm64-v0.6.0.dmg) |
+| macOS Intel | [下载 x64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/JW3-Workbench-macOS-x64-v0.6.0.dmg) |
 
-[下载 SHA-256 校验清单](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.5.0/SHA256SUMS.txt)。无需下载合集压缩包或 Source code。
+[下载 SHA-256 校验清单](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/SHA256SUMS.txt)。无需下载合集压缩包或 Source code。
 
-[开发版与历史版本](https://github.com/cherishXie/JW3-Work-Pages/releases)单独列出。dev 客户端版本为 `0.5.0-dev.<构建号>`，标记为预发布；main 正式客户端为 `0.5.0`。每次推送 dev 仅更新开发网页与开发客户端，正式发布按 [CONTRIBUTING.md](CONTRIBUTING.md) 执行。
+[开发版与历史版本](https://github.com/cherishXie/JW3-Work-Pages/releases)单独列出。dev 客户端版本为 `0.6.0-dev.<构建号>`，标记为预发布；main 正式客户端为 `0.6.0`。每次推送 dev 仅更新开发网页与开发客户端，正式发布按 [CONTRIBUTING.md](CONTRIBUTING.md) 执行。
 
 ## 主要功能
 
