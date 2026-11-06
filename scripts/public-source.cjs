@@ -41,6 +41,8 @@ module.exports=[
   "platform.js",
   "raid-catalog.js",
   "roi.js",
+  "jx3box.js",
+  "scripts/jx3box-verify.cjs",
   "screenshot.js",
   "scripts/build-desktop.cjs",
   "scripts/build-pages.cjs",

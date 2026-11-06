@@ -10,7 +10,7 @@ const pinnedAssets={...ocrAssets,...sqliteAssets};
 const sourceFiles=[
   'recover.html','recovery.js','update.js','manifest.webmanifest','app-icon.png','app-icon-192.png','app-icon-512.png','screenshot.js',...Object.keys(pinnedAssets),'index.html','boot.js','platform.js','styles.css',
   'themes.js','catalog.js','raid-catalog.js','model.js','operations.js','activity.js',
-  'storage.js','verification.js','vendor/jszip.min.js','daily.js','execution.js','importer.js','roi.js','app.js'
+  'storage.js','verification.js','vendor/jszip.min.js','daily.js','execution.js','importer.js','roi.js','jx3box.js','app.js'
 ];
 const generatedFiles=['version.js','update-manifest.json','sw.js'];
 const publicFiles=[...sourceFiles,...generatedFiles];

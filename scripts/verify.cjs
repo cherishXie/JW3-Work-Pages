@@ -9,3 +9,5 @@ for(const test of ['startup-verify','storage-verify','desktop-verify','desktop-r
 require('./check-public-source.cjs');
 
 require('./pwa-navigation-verify.cjs');
+
+require('./jx3box-verify.cjs');

@@ -129,3 +129,6 @@
 
 !/scripts/experience-desktop-qa.cjs
 !/scripts/roster-combat-qa.cjs
+
+!/jx3box.js
+!/scripts/jx3box-verify.cjs

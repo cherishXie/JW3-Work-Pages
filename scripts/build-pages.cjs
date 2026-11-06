@@ -57,7 +57,9 @@ function validateDependencies() {
   if (/@import\b|url\s*\(/i.test(css)) {
     throw new Error('CSS imports/URLs require review before publishing');
   }
-  for (const file of sourceFiles.filter(name => name.endsWith('.js') && !Object.hasOwn(pinnedAssets,name) && name!=='update.js')) {
+  // jx3box.js is reviewed: fixed catalogue/auction endpoints, credentials omitted,
+  // only explicit item searches and server+item IDs; no account or role identity.
+  for (const file of sourceFiles.filter(name => name.endsWith('.js') && !Object.hasOwn(pinnedAssets,name) && name!=='update.js' && name!=='jx3box.js')) {
     const js = fs.readFileSync(assertSafeSource(file), 'utf8');
     if (/\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\s*\(/i.test(js)) {
       throw new Error('Network API introduced in public script; review privacy: ' + file);
