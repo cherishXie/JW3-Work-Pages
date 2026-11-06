@@ -1380,3 +1380,48 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .account-layout .account-tree{align-self:start;max-height:none}.account-tree .directory-account-search{margin:6px 0 8px}.directory-account-search input{width:100%;font-size:12px;min-height:36px}.account-tree .directory-account-list{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;max-height:none;overflow:visible;padding:0}.account-tree .directory-account-list button{margin:0;justify-content:space-between;gap:6px;padding:6px 8px}.account-tree .directory-account-list button small{font-size:12px}.directory-account-pages{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:8px}.directory-account-pages>div{display:flex;gap:4px}.account-tree .directory-account-pages button{width:32px;min-height:36px;padding:4px;margin:0}.directory-account-current{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px}.directory-account-current small{min-width:0;overflow-wrap:anywhere}.account-tree .directory-account-current button{width:auto;margin:0;white-space:nowrap;padding:4px 6px}
 .calendar-day-preview{position:fixed;z-index:45;width:min(380px,calc(100vw - 20px));max-height:calc(100dvh - 20px);display:flex;flex-direction:column;background:var(--wb-surface);color:var(--wb-text);border:.5px solid var(--wb-control-border);border-radius:8px;box-shadow:0 4px 16px var(--wb-shadow);padding:10px;gap:8px;font-variant-numeric:tabular-nums}.calendar-day-preview>header{display:flex;align-items:center;justify-content:space-between;gap:8px}.calendar-day-preview>header>div{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}.calendar-day-preview strong{font-size:14px}.calendar-day-preview small{font-size:12px;color:var(--wb-text-secondary)}.calendar-day-preview>header button{min-height:36px;min-width:36px;padding:6px}.calendar-preview-list{min-height:0;max-height:min(340px,55dvh);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.calendar-preview-list ul{list-style:none;padding:0;margin:0;display:grid;gap:6px}.calendar-preview-list li{display:flex;align-items:start;gap:8px;padding:6px 0;border-top:.5px solid var(--wb-border)}.calendar-preview-list li>i{width:6px;height:6px;border-radius:2px;flex:none;margin-top:8px}.calendar-preview-list li>div{min-width:0;display:grid;gap:2px}.calendar-preview-list b{font-size:14px;overflow-wrap:anywhere;white-space:normal}.calendar-day-preview :focus-visible{outline:.5px solid var(--wb-primary);outline-offset:2px}
 @media(max-width:767px){.account-tree .directory-account-list{grid-template-columns:repeat(2,minmax(0,1fr))}.account-tree .directory-account-list button{flex:none}.directory-account-pages{margin-top:6px}.calendar-preview-list{max-height:min(300px,50dvh)}}
+
+/* Roster equipment analysis shares the directory's compact, theme-aware language. */
+.combat-insights{border-top:.5px solid var(--wb-border);padding-top:10px;min-width:0}
+.combat-summary{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--wb-text-secondary)}
+.combat-summary h3{margin:0;font-size:16px;color:var(--wb-text)}
+.combat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.combat-panel{min-width:0;padding:10px;background:var(--wb-surface-2);border-radius:6px;align-self:start}
+.combat-panel h3{font-size:14px;margin:0 0 8px;display:flex;align-items:baseline;flex-wrap:wrap;gap:6px}
+.combat-panel h3 small,.combat-panel small{font-size:12px;color:var(--wb-text-secondary);font-weight:400}
+.combat-panel-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+.combat-panel-heading h3{margin:0}.combat-panel .roster-track{height:6px}
+.combat-histogram{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;font-size:12px;text-align:center}
+.combat-histogram>div{min-width:0;display:grid;gap:6px;grid-template-rows:auto 100px auto}
+.combat-bin{display:flex;align-items:flex-end;background:var(--wb-track);border-radius:2px;overflow:hidden}
+.combat-bin i{display:block;width:100%;background:var(--wb-primary)}
+.combat-histogram small{overflow-wrap:anywhere}
+.combat-search input{width:100%;margin:0 0 8px;min-width:0}
+.combat-ranks{display:grid;gap:6px}
+.combat-rank-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left;width:100%;padding:6px;font-size:12px;border:.5px solid var(--wb-control-border);border-radius:4px;background:var(--wb-surface)}
+.combat-rank-row.active{background:var(--wb-primary-soft);border-color:var(--wb-primary)}
+.combat-rank{color:var(--wb-text-secondary);align-self:start}.combat-rank-label{display:grid;gap:4px;min-width:0}.combat-rank-label strong{font-size:14px;overflow-wrap:anywhere}
+.combat-rank-label .role-identity-tags{flex-wrap:wrap}.combat-role-heading{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.combat-attributes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;font-size:12px}
+.combat-attributes>div{display:grid;grid-template-columns:1fr auto;gap:4px;min-width:0}.combat-attributes .roster-track,.combat-attributes small{grid-column:1/-1}
+.combat-target{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}.combat-target input{width:140px;min-width:0}
+.combat-contexts{display:flex;gap:6px;flex-wrap:wrap;max-height:100px;overflow:auto;margin-top:8px}.combat-contexts button{white-space:normal;overflow-wrap:anywhere;max-width:100%}
+.combat-simulations{display:grid;gap:8px;max-height:280px;overflow:auto;overscroll-behavior:contain;margin-top:8px;padding:1px}
+.combat-sim-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;font-size:12px;align-items:center}.combat-sim-row>div{display:grid;gap:5px;min-width:0}.combat-sim-row>strong{text-align:right}.combat-sim-row>strong small{display:block}.combat-sim-row .role-identity-tags{flex-wrap:wrap}
+.combat-insights>.roster-basis{margin-top:10px}
+@media(max-width:767px){.combat-grid{grid-template-columns:minmax(0,1fr);gap:10px}.combat-panel{padding:10px}.combat-histogram{gap:4px}.combat-panel .directory-pager{flex-wrap:wrap}}
+.combat-column{display:grid;gap:12px;align-content:start;min-width:0}
+.combat-ranks{max-height:320px;overflow:auto;overscroll-behavior:contain;padding:1px}
+.account-content>.directory-tabs{margin:0}
+
+/* Catalogue selection stays bounded, with ownership and server visible. */
+.box-entry{display:grid;gap:8px;min-width:0}
+.box-search{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.box-search .field{flex:1 1 180px}
+.box-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(64px,auto);gap:6px;max-height:220px;overflow:auto;align-content:start;scrollbar-gutter:stable}
+.box-options button{display:grid;gap:4px;justify-content:stretch;text-align:left;white-space:normal;overflow-wrap:anywhere;min-width:0;height:auto;min-height:64px;padding:8px 10px}
+.box-options button b,.box-options button small{justify-self:start;text-align:left}
+.box-options button b{font-size:14px}.box-options button small{font-size:12px;color:var(--wb-text-muted)}
+.box-selected{font-weight:600;overflow-wrap:anywhere}
+#box-roles{max-height:160px}
+@media(max-width:540px){.box-options{grid-template-columns:1fr}}

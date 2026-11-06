@@ -1,10 +1,10 @@
 {
-  "id": "63b6772fa4e00d99c0e5e07c580658c3a92f0cd1de325dae764c50fdb67e7834",
-  "version": "0.5.0",
+  "id": "8369920aa8711b2ac670a66c95f6196cf29807e56df63578b7de66bdaf2c7a16",
+  "version": "0.6.0",
   "channel": "main",
-  "sourceCommit": "d97672fbdb0952ea2c8defb0cddc2ad676943afc",
-  "sourceTimestamp": 1793503355,
-  "protocol": 1,
+  "sourceCommit": "0ab98bbe63938f9c96fcc254f321d7628cf3607e",
+  "sourceTimestamp": 1793930055,
+  "protocol": 2,
   "files": [
     {
       "name": "recover.html",
@@ -18,8 +18,8 @@
     },
     {
       "name": "update.js",
-      "bytes": 5663,
-      "sha256": "ba6e1a0eb7ba6e81b0589b52152258b2da9ce9340224e0a28cc0554a63cb3c26"
+      "bytes": 5697,
+      "sha256": "f30643df6b63b4e3d1ad903f88a4bcfcb8b840251d0e9593972f032a49946ef7"
     },
     {
       "name": "manifest.webmanifest",
@@ -97,9 +97,24 @@
       "sha256": "38645599043239c0eb6db08a6504a92dcdc292200535f3e9339cd77c4443b842"
     },
     {
+      "name": "vendor/sql-wasm.js",
+      "bytes": 48788,
+      "sha256": "694ca5b36aa3e6e71f417819d7df390b65343665fcfa5c69015ca33d93d291b3"
+    },
+    {
+      "name": "vendor/sql-wasm.wasm",
+      "bytes": 659806,
+      "sha256": "0734155c83e493983d1f2ff5b09a4fab6e35a32e9449c7e4e545756439f62d73"
+    },
+    {
+      "name": "vendor/sql-js-LICENSE.txt",
+      "bytes": 2199,
+      "sha256": "60a3f6e4d7b29b4321359e683b36cf198d24f58e24582070f56e6fa89d5ee2be"
+    },
+    {
       "name": "index.html",
-      "bytes": 6330,
-      "sha256": "0a485267850570411ccdf3496cfdf3573c92cc9ffaabe89830fab6a21dd4c728"
+      "bytes": 6370,
+      "sha256": "d1bac8fcdc7fcd97a938c69cc1de557178990f2e8bd7f6e6d85a5290165da3b0"
     },
     {
       "name": "boot.js",
@@ -113,8 +128,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 286318,
-      "sha256": "55640814edc9f9df8662b1e4c0f880bc7f4ad4e78e0bb6d1031d576261c7aa57"
+      "bytes": 290865,
+      "sha256": "c74115169324bc3f389cce05f2c378e371432ac49c0fc058a45c973aecad60b6"
     },
     {
       "name": "themes.js",
@@ -133,8 +148,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 180427,
-      "sha256": "c5cf8b69c25f941cba5eb1ff3940562314180c55e5c9c35129eaa6ce99fdda8c"
+      "bytes": 184649,
+      "sha256": "83478d7cfd0668ee504279d86200acbd79ee2be7bd3bda733caac3da84500abe"
     },
     {
       "name": "operations.js",
@@ -153,8 +168,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 32800,
-      "sha256": "4227948e596c4bd0b36a66f797e0d4d0af6e3d589a25d1ed455d455621b82707"
+      "bytes": 34941,
+      "sha256": "03f5fa1e274c30bd6fb8bdfa086d9ce3ed6d835d85d744995d1ef9698780825b"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -173,23 +188,28 @@
     },
     {
       "name": "importer.js",
-      "bytes": 14036,
-      "sha256": "91c348def8735d424d7ac58b406a299da502aec71f922773fa80d49d2715e82c"
+      "bytes": 22561,
+      "sha256": "9136160c7ca23c054757e308bba47b0e864194e054d3f846a53bc21ce087098f"
     },
     {
       "name": "roi.js",
-      "bytes": 18441,
-      "sha256": "d7ec9356d0da520258fb8600bf5bac270e0282e67e4fe0c1b97cd38ea8883fa1"
+      "bytes": 18593,
+      "sha256": "f9ceb49392be2731e6e2cb47fae88ea54706cab9b421b81cdd201e37449f56b0"
+    },
+    {
+      "name": "jx3box.js",
+      "bytes": 3460,
+      "sha256": "3c8a3067ad788d37094f64fa4ed6cef7ca01fccd5f7546c467dec02d075cec0a"
     },
     {
       "name": "app.js",
-      "bytes": 650792,
-      "sha256": "546c61d17de9ac5f8772701344ede67947ed2335f6429d2eb7eef553194034f2"
+      "bytes": 677456,
+      "sha256": "9dfc28d16410895e88c8e1958121e142f91d525be7a0295f1cdd3daa2babb68d"
     },
     {
       "name": "version.js",
       "bytes": 253,
-      "sha256": "c5e9c18d2d432436b8566d8de5f38c1cc9dd57281d6e8e54e0f3e76b330d03d4"
+      "sha256": "3f394cccb609c688ea8f5dfe6ad0565d1387a74d0202c45f61182c1bd8a480fb"
     }
   ]
 }
