@@ -1412,3 +1412,4 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 @media(max-width:767px){.combat-grid{grid-template-columns:minmax(0,1fr);gap:10px}.combat-panel{padding:10px}.combat-histogram{gap:4px}.combat-panel .directory-pager{flex-wrap:wrap}}
 .combat-column{display:grid;gap:12px;align-content:start;min-width:0}
 .combat-ranks{max-height:320px;overflow:auto;overscroll-behavior:contain;padding:1px}
+.account-content>.directory-tabs{margin:0}
