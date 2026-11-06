@@ -7,18 +7,27 @@ const fixture=privateQA?path.resolve(__dirname,'../data/JX3_Workbench_2026-10-30
 const bytes=fixture?fs.readFileSync(fixture):null,raw=bytes?JSON.parse(bytes):null,seed=raw?(raw.active||raw):M.demo();
 const out=path.resolve(__dirname,'../output/playwright/roster-combat');fs.mkdirSync(out,{recursive:true});
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-async function navigate(page,id){const menu=page.locator('#topbar [data-action="menu"]');if(await menu.isVisible())await menu.click();await page.locator('nav [data-page="'+id+'"]').click();}
+async function navigate(page,id){
+  if(!(await page.locator('#directory-tab-list').count())){const menu=page.locator('#topbar [data-action="menu"]');if(await menu.isVisible())await menu.click();await page.locator('nav [data-page="roles"]').click();}
+  await page.getByRole('tab',{name:id==='roster'?'账号角色分析':'账号角色列表',exact:true}).click();
+}
 (async()=>{const browser=await chromium.launch({headless:true,...(process.env.JX3_CHROMIUM_PATH?{executablePath:process.env.JX3_CHROMIUM_PATH}:{})});try{
   const errors=[],context=await browser.newContext({viewport:{width:1440,height:1000},timezoneId:'Asia/Shanghai',reducedMotion:'reduce'});
   await context.addInitScript(s=>{if(!localStorage.getItem('jx3-workbench-data-v2'))localStorage.setItem('jx3-workbench-data-v2',JSON.stringify({storeVersion:1,active:s,snapshots:[]}));},seed);
-  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});await navigate(page,'roles');assert.equal(await page.locator('.roster-analysis').count(),0);await navigate(page,'roster');await page.locator('.combat-grid').waitFor();assert.equal(await page.locator('.account-archive').count(),0);
+  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});await navigate(page,'roles');assert.equal(await page.locator('nav [data-page="roster"]').count(),0);assert.equal(await page.locator('nav [data-page="roles"]').innerText(),'账号与角色');assert.equal(await page.locator('.roster-analysis').count(),0);await navigate(page,'roster');await page.locator('.combat-grid').waitFor();assert.equal(await page.locator('.account-archive').count(),0);
   const metrics=[];
   for(const theme of ['deep-ocean','cloud-blue','jade-green','warm-sand','amethyst-night']){await page.evaluate(theme=>WorkbenchThemes.apply(theme),theme);for(const width of [1440,1024,390]){
     await page.setViewportSize({width,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),theme+' '+width);
     const analysisHeight=await page.evaluate(()=>document.documentElement.scrollHeight);await navigate(page,'roles');assert.equal(await page.locator('.roster-analysis').count(),0);const listHeight=await page.evaluate(()=>document.documentElement.scrollHeight);await navigate(page,'roster');metrics.push({theme,width,analysisHeight,listHeight});
     await page.screenshot({path:path.join(out,`${privateQA?'private':'synthetic'}-${theme}-${width}.png`),fullPage:true});
   }}
-  await page.setViewportSize({width:1440,height:1000});await page.locator('.combat-rank-row').first().click();
+  await page.setViewportSize({width:1440,height:1000});
+  const globalScope=await page.evaluate(()=>{const p=new URLSearchParams(location.hash.slice(1));return [p.get('account'),p.get('role')];});
+  await page.locator('.directory-account-list button').first().click();const picker=await page.locator('.account-tree').innerHTML();
+  await page.getByRole('tab',{name:'账号角色列表',exact:true}).focus();await page.keyboard.press('Enter');assert.equal(await page.locator('.account-tree').innerHTML(),picker);
+  await page.keyboard.press('ArrowRight');assert.equal(await page.getByRole('tab',{name:'账号角色分析',exact:true}).getAttribute('aria-selected'),'true');assert.equal(await page.locator('.account-tree').innerHTML(),picker);
+  assert.deepEqual(await page.evaluate(()=>{const p=new URLSearchParams(location.hash.slice(1));return [p.get('account'),p.get('role')];}),globalScope);
+  await page.locator('.account-tree>[data-action="account-filter"]').click();await page.locator('.combat-rank-row').first().click();
   const selected=await page.locator('.combat-rank-row.active').getAttribute('data-id');
   await page.locator('.combat-panel-heading [data-action="edit-role"]').click();await page.locator('[name="referenceDps"]').fill('200000');await page.locator('[name="referenceDpsContext"]').fill('测试木桩 / 180 秒 / 无增益');
   const details=page.locator('details').filter({has:page.locator('[name="combat_attack"]')});await details.locator('summary').click();await page.locator('[name="combat_attack"]').fill('100000');await page.locator('[name="combat_critical"]').fill('32.5');await page.locator('#dialog button[type="submit"]').click();await page.locator('#dialog').waitFor({state:'hidden'});
@@ -43,5 +52,5 @@ async function navigate(page,id){const menu=page.locator('#topbar [data-action="
   await p.locator('#directory-search').fill('测试角色 000');assert.match(await p.locator('.combat-summary').innerText(),/1 \/ 1/);
   await p.screenshot({path:path.join(out,'large-roster-filter.png'),fullPage:true});await c.close();
   if(fixture)assert.equal(hash(fs.readFileSync(fixture)),hash(bytes));assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'metrics.json'),JSON.stringify(metrics,null,2));
-  console.log('PASS roster combat: separate overview/list routes, 5 themes x 3 widths, attributes save/reload, scenario simulation, 270-role search/paging/selection/focus/disabled archive; original fixture unchanged');
+  console.log('PASS roster combat: shared account picker and keyboard tabs, restored workspace navigation, 5 themes x 3 widths, attributes save/reload, scenario simulation, 270-role search/paging/selection/focus/disabled archive; original fixture unchanged');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
