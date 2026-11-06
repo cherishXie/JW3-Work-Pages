@@ -9,7 +9,7 @@ function generate(root,out,sourceFiles){
  const records=sourceFiles.map(name=>{const b=fs.readFileSync(path.join(out,name));return {name,bytes:b.length,sha256:hash(b)};});
  const id=hash(JSON.stringify({channel,sourceCommit,version,records}));
  const sourceTimestamp=Number(git(['show','-s','--format=%ct',sourceCommit]));
- const meta={id,version,channel,sourceCommit,sourceTimestamp,protocol:1};
+ const meta={id,version,channel,sourceCommit,sourceTimestamp,protocol:2};
  fs.writeFileSync(path.join(out,'version.js'),'globalThis.WorkbenchVersion=Object.freeze('+JSON.stringify(meta)+');\n');
  const v=fs.readFileSync(path.join(out,'version.js'));records.push({name:'version.js',bytes:v.length,sha256:hash(v)});
  const manifest={...meta,files:records};

@@ -1,6 +1,8 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+"scripts/roster-combat-qa.cjs",
+"scripts/experience-desktop-qa.cjs",
 "recover.html","recovery.js","scripts/pwa-navigation-verify.cjs",
 "scripts/directory-setup-browser-qa.cjs",
 ".gitattributes",

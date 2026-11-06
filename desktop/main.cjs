@@ -2,7 +2,7 @@
 const {app,BrowserWindow,protocol,ipcMain,session,Menu,dialog,shell}=require('electron');
 const fs=require('node:fs'),path=require('node:path');
 const {createUpdater}=require('./updater.cjs');
-const {createStore}=require('./store.cjs'),{ORIGIN,assetPath,trustedSender}=require('./security.cjs');
+const {createStore}=require('./store.cjs'),{ORIGIN,assetPath,trustedSender,entryNavigation}=require('./security.cjs');
 protocol.registerSchemesAsPrivileged([{scheme:'workbench',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
 if(process.env.JX3_DESKTOP_USER_DATA)app.setPath('userData',path.resolve(process.env.JX3_DESKTOP_USER_DATA));
 let window;
@@ -56,7 +56,9 @@ else{
       window=new BrowserWindow({width:1440,height:1000,minWidth:390,minHeight:600,title:'剑网三工作台',backgroundColor:'#111111',show:false,
         webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,webviewTag:false}});
       window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
-      window.webContents.on('will-navigate',event=>event.preventDefault());
+      // Renderer reloads switch isolated experience storage and clear all transient state.
+      // Permit only this app's exact entry document; external and subpage navigation stay blocked.
+      window.webContents.on('will-navigate',(event,url)=>{if(!entryNavigation(url))event.preventDefault();});
       window.webContents.on('will-attach-webview',event=>event.preventDefault());
       window.once('ready-to-show',()=>window.show());
       window.on('closed',()=>{window=null;});

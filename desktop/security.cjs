@@ -10,8 +10,9 @@ function assetPath(raw,root,allowed){
     const resolved=path.resolve(root,name);return resolved.startsWith(path.resolve(root)+path.sep)?resolved:null;
   }catch{return null;}
 }
+function entryNavigation(url){return typeof url==='string'&&url.split('#')[0]===ORIGIN+'/';}
 function trustedSender(event){
   const frame=event.senderFrame;
   return !!frame&&frame===event.sender.mainFrame&&frame.url.split('#')[0]===ORIGIN+'/';
 }
-module.exports={ORIGIN,assetPath,trustedSender};
+module.exports={ORIGIN,assetPath,trustedSender,entryNavigation};

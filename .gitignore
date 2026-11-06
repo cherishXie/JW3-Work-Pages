@@ -126,3 +126,6 @@
 !/recover.html
 !/recovery.js
 !/scripts/pwa-navigation-verify.cjs
+
+!/scripts/experience-desktop-qa.cjs
+!/scripts/roster-combat-qa.cjs

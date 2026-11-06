@@ -16,7 +16,7 @@ function createUpdater({directory,bundledRoot,read=get}){
  const base='https://cherishxie.github.io/JW3-Work-Pages/'+(channel==='dev'?'dev/':'');
  const pointer=path.join(directory,'active.json');fs.mkdirSync(directory,{recursive:true});
  let active={manifest:bundled,root:bundledRoot},previous=null,prepared=null,checking=null,preparing=null;
- const checkedRoot=(id)=>{if(!/^[a-f0-9]{64}$/.test(id))throw Error('无效更新目录');const root=path.join(directory,id),manifest=validate(JSON.parse(fs.readFileSync(path.join(root,'update-manifest.json'),'utf8')),channel);if(manifest.id!==id||manifest.protocol!==1||(manifest.sourceTimestamp||0)<(bundled.sourceTimestamp||0))throw Error('更新版本不兼容');for(const f of manifest.files){const b=fs.readFileSync(path.join(root,f.name));if(b.length!==f.bytes||hash(b)!==f.sha256)throw Error('本地更新资源损坏');}return {root,manifest};};
+ const checkedRoot=(id)=>{if(!/^[a-f0-9]{64}$/.test(id))throw Error('无效更新目录');const root=path.join(directory,id),manifest=validate(JSON.parse(fs.readFileSync(path.join(root,'update-manifest.json'),'utf8')),channel);if(manifest.id!==id||manifest.protocol!==bundled.protocol||(manifest.sourceTimestamp||0)<(bundled.sourceTimestamp||0))throw Error('更新版本不兼容');for(const f of manifest.files){const b=fs.readFileSync(path.join(root,f.name));if(b.length!==f.bytes||hash(b)!==f.sha256)throw Error('本地更新资源损坏');}return {root,manifest};};
  const writePointer=value=>{fs.writeFileSync(pointer+'.tmp',JSON.stringify(value));fs.renameSync(pointer+'.tmp',pointer);};
  try{if(fs.existsSync(pointer)){const p=JSON.parse(fs.readFileSync(pointer,'utf8'));if(p.pending){if(p.previous)active=checkedRoot(p.previous);writePointer({id:active.manifest.id,pending:false});}else if(p.id!==bundled.id)active=checkedRoot(p.id);}}catch{active={manifest:bundled,root:bundledRoot};fs.rmSync(pointer,{force:true});}
  function current(){return active;}
@@ -24,7 +24,7 @@ function createUpdater({directory,bundledRoot,read=get}){
  async function prepare(){
   if(preparing)return preparing;
   preparing=(async()=>{
-   const manifest=await check();if(manifest.protocol!==1)throw Error('此版本需要更新桌面安装包');
+   const manifest=await check();if(manifest.protocol!==bundled.protocol)throw Error('此版本需要更新桌面安装包');
    if(manifest.id===active.manifest.id)return active.manifest;
    if(prepared?.manifest.id===manifest.id)return prepared.manifest;
    const staging=path.join(directory,manifest.id+'.partial'),destination=path.join(directory,manifest.id);

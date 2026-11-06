@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
-const {createStore}=require('../desktop/store.cjs'),{assetPath,trustedSender}=require('../desktop/security.cjs');
+const {createStore}=require('../desktop/store.cjs'),{assetPath,trustedSender,entryNavigation}=require('../desktop/security.cjs');
 const Platform=require('../platform.js'),Store=require('../storage.js'),M=require('../model.js');
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'jw3-desktop-verify-'));
 try{
@@ -24,6 +24,8 @@ try{
   const blocked=Platform.create({get localStorage(){throw new Error('blocked');}});assert.throws(()=>blocked.storage.getItem('x'),/blocked/);
   const allowed=new Set(['index.html','platform.js']);assert.equal(assetPath('workbench://app/',directory,allowed),path.join(directory,'index.html'));
   for(const url of ['https://app/index.html','workbench://evil/','workbench://app/secret.json','workbench://app/%2e%2e%2fprivate','workbench://app/%5cindex.html','workbench://user@app/'])assert.equal(assetPath(url,directory,allowed),null);
+  for(const url of ['workbench://app/','workbench://app/#task'])assert(entryNavigation(url));
+  for(const url of [undefined,'https://app/','workbench://evil/','workbench://app/other.html','workbench://app/?redirect=x','workbench://user@app/','workbench://app:80/'])assert(!entryNavigation(url));
   const frame={url:'workbench://app/#task'};assert(trustedSender({senderFrame:frame,sender:{mainFrame:frame}}));assert(!trustedSender({senderFrame:{url:frame.url},sender:{mainFrame:frame}}));
   for(const file of ['main.cjs','preload.cjs','store.cjs','security.cjs','electron-builder.cjs'])new vm.Script(fs.readFileSync(path.join(__dirname,'../desktop',file),'utf8'),{filename:file});
   const {publicFiles}=require('./public-assets.cjs');assert(publicFiles.includes('platform.js'));assert(!publicFiles.some(p=>/^(data|desktop|docs|output)\//.test(p)));

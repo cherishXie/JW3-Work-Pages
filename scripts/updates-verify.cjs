@@ -21,6 +21,11 @@ const {validate,hash,createUpdater}=require('../desktop/updater.cjs');
   await updater.prepare();updater.activate();updater.ready();updater=make();assert.equal(updater.current().manifest.id,b.manifest.id);
   incoming=fixture('c');await updater.prepare();updater.activate();assert.equal(updater.rollback().manifest.id,b.manifest.id);
   fs.writeFileSync(path.join(dir,b.manifest.id,'app.js'),'corrupt local cache');assert.equal(make().current().manifest.id,a.manifest.id);
+  // New shells accept their bundled protocol; old resource snapshots cannot override it.
+  const root2=path.join(tmp,'bundled2'),dir2=path.join(tmp,'updates2'),base2=fixture('d','dev',2);fs.mkdirSync(root2);
+  for(const [name,bytes]of base2.files)fs.writeFileSync(path.join(root2,name),bytes);fs.writeFileSync(path.join(root2,'update-manifest.json'),JSON.stringify(base2.manifest));
+  incoming=fixture('e','dev',2);const nextShell=createUpdater({directory:dir2,bundledRoot:root2,read});await nextShell.prepare();nextShell.activate();nextShell.ready();assert.equal(createUpdater({directory:dir2,bundledRoot:root2,read}).current().manifest.id,incoming.manifest.id);
+  incoming=fixture('f','dev',1);await assert.rejects(nextShell.prepare(),/安装包/);
   assert(requested.every(url=>!url.includes('data/')));
   console.log('PASS updates: channel isolation, GET-only fixed origin, path/size/hash rejection, offline preservation, staged activation, crash and corruption rollback, persistent successful update.');
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}

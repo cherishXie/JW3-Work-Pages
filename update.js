@@ -23,14 +23,14 @@
    const latest=desktop?await desktop.check():await(async()=>{const r=await fetch(new URL('update-manifest.json?check='+Date.now(),base),{cache:'no-store',credentials:'omit'});if(!r.ok)throw Error('暂时无法检查更新');return r.json();})();
    if(!latest||!/^[a-f0-9]{64}$/.test(latest.id)||latest.channel!==current.channel||!/^\d+\.\d+\.\d+/.test(latest.version)||!/^[a-f0-9]{40}$/.test(latest.sourceCommit))throw Error('更新信息无效');
    target=latest;
-   if(latest.id!==current.id&&(force||dismissed!==latest.id))show(label(latest),'更新后重新打开工作台，本机数据会保留。',desktop&&latest.protocol>1?'下载安装包':'立即更新');
+   if(latest.id!==current.id&&(force||dismissed!==latest.id))show(label(latest),'更新后重新打开工作台，本机数据会保留。',desktop&&latest.protocol!==current.protocol?'下载安装包':'立即更新');
    else if(force)show('当前版本',label(current),'','current');
   }catch(error){if(force)show('更新检查未完成',navigator.onLine===false?'当前离线，可继续使用已缓存的版本。':error.message,'重试','error');}
   finally{checkButton.disabled=false;}
  }
  async function apply(){
   if(busy)return;if(!target||target.id===current.id){await check(true);return;}if(!guard())return;
-  if(desktop&&target.protocol>1){await desktop.openInstaller();return;}
+  if(desktop&&target.protocol!==current.protocol){await desktop.openInstaller();return;}
   busy=true;checkButton.disabled=true;show('正在准备更新','下载并核对资源，请保持工作台打开。','更新中','progress');
   try{
    if(desktop){await desktop.prepare();if(!guard())return;await desktop.activate();}
