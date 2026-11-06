@@ -1,9 +1,9 @@
 {
-  "id": "7232768de85dc952a463f0e8f656d2fc8f6e572efb47d8189f8be716731a895b",
-  "version": "0.6.0-dev.31",
+  "id": "40a6bdfc9fa91acf41fe7ee8bf68d33e04052679435207c1360014d242a098ea",
+  "version": "0.6.0-dev.32",
   "channel": "dev",
-  "sourceCommit": "53412e31d32a31d4c2649172b607f0520c5f1409",
-  "sourceTimestamp": 1793929538,
+  "sourceCommit": "0ab98bbe63938f9c96fcc254f321d7628cf3607e",
+  "sourceTimestamp": 1793930055,
   "protocol": 2,
   "files": [
     {
@@ -113,8 +113,8 @@
     },
     {
       "name": "index.html",
-      "bytes": 6330,
-      "sha256": "0a485267850570411ccdf3496cfdf3573c92cc9ffaabe89830fab6a21dd4c728"
+      "bytes": 6370,
+      "sha256": "d1bac8fcdc7fcd97a938c69cc1de557178990f2e8bd7f6e6d85a5290165da3b0"
     },
     {
       "name": "boot.js",
@@ -128,8 +128,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 289935,
-      "sha256": "43aba256144eb551dd949399e4a363e00f711820fb6be7da88583256ba11df35"
+      "bytes": 290865,
+      "sha256": "c74115169324bc3f389cce05f2c378e371432ac49c0fc058a45c973aecad60b6"
     },
     {
       "name": "themes.js",
@@ -193,18 +193,23 @@
     },
     {
       "name": "roi.js",
-      "bytes": 18441,
-      "sha256": "d7ec9356d0da520258fb8600bf5bac270e0282e67e4fe0c1b97cd38ea8883fa1"
+      "bytes": 18593,
+      "sha256": "f9ceb49392be2731e6e2cb47fae88ea54706cab9b421b81cdd201e37449f56b0"
+    },
+    {
+      "name": "jx3box.js",
+      "bytes": 3460,
+      "sha256": "3c8a3067ad788d37094f64fa4ed6cef7ca01fccd5f7546c467dec02d075cec0a"
     },
     {
       "name": "app.js",
-      "bytes": 668274,
-      "sha256": "8c5581cb2c3cb7a0d01094163480fae251ecba6b486542541ba5b1e7104680bc"
+      "bytes": 677456,
+      "sha256": "9dfc28d16410895e88c8e1958121e142f91d525be7a0295f1cdd3daa2babb68d"
     },
     {
       "name": "version.js",
       "bytes": 259,
-      "sha256": "8302a7674452d1f8d207ba81c02e1c2793d58d2c74f24f63979db46274ade1de"
+      "sha256": "f9bddf2dc026a029d494cca71d3bc638729f3664689c3809b41973173630f395"
     }
   ]
 }

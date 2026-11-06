@@ -4,11 +4,12 @@
   const EPS=1e-7,copy=x=>JSON.parse(JSON.stringify(x));
   function at(value=new Date()){const n=typeof value==='string'&&value.length===10?Date.parse(value+'T23:59:59.999+08:00'):new Date(value).getTime();if(!Number.isFinite(n))throw new Error('估值时点无效');return n;}
   function itemMatch(a,b){return a.itemId||b.itemId?!!a.itemId&&a.itemId===b.itemId:a.name===b.name;}
-  function serverFor(s,m){return m.server??s.roles.find(r=>r.id===m.roleId)?.server??'';}
+  function serverFor(s,m){return m.catalogSource==='jx3box'&&m.roleId?(s.roles.find(r=>r.id===m.roleId)?.server||''):(m.server??s.roles.find(r=>r.id===m.roleId)?.server??'');}
   function quote(s,item,server='',when=new Date(),lockedId=null){const time=at(when),rows=(s.priceQuotes||[]).filter(q=>q.kind==='material'&&itemMatch(q,item)&&q.server===server&&at(q.observedAt)<=time);const q=lockedId?rows.find(q=>q.id===lockedId):rows.sort((a,b)=>at(b.observedAt)-at(a.observedAt)||b.id.localeCompare(a.id))[0];if(!q)return null;return {...q,unitGold:q.price/q.unit,stale:time-at(q.observedAt)>q.validForHours*3600000,unknownSource:!q.sourceName||!q.server};}
   function materialQuote(s,m,when=new Date()){
     const mode=m.pricingMode||'manual',server=serverFor(s,m);
     if(mode==='latest'||mode==='locked')return quote(s,m,server,when,mode==='locked'?m.priceQuoteId:null);
+    if(m.catalogSource==='jx3box'&&m.server!==server)return null;
     if(m.unitPrice==null||!m.priceDate||at(m.priceDate)>at(when))return null;
     return {id:null,name:m.name,itemId:m.itemId||'',server,unitGold:m.unitPrice,observedAt:m.priceDate,sourceName:m.priceSource||'来源待补 · 手工单价',sourceType:'manual',validForHours:m.priceValidForHours??72,stale:at(when)-at(m.priceDate)>(m.priceValidForHours??72)*3600000,unknownSource:!m.priceSource||!server,legacy:true};
   }
