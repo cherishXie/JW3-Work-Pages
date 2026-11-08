@@ -1,10 +1,20 @@
 {
-  "id": "40a6bdfc9fa91acf41fe7ee8bf68d33e04052679435207c1360014d242a098ea",
-  "version": "0.6.0-dev.32",
+  "id": "0dfb04bfadde1a8094782a67c2907e37fb52355a548d5f2bb598b8772fd55164",
+  "version": "0.6.0-dev.34",
   "channel": "dev",
-  "sourceCommit": "0ab98bbe63938f9c96fcc254f321d7628cf3607e",
-  "sourceTimestamp": 1793930055,
+  "sourceCommit": "643f09ea1b77b33e65b18bc0cf1a25839002febb",
+  "sourceTimestamp": 1794134640,
   "protocol": 2,
+  "releaseNotes": {
+    "title": "未发布",
+    "items": [
+      "副本攻略新增独立查看入口，与任务执行共用逐首领速刷笔记，保存后同步更新。",
+      "自定义队伍独立管理，分为 5 人与 10 人队伍；同类型队伍中的角色互斥，两种类型可共用角色。支持队伍与角色搜索、分队名称、整队面板拖入、键盘选择和分页，模板配置不占用 CD；切回自动生成恢复原参与范围和逐队规则。",
+      "角色分析中的门派、当前心法定位可直接展开对应角色与账号名单，并查看或编辑角色档案；筛选只影响本模块。",
+      "网页保存将日期档案校验与序列化移到本地后台线程，及时显示保存状态，阻止重复提交，保留保存失败重试、撤销和原始数据保护。",
+      "更新提示支持悬停、键盘聚焦和手机点击查看本频道更新内容；网页更新显示真实下载与校验进度，复用校验一致的缓存资源、并行下载变更文件，失败时保留当前版本与本机数据。"
+    ]
+  },
   "files": [
     {
       "name": "recover.html",
@@ -18,8 +28,8 @@
     },
     {
       "name": "update.js",
-      "bytes": 5697,
-      "sha256": "f30643df6b63b4e3d1ad903f88a4bcfcb8b840251d0e9593972f032a49946ef7"
+      "bytes": 11317,
+      "sha256": "683d75be0d82c988793494e13cc6c567c601c30c4fabfe6e810d07aa08176c82"
     },
     {
       "name": "manifest.webmanifest",
@@ -128,8 +138,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 290865,
-      "sha256": "c74115169324bc3f389cce05f2c378e371432ac49c0fc058a45c973aecad60b6"
+      "bytes": 295715,
+      "sha256": "643b37b24a7a103203c4b0cec76992367d0c4a0da9c7ac9d22c27ab7ce6fe8ee"
     },
     {
       "name": "themes.js",
@@ -163,8 +173,13 @@
     },
     {
       "name": "storage.js",
-      "bytes": 5756,
-      "sha256": "1f77bd27275c0619685dbbb382e172d23ddb15d1d30bba16d01b09f8d3a9ccf0"
+      "bytes": 6358,
+      "sha256": "8cc400cd317fec512cc9ceaee85396386151a49860be264cde89fc9cb34044a6"
+    },
+    {
+      "name": "storage-worker.js",
+      "bytes": 510,
+      "sha256": "a3e722c1695cd146e7da17a0c530a6c0733b7f7d2ab12fe093fc8c0d85b3c31a"
     },
     {
       "name": "verification.js",
@@ -178,8 +193,8 @@
     },
     {
       "name": "daily.js",
-      "bytes": 56740,
-      "sha256": "40d03777e79a0a1e4b4e104038472538a3c1a8af8de6df463a5d622340338543"
+      "bytes": 57187,
+      "sha256": "9fe7ca3b6d729e37d14910d8b5a52332f683bd22fc70707ee955ba15d962f1c9"
     },
     {
       "name": "execution.js",
@@ -203,13 +218,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 677456,
-      "sha256": "9dfc28d16410895e88c8e1958121e142f91d525be7a0295f1cdd3daa2babb68d"
+      "bytes": 690954,
+      "sha256": "49809ccb368b32606c6c5429bacf866065c519edf39298ea7e53b0621131d34f"
     },
     {
       "name": "version.js",
-      "bytes": 259,
-      "sha256": "f9bddf2dc026a029d494cca71d3bc638729f3664689c3809b41973173630f395"
+      "bytes": 1297,
+      "sha256": "e8478b3944a9e63398646be762da633f5c1dcebe149218b2fcf80125ebd61a27"
     }
   ]
 }
