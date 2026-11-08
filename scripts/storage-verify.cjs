@@ -43,3 +43,15 @@ check('非容量错误原样抛出，损坏去重引用拒绝读取并保护原�
   for(const nodes of [[{self:[0]}],[{bad:[9]}],[{bad:[-1]}]]){const raw=JSON.stringify({storageEncoding:'shared-json-v1',root:[0],nodes}),storage=memory({[S.KEY]:raw});assert.throws(()=>S.read(storage),/引用无效/);assert.equal(storage.getItem(S.KEY),raw);}
 });
 console.log(checks.length+'/'+checks.length+' storage checks passed');
+
+check('后台保存校验完整档案、保留扩展字段并支持容量回退',()=>{
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),root=path.resolve(__dirname,'..');let prepared;
+  const context=vm.createContext({self:{postMessage:v=>{prepared=JSON.parse(JSON.stringify(v));}},console});
+  context.importScripts=(...files)=>{for(const file of files)vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});};
+  vm.runInContext(fs.readFileSync(path.join(root,'storage-worker.js'),'utf8'),context);
+  const state=fixture();state.custom={text:'扩展档案'.repeat(1500)};const store=S.withState(S.empty(),state,new Date('2026-10-13T02:00:00Z')),original=JSON.stringify(store);
+  context.self.onmessage({data:{id:1,store,state}});assert.equal(prepared.id,1);assert(!prepared.error);assert.equal(JSON.stringify(store),original);assert.equal(prepared.store.snapshots[0].data.custom.text,state.custom.text);
+  const storage=limited({},prepared.raw.length*.8);S.writePrepared(storage,prepared);assert.deepEqual(S.read(storage).store,prepared.store);
+  const old=storage.getItem(S.KEY),tooSmall=limited({[S.KEY]:old},1);assert.throws(()=>S.writePrepared(tooSmall,prepared),/原数据已保留/);assert.equal(tooSmall.getItem(S.KEY),old);
+  context.self.onmessage({data:{id:2,store,state:{...state,roles:[{id:'bad',name:'坏引用',accountId:'absent'}]}}});assert.equal(prepared.id,2);assert(prepared.error);assert.equal(storage.getItem(S.KEY),old);
+});

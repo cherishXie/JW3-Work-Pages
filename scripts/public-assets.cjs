@@ -10,9 +10,9 @@ const pinnedAssets={...ocrAssets,...sqliteAssets};
 const sourceFiles=[
   'recover.html','recovery.js','update.js','manifest.webmanifest','app-icon.png','app-icon-192.png','app-icon-512.png','screenshot.js',...Object.keys(pinnedAssets),'index.html','boot.js','platform.js','styles.css',
   'themes.js','catalog.js','raid-catalog.js','model.js','operations.js','activity.js',
-  'storage.js','verification.js','vendor/jszip.min.js','daily.js','execution.js','importer.js','roi.js','jx3box.js','app.js'
+  'storage.js','storage-worker.js','verification.js','vendor/jszip.min.js','daily.js','execution.js','importer.js','roi.js','jx3box.js','app.js'
 ];
 const generatedFiles=['version.js','update-manifest.json','sw.js'];
 const publicFiles=[...sourceFiles,...generatedFiles];
-const runtimeFiles=['recover.html','recovery.js','app-icon-192.png','app-icon-512.png','sw.js','update-manifest.json'];
+const runtimeFiles=['storage-worker.js','recover.html','recovery.js','app-icon-192.png','app-icon-512.png','sw.js','update-manifest.json'];
 module.exports={ocrAssets,pinnedAssets,sourceFiles,generatedFiles,runtimeFiles,publicFiles,publicDocuments:['README.md','CHANGELOG.md','CONTRIBUTING.md']};

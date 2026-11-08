@@ -132,3 +132,7 @@
 
 !/jx3box.js
 !/scripts/jx3box-verify.cjs
+
+!storage-worker.js
+
+!scripts/workflow-interaction-qa.cjs

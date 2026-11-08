@@ -67,6 +67,12 @@
     return decode(root,decoded.length);
   }
   function quotaError(e){return e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22||e?.code===1014;}
+  // Prepared by the same storage implementation in a worker. setItem remains atomic.
+  function writePrepared(storage,prepared,key=KEY){
+    try{storage.setItem(key,prepared.raw);return;}catch(e){if(!quotaError(e))throw e;}
+    if(prepared.compact&&prepared.compact.length<prepared.raw.length){try{storage.setItem(key,prepared.compact);return;}catch(e){if(!quotaError(e))throw e;}}
+    throw new Error('浏览器本地存储空间不足，无损去重后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
+  }
   function write(storage,store,key=KEY){
     const raw=JSON.stringify(validate(store));
     try{storage.setItem(key,raw);return;}catch(e){if(!quotaError(e))throw e;}
@@ -83,5 +89,5 @@
     for(const row of incoming.snapshots){const old=next.snapshots.find(x=>x.id===row.id);if(!old)next.snapshots.push(copy(row));else if(row.savedAt>old.savedAt)Object.assign(old,copy(row));}
     return validate(next);
   }
-  return {KEY,LEGACY_KEY,empty,hasData,validate,withState,read,write,restore,mergeArchives};
+  return {writePrepared,pack,KEY,LEGACY_KEY,empty,hasData,validate,withState,read,write,restore,mergeArchives};
 });

@@ -1,6 +1,7 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+"storage-worker.js","scripts/workflow-interaction-qa.cjs",
 "scripts/roster-combat-qa.cjs",
 "scripts/experience-desktop-qa.cjs",
 "recover.html","recovery.js","scripts/pwa-navigation-verify.cjs",

@@ -1425,3 +1425,49 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .box-selected{font-weight:600;overflow-wrap:anywhere}
 #box-roles{max-height:160px}
 @media(max-width:540px){.box-options{grid-template-columns:1fr}}
+
+/* High-frequency actions acknowledge the press without waiting for motion. */
+button:active:not(:disabled){transform:translateY(1px)}
+button:disabled{cursor:not-allowed}
+button[aria-busy="true"]{cursor:progress}
+.guide-directory{display:grid;gap:8px}.guide-directory>label{max-width:420px}
+.guide-choices{display:flex;flex-wrap:wrap;gap:6px;max-height:240px;overflow:auto}
+.guide-choices button.active{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
+.roster-distribution{width:100%;text-align:left;background:transparent;border:.5px solid transparent;padding:4px;min-height:32px;border-radius:4px}
+.roster-distribution:hover,.roster-distribution:focus-visible{background:var(--wb-surface-2);border-color:var(--wb-border)}
+.roster-drilldown{display:grid;gap:8px;border-top:.5px solid var(--wb-border);padding-top:10px;scroll-margin-top:12px}
+.roster-drilldown h3{font-size:14px;margin:0}.roster-drill-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.roster-drill-grid article{display:grid;gap:6px}.roster-drill-grid small{font-size:12px;color:var(--wb-text-secondary)}
+.roster-dialog .roster-team{border:.5px solid var(--wb-border);border-radius:6px;padding:10px}
+.roster-dialog .roster-team.is-active{border-color:var(--wb-primary)}
+.roster-dialog .roster-drop{min-height:104px;padding:8px;border:.5px dashed var(--wb-border);border-radius:4px}
+.roster-dialog .roster-team.is-drag-target,.roster-dialog .roster-pool.is-drag-target{outline:2px solid var(--wb-primary);outline-offset:-2px;background:var(--wb-primary-soft)}
+.roster-dialog .roster-member button{min-width:32px;min-height:32px}
+.roster-team-config{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}.roster-team-config input{min-width:0;flex:1;width:120px}
+@media(max-width:767px){.roster-drill-grid{grid-template-columns:minmax(0,1fr)}.roster-dialog .roster-drop{min-height:88px}.guide-choices{max-height:180px}}
+@media(prefers-reduced-motion:reduce){button:active:not(:disabled){transform:none}}
+/* Roster editing uses the full dialog width; completion forms have a different grid. */
+#dialog.roster-dialog .dialog-body{display:block}
+.roster-dialog .roster-drop{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.roster-dialog .roster-member{min-width:0;align-items:flex-start}
+.roster-dialog .roster-member b{overflow-wrap:anywhere}
+.roster-dialog .roster-team>button{min-height:32px}
+.library-search{display:block;margin-top:8px;max-width:420px;font-size:12px}.library-search input{display:block;width:100%;margin-top:4px}
+.raid-library-grid{gap:8px;max-height:65vh;overflow:auto;overscroll-behavior:contain}
+.library-members{display:grid;gap:8px;max-height:260px;overflow:auto;overscroll-behavior:contain}
+.library-members>div{display:grid;gap:4px}.library-members strong,.library-members small{font-size:12px}
+.library-members .library-role-identity{display:flex;gap:4px;margin:0 0 6px;flex-wrap:wrap}
+.library-members .library-role-identity>small{color:var(--wb-text-secondary)}
+.roster-dialog .roster-school .role-identity-tags{display:flex;flex-wrap:wrap;flex:0 1 auto}
+.roster-dialog .roster-school .role-identity-tags>span{flex:0 0 auto}
+/* Update details remain attached to the floating notice and never move the page. */
+.app-update>div:first-child{flex:1}
+.update-notes-toggle{padding:2px 6px;min-height:28px;color:var(--wb-primary-label);background:transparent}
+.update-notes{position:absolute;top:calc(100% + 6px);left:0;right:0;max-height:min(420px,55dvh);overflow:auto;overscroll-behavior:contain;padding:12px;border:.5px solid var(--wb-border);border-radius:8px;background:var(--wb-surface);color:var(--wb-text);box-shadow:0 4px 16px var(--wb-shadow);font-size:14px}
+.update-notes::before{content:"";position:absolute;top:-7px;left:0;right:0;height:7px}
+.update-notes h3{font-size:14px;margin:0 0 8px}.update-notes ul{padding-left:20px;margin:0;display:grid;gap:8px}.update-notes li{overflow-wrap:anywhere;line-height:1.6}
+.update-notes:focus-visible{outline:.5px solid var(--wb-primary);outline-offset:2px}
+.update-progress{margin-top:8px;display:grid;gap:4px}.update-progress-heading{display:flex;justify-content:space-between;gap:8px;font-size:12px}.update-progress small{font-size:12px;color:var(--wb-text-secondary);overflow-wrap:anywhere}
+.update-progress progress{display:block;width:100%;height:8px;border:0;border-radius:4px;overflow:hidden;accent-color:var(--wb-primary);background:var(--wb-track)}
+.update-progress progress::-webkit-progress-bar{background:var(--wb-track)}.update-progress progress::-webkit-progress-value{background:var(--wb-primary)}.update-progress progress::-moz-progress-bar{background:var(--wb-primary)}
+@media(max-width:600px){.update-notes{max-height:50dvh}.app-update[data-state="progress"]>div:first-child{flex-basis:100%}}

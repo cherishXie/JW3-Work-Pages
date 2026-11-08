@@ -30,3 +30,9 @@ const {validate,hash,createUpdater}=require('../desktop/updater.cjs');
   console.log('PASS updates: channel isolation, GET-only fixed origin, path/size/hash rejection, offline preservation, staged activation, crash and corruption rollback, persistent successful update.');
  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+{
+ const {releaseNotes}=require('./update-build.cjs'),text='## [未发布]\n- 开发改进\n\n## [0.6.0]\n- 正式改进\n\n## [0.5.0]\n- 旧内容\n';
+ assert.deepEqual(releaseNotes(text,'dev','0.6.0-dev.1'),{title:'未发布',items:['开发改进']});assert.deepEqual(releaseNotes(text,'main','0.6.0'),{title:'0.6.0',items:['正式改进']});assert.deepEqual(releaseNotes(text.replace('- 开发改进',''),'dev','0.6.0-dev.1').items,['正式改进']);assert.deepEqual(releaseNotes(text,'main','0.7.0').items,[]);
+ console.log('PASS update notes: dev unreleased notes, main version notes, empty and older-version isolation.');
+}
