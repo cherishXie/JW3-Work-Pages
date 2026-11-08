@@ -992,6 +992,61 @@
     const hasData=mode!=='actual'||actualRows.some(r=>r.date>=start&&r.date<=end&&inScope(s,r,scope));
     return {...sum(perTask,s.config),tasks:perTask,hasData,start,end};
   }
+  // Calendar review uses confirmed execution only; completion facts and measurements
+  // are reconciled by executionRecords, so measuring a fact never counts it twice.
+  function reviewPeriod(date,unit='week'){
+    if(!['week','month','quarter'].includes(unit)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(new Date(date+'T12:00:00+08:00').getTime())||dateKey(new Date(date+'T12:00:00+08:00'))!==date)throw new Error('周期日期无效');
+    if(unit==='week'){const start=weekStart(date);return {start,end:addDays(start,6)};}
+    const year=Number(date.slice(0,4)),month=Number(date.slice(5,7)),step=unit==='quarter'?3:1,first=unit==='quarter'?Math.floor((month-1)/3)*3+1:month;
+    const start=year+'-'+String(first).padStart(2,'0')+'-01',next=dateKey(new Date(Date.UTC(year,first-1+step,1)));
+    return {start,end:addDays(next,-1)};
+  }
+  function periodReview(s,start,end,scope={}){
+    const rows=new Map(),active=new Set(),roles=new Set(),accounts=new Set(),cds=new Set(),daily=new Map(),roleRows=new Map();
+    let batches=0,unknownBatches=0,unknownRoleRuns=0,roleRuns=0,pending=0,recordCount=0,raid10=0,raid25=0;
+    for(const r of executionRecords(s)){
+      if(r.date<start||r.date>end)continue;const ids=selectedRecordRoles(s,r,scope);if(!ids.length)continue;recordCount++;
+      const p=s.plans.find(p=>p.id===r.planId),task={...(s.tasks.find(t=>t.id===r.taskId)||{}),...(p?.taskSnapshots?.[r.taskId]||{}),...(r.allocationTask||{})};
+      // Prefer frozen dungeon identity and difficulty over today's edited template.
+      const dungeonId=r.dungeonId||task.dungeonId,difficulty=r.difficulty||task.difficulty,raid=!!dungeonId||task.partyRule==='raid10',raidTask={...task,difficulty,...(r.difficulty?{raidSize:/^25/.test(r.difficulty)?25:10}:{})};
+      const row=rows.get(r.taskId)||{id:r.taskId,name:task.name||'历史任务（名称待补）',batches:0,unknownBatches:0,roleRuns:0,cd:0,pending:0,kind:raid?(raidCapacity(raidTask)===25?'25 人副本':'10 人副本'):task.partyRule==='daily5'?'大战日常':task.period==='weekly'?'其他周常':task.period==='daily'?'其他日常':'其他任务'};
+      const roster=recordBatches(s,r),count=roster?roster.filter(b=>b.some(id=>ids.includes(id))).length:ids.length===r.roleIds.length?Number(r.batches)||1:null;
+      if(count===null){unknownBatches++;row.unknownBatches++;}else{batches+=count;row.batches+=count;}
+      const visits=roster?roster.reduce((n,b)=>n+b.filter(id=>ids.includes(id)).length,0):ids.length;
+      if(!roster&&Number(r.batches)>1)unknownRoleRuns++;roleRuns+=visits;row.roleRuns+=visits;active.add(r.date);ids.forEach(id=>{roles.add(id);accounts.add(recordAccount(s,r,id));});
+      for(const id of ids){const entry=roleRows.get(id)||{role:s.roles.find(r=>r.id===id),roleRuns:0,cd:0,unknownRoleRuns:0,dates:new Set(),tasks:new Set()};entry.roleRuns+=roster?roster.filter(b=>b.includes(id)).length:1;entry.unknownRoleRuns+=!roster&&Number(r.batches)>1?1:0;entry.dates.add(r.date);entry.tasks.add(r.taskId);roleRows.set(id,entry);}
+      const isPending=!s.records.includes(r)||r.measurementStatus!=='confirmed'||r.incompleteMeasurement;if(isPending){pending++;row.pending++;}
+      if(raid&&dungeonId)for(const id of ids){const key=[id,cdKey({dungeonId,difficulty}),r.cycle||cycle({...task,period:task.period||'weekly'},r.startedAt||r.date)].join('|');if(!cds.has(key)){cds.add(key);row.cd++;roleRows.get(id).cd++;if(raidCapacity(raidTask)===25)raid25++;else raid10++;}}
+      rows.set(r.taskId,row);const d=daily.get(r.date)||{date:r.date,batches:0,roleRuns:0,unknownBatches:0};d.batches+=count||0;d.roleRuns+=visits;d.unknownBatches+=count===null?1:0;daily.set(r.date,d);
+    }
+    const types=new Map();for(const row of rows.values()){const group=types.get(row.kind)||{name:row.kind,roleRuns:0,batches:0,taskCount:0,cd:0};for(const key of ['roleRuns','batches','cd'])group[key]+=row[key];group.taskCount++;types.set(row.kind,group);}
+    return {batches,unknownBatches,unknownRoleRuns,roleRuns,pending,recordCount,types:[...types.values()].sort((a,b)=>b.roleRuns-a.roleRuns),roleDetails:[...roleRows.values()].map(r=>({...r,activeDays:r.dates.size,taskCount:r.tasks.size,dates:[...r.dates],tasks:[...r.tasks]})).sort((a,b)=>b.roleRuns-a.roleRuns||a.role.id.localeCompare(b.role.id)),raid10,raid25,activeDays:active.size,roles:roles.size,accounts:accounts.size,tasks:[...rows.values()].sort((a,b)=>b.roleRuns-a.roleRuns||a.name.localeCompare(b.name)),daily:[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date))};
+  }
+  // Attribution follows the existing financial allocation contract; unknown shares
+  // never become a zero-income role or an invented equal split.
+  function reviewAnalysis(s,start,end,scope={}){
+    const execution=periodReview(s,start,end,scope),income=summary(s,start,end,scope,'actual'),byRole=new Map(execution.roleDetails.map(r=>[r.role.id,{...r,gold:0,net:0,netGold:0,minutes:0,hasGold:false,hasTime:false,incomplete:false,unallocated:0}]));
+    let unallocated=0,legacy=0,missingGold=0;const efficiencyRows=new Map();
+    const ensure=id=>{if(!byRole.has(id))byRole.set(id,{role:s.roles.find(r=>r.id===id),roleRuns:0,activeDays:0,taskCount:0,cd:0,unknownRoleRuns:0,gold:0,net:0,netGold:0,minutes:0,hasGold:false,hasTime:false,incomplete:false,unallocated:0});return byRole.get(id);};
+    for(const r of incomeRecords(s)){
+      if(r.date<start||r.date>end)continue;
+      const ids=selectedRecordRoles(s,r,scope);if(!ids.length){if(r.unallocated&&![scope.account,scope.role,scope.group].some(v=>Array.isArray(v)?v.length:!!v))unallocated++;continue;}
+      const complete=(r.measurementStatus==='confirmed'||r.financialEvent)&&!r.incompleteMeasurement,whole=complete?scopedRecord(s,r,scope):null;if(whole){const list=efficiencyRows.get(r.taskId)||[];list.push(recordResult(whole,s.config));efficiencyRows.set(r.taskId,list);}
+      let unresolved=false;const goldKnown=!r.incompleteMeasurement||r.measurements?.gold!=null,timeKnown=!r.incompleteMeasurement||r.measurements?.minutes!=null;
+      if(!r.financialEvent&&r.measurementStatus!=='confirmed')legacy++;if(!goldKnown)missingGold++;
+      for(const id of ids){const role=ensure(id),scoped=scopedRecord(s,r,{...scope,role:id});if(!scoped){role.unallocated++;role.incomplete=true;unresolved=true;continue;}
+        const result=recordResult(scoped,s.config);if(goldKnown){role.gold+=result.gold;role.hasGold=true;}else role.incomplete=true;
+        if(timeKnown&&(!r.financialEvent||r.measurements)){role.minutes+=result.minutes;role.hasTime=true;}
+        if(result.incompleteMeasurement||result.net==null)role.incomplete=true;else{role.net+=result.net;role.netGold+=result.netGold||0;}
+      }
+      if(unresolved)unallocated++;
+    }
+    const roles=[...byRole.values()].map(r=>({...r,net:r.incomplete?null:r.net,hourlyGold:!r.incomplete&&r.hasTime&&r.minutes>0?r.netGold/(r.minutes/60):null}));
+    const roleIncome=roles.filter(r=>r.hasGold).sort((a,b)=>b.gold-a.gold||a.role.id.localeCompare(b.role.id)),roleActivity=roles.filter(r=>r.roleRuns).sort((a,b)=>b.roleRuns-a.roleRuns||b.activeDays-a.activeDays||a.role.id.localeCompare(b.role.id)),attributedGold=roleIncome.reduce((n,r)=>n+r.gold,0),positiveGold=roleIncome.reduce((n,r)=>n+Math.max(0,r.gold),0);
+    const weekdays=Array.from({length:7},(_,i)=>({name:['周一','周二','周三','周四','周五','周六','周日'][i],roleRuns:0,days:0,average:0}));for(const d of dates(start,end)){const row=weekdays[(weekday(d)+6)%7];row.days++;row.roleRuns+=execution.daily.find(r=>r.date===d)?.roleRuns||0;}for(const row of weekdays)row.average=row.days?row.roleRuns/row.days:0;
+    const taskEfficiency=[...efficiencyRows].map(([id,rows])=>({task:s.tasks.find(t=>t.id===id)||{id,name:'历史任务（名称待补）'},...sum(rows,s.config)})).filter(t=>t.minutes>0&&Number.isFinite(t.hourlyGold)&&!t.incompleteMeasurement).sort((a,b)=>b.hourlyGold-a.hourlyGold),coverage=execution.recordCount?(execution.recordCount-execution.pending)/execution.recordCount*100:null;
+    return {execution,income,roles,roleIncome,roleActivity,weekdays,taskEfficiency,attributedGold,unallocated,missingGold,legacy,coverage,top3IncomeShare:positiveGold?roleIncome.slice(0,3).reduce((n,r)=>n+Math.max(0,r.gold),0)/positiveGold*100:null,averageRuns:execution.roles?execution.roleRuns/execution.roles:null};
+  }
   function completion(s,start,end,scope={}) {
     let total=0,done=0;const seen=new Set(),lookups=new Map(),roles=new Map(),records=executionRecords(s);
     // Build each task/cycle lookup once instead of rescanning all history for every role/day.
@@ -1315,5 +1370,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
