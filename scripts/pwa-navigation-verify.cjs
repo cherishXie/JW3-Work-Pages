@@ -16,6 +16,7 @@ async function run(){
  blocked=true;assert.equal(await(await get('')).text(),'network index','blocked CacheStorage must not block the website');blocked=false;
  const complete=await caches.open(prefix+id);await complete.put(base+'index.html',new Response('offline index'));offline=true;assert.equal(await(await get('')).text(),'offline index');offline=false;
  const old='b'.repeat(64),oldCache=await caches.open(prefix+old);await oldCache.put(base+'index.html',new Response('old index'));await oldCache.put(base+'app.js',new Response('old app'));await(await caches.open(prefix+'clients')).put(base+'__client__/old-client',new Response(old));assert.equal(await(await get('app.js','cors','old-client')).text(),'old app');
+ assert.equal(await(await get('app.js?snapshot='+old,'cors')).text(),'old app');assert.equal((await get('app.js?snapshot='+'f'.repeat(64),'cors')).status,503);
  let intercepted=false;handlers.get('fetch')({request:{method:'GET',url:'https://example.test/outside/',mode:'navigate'},respondWith:()=>intercepted=true});assert.equal(intercepted,false);
  console.log('PASS PWA navigation: missing/evicted/blocked cache falls back to network, incomplete snapshots never mix resources, offline complete snapshots and pinned tabs preserved.');
 }

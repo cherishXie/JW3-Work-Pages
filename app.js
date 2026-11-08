@@ -136,7 +136,7 @@
     if(!/^https?:$/.test(location.protocol)||typeof Worker!=='function')return Promise.resolve(null);
     return new Promise(resolve=>{
       let timer;const finish=value=>{clearTimeout(timer);resolve(value);};
-      try{saveWorker??=new Worker(new URL('storage-worker.js',location.href));const worker=saveWorker,id=++saveWorkerJob;
+      try{const url=new URL('storage-worker.js',location.href);if(/^[a-f0-9]{64}$/.test(globalThis.WorkbenchVersion?.id))url.searchParams.set('snapshot',WorkbenchVersion.id);saveWorker??=new Worker(url);const worker=saveWorker,id=++saveWorkerJob;
         worker.onmessage=e=>{if(e.data.id!==id)return;worker.onmessage=null;worker.onerror=null;if(e.data.error)finish({error:e.data.error});else finish(e.data);};
         worker.onerror=()=>{worker.terminate();saveWorker=null;finish(null);};
         timer=setTimeout(()=>{worker.terminate();saveWorker=null;finish(null);},15000);
@@ -147,10 +147,13 @@
   function commit(change,message,undo=true){
     if(pendingMutation)throw new Error('正在保存，请稍候');
     if(!$('#dialog').open)toast('正在保存…');
+    const before=M.clone(state),beforeStore=dataStore,sourceRaw=localStorage.getItem(KEY);
+    // Keep mutation callbacks synchronous: existing editors may open the next form
+    // or clear a draft immediately after commit returns. Only save preparation yields.
+    try{change();}catch(error){state=before;dataStore=beforeStore;render();throw error;}
     const run=async()=>{
-      const before=M.clone(state),beforeStore=dataStore,sourceRaw=localStorage.getItem(KEY);
       try{
-        change();M.capturePlanForecasts(state,dataStore.snapshots);M.freezeHistory(state);Ops.ensureDefaults(state);state.updatedAt=new Date().toISOString();
+        M.capturePlanForecasts(state,dataStore.snapshots);M.freezeHistory(state);Ops.ensureDefaults(state);state.updatedAt=new Date().toISOString();
         const prepared=await prepareSave(state);if(prepared?.error)throw new Error(prepared.error);if(localStorage.getItem(KEY)!==sourceRaw)throw new Error('其他页面已更新档案，本次未覆盖；请重新加载后再保存');
         if(prepared){
           if((localStorage.getItem(DEMO_KEY)!==null)!==experience)throw new Error('工作空间已切换，请刷新后继续');
@@ -2180,14 +2183,14 @@
               return `<td><input name="shot-${i}-${k}" aria-label="第 ${i+1} 行${esc(WorkbenchScreenshot.labels[WorkbenchScreenshot.fields.indexOf(k)])}" value="${esc(r[k]||'')}" style="min-width:85px;width:110px">${options?`<small class="negative">冲突：${options.map(o=>esc(o.value)+'（'+esc(o.files.join('、'))+'）').join(' / ')}</small>`:''}</td>`;
             }).join('')}</tr>`;
         }).join('')}</tbody></table></div>
-        <p class="panel-sub mt">金币请核实单位；空白字段保留原值。选中角色一次提交，可立即撤销。</p>`,fd=>{
+        <p class="panel-sub mt">金币请核实单位；空白字段保留原值。选中角色一次提交，可立即撤销。</p>`,async fd=>{
           const draft=screenshotDraft,rows=draft.rows.map((r,i)=>({
             ...Object.fromEntries(WorkbenchScreenshot.fields.map(k=>[k,String(fd.get('shot-'+i+'-'+k)||'').trim()])),
             conflicts:r.conflicts,sourceNames:r.sourceNames,ocrNames:r.ocrNames,conflictsConfirmed:fd.has('shot-confirm-'+i),
             selected:fd.has('shot-pick-'+i),roleId:fd.get('shot-role-'+i)
           }));
           const capturedAt=new Date(fd.get('screenshot-time')+':00+08:00').toISOString();
-          commit(()=>{state=WorkbenchScreenshot.apply(state,rows,{...draft,capturedAt,allowHistorical:true,allowReimport:fd.has('shot-allow-reimport')});ui.page='assets';ui.assetTab='period';ui.resourceBatch=capturedAt;ui.goldBaseline='';ui.resourceMode='batch';ui.account='';ui.role='';ui.group='';},'采集已归档，余额与可比变化已更新；历史采集不覆盖较新信息，可撤销');
+          await commit(()=>{state=WorkbenchScreenshot.apply(state,rows,{...draft,capturedAt,allowHistorical:true,allowReimport:fd.has('shot-allow-reimport')});ui.page='assets';ui.assetTab='period';ui.resourceBatch=capturedAt;ui.goldBaseline='';ui.resourceMode='batch';ui.account='';ui.role='';ui.group='';},'采集已归档，余额与可比变化已更新；历史采集不覆盖较新信息，可撤销');
           screenshotDraft=null;
         },'确认更新勾选角色');
       $('#dialog').classList.add('screenshot-wide');
@@ -2665,7 +2668,7 @@
   }
   document.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-drag-plan]');if(!handle||e.button!==0)return;e.preventDefault();handle.setPointerCapture(e.pointerId);queueDrag={sourceId:handle.dataset.dragPlan,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,pointerId:e.pointerId,active:false};});
   document.addEventListener('pointermove',e=>{if(!queueDrag||queueDrag.pointerId!==e.pointerId)return;queueDrag.x=e.clientX;queueDrag.y=e.clientY;if(!queueDrag.active&&Math.hypot(e.clientX-queueDrag.startX,e.clientY-queueDrag.startY)>5){queueDrag.active=true;document.querySelector('[data-plan-id="'+queueDrag.sourceId+'"]')?.classList.add('is-dragging');paintQueueDrag();}if(queueDrag.active)e.preventDefault();},{passive:false});
-  document.addEventListener('pointerup',e=>{if(!queueDrag||queueDrag.pointerId!==e.pointerId)return;const source=queueDrag.sourceId,target=queueDragTarget(e.clientX,e.clientY),active=queueDrag.active;clearQueueDrag();if(!active||!target||source===target.dataset.planId)return;try{commit(()=>Daily.reorderQueue(state,source,target.dataset.planId),'任务顺序已保存');}catch(err){toast(err.message);}});
+  document.addEventListener('pointerup',async e=>{if(!queueDrag||queueDrag.pointerId!==e.pointerId)return;const source=queueDrag.sourceId,target=queueDragTarget(e.clientX,e.clientY),active=queueDrag.active;clearQueueDrag();if(!active||!target||source===target.dataset.planId)return;try{await commit(()=>Daily.reorderQueue(state,source,target.dataset.planId),'任务顺序已保存');}catch(err){toast(err.message);}});
   document.addEventListener('pointercancel',clearQueueDrag);window.addEventListener('blur',clearQueueDrag);
   document.addEventListener('pointerover',e=>{const group=e.target.closest('.trend-group');if(group)inspectTrend(group);});
   document.addEventListener('pointerout',e=>{const chart=e.target.closest('.trend-bars');if(chart&&!chart.contains(e.relatedTarget))inspectTrend(chart.querySelector('.trend-group[data-index="'+chart.dataset.selected+'"]'));});

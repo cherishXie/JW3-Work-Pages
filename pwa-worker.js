@@ -62,13 +62,15 @@ self.addEventListener('fetch',event=>{
   // Never resolve a navigation with undefined, or mix network HTML with an old
   // partial snapshot. Cache and pin failures must not prevent an online visit.
   try{
-   const cache=await caches.open(navigation?CACHE:await clientCache(event.clientId));
+   const requested=url.searchParams.get('snapshot'),pinned=/^[a-f0-9]{64}$/.test(requested)?PREFIX+requested:null;
+   const cache=await caches.open(pinned||(navigation?CACHE:await clientCache(event.clientId)));
    const index=await cache.match(new URL('index.html',BASE).href);
    if(index){
     if(navigation){await pin(event.resultingClientId||event.clientId,BUILD.id).catch(()=>{});return index;}
     const response=await cache.match(url.origin+url.pathname);if(response)return response;
    }
-  }catch{}
+   if(pinned)return new Response('Pinned update resource unavailable',{status:503});
+  }catch{if(/^[a-f0-9]{64}$/.test(url.searchParams.get('snapshot')))return new Response('Pinned update resource unavailable',{status:503});}
   return fetch(event.request,{cache:'no-store'});
  })());
 });

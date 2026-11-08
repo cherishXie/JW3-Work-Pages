@@ -46,7 +46,7 @@ console.log(checks.length+'/'+checks.length+' storage checks passed');
 
 check('后台保存校验完整档案、保留扩展字段并支持容量回退',()=>{
   const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),root=path.resolve(__dirname,'..');let prepared;
-  const context=vm.createContext({self:{postMessage:v=>{prepared=JSON.parse(JSON.stringify(v));}},console});
+  const context=vm.createContext({self:{location:{href:'https://example.test/storage-worker.js'},postMessage:v=>{prepared=JSON.parse(JSON.stringify(v));}},URL,console});
   context.importScripts=(...files)=>{for(const file of files)vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});};
   vm.runInContext(fs.readFileSync(path.join(root,'storage-worker.js'),'utf8'),context);
   const state=fixture();state.custom={text:'扩展档案'.repeat(1500)};const store=S.withState(S.empty(),state,new Date('2026-10-13T02:00:00Z')),original=JSON.stringify(store);
