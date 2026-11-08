@@ -1,9 +1,9 @@
 {
-  "id": "0dfb04bfadde1a8094782a67c2907e37fb52355a548d5f2bb598b8772fd55164",
-  "version": "0.6.0-dev.34",
+  "id": "29c33ebdead975cbe382137875cfcfcf4a168552c2be8870d3759cca2ef261fa",
+  "version": "0.6.0-dev.35",
   "channel": "dev",
-  "sourceCommit": "643f09ea1b77b33e65b18bc0cf1a25839002febb",
-  "sourceTimestamp": 1794134640,
+  "sourceCommit": "4cce562abec53d451acb570bc5ed6f0cec6bdcd7",
+  "sourceTimestamp": 1794135099,
   "protocol": 2,
   "releaseNotes": {
     "title": "未发布",
@@ -178,8 +178,8 @@
     },
     {
       "name": "storage-worker.js",
-      "bytes": 510,
-      "sha256": "a3e722c1695cd146e7da17a0c530a6c0733b7f7d2ab12fe093fc8c0d85b3c31a"
+      "bytes": 675,
+      "sha256": "248a2bbb4f52d974eb1052f0111317cfeeec43c2ae95e6311d0919674902b71b"
     },
     {
       "name": "verification.js",
@@ -218,13 +218,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 690954,
-      "sha256": "49809ccb368b32606c6c5429bacf866065c519edf39298ea7e53b0621131d34f"
+      "bytes": 691353,
+      "sha256": "227df0c567971299d2a2fa160964e534fdaea4422714e7ef433ce2bbdda4e1e4"
     },
     {
       "name": "version.js",
       "bytes": 1297,
-      "sha256": "e8478b3944a9e63398646be762da633f5c1dcebe149218b2fcf80125ebd61a27"
+      "sha256": "7b2d50731c0efb5a6fdf14834e4e5a0969ffab05a53400bb2ce55d5fe09e4e51"
     }
   ]
 }
