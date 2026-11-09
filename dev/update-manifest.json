@@ -1,16 +1,16 @@
 {
-  "id": "b307aef590834fe0a5c967e7cb3576a4e79cdd3d5b48c0bc642ced36ed6b6d12",
-  "version": "0.7.0-dev.42",
+  "id": "3983f8cad696f686e63cdcbd381a31afc6e37d9f77747f8cc9d539d1f599704a",
+  "version": "0.7.0-dev.43",
   "channel": "dev",
-  "sourceCommit": "e58b05d174073126f3888327587f304929ba03b7",
-  "sourceTimestamp": 1794213527,
+  "sourceCommit": "831f3eae6a2b8c5c24d0777599ff8d188b129461",
+  "sourceTimestamp": 1794241006,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "副本攻略与任务目录统一区分 5 人大战、10 人本、25 人普通、25 人英雄与 25 人挑战，按赛季浏览；大战更新为当前赛季的四个秘境，排除已开放侠客出行的对应秘境，保留十人侠客补位、原攻略与历史记录。",
-      "各副本难度独立保存攻略；任务选择同步对应目录、名称和首领参数，跨分类选择保持，未开放挑战本不进入排程。",
-      "修复开发版更新提示反复显示旧内容的问题，改为展示本次新增或修订的更新说明；没有新增说明时使用本次提交摘要，正式版继续对应版本更新记录。"
+      "任务安排的副本范围新增人数与难度分类，跨分类保留选择与路线顺序，过滤侠客出行秘境。",
+      "日常与周常任务按刷新 CD 判断逾期和完成资格，支持次日刷新前执行上一日任务，保留实际发生日期与原周期归属。",
+      "修复自定义队伍应用入口与人数类型切换，已有队伍无需编辑即可用于本次任务。"
     ]
   },
   "files": [
@@ -136,8 +136,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 310655,
-      "sha256": "8ef3dedf72412f03a063c354ef33cc718a4b7640fe0f0b98f54a15317537f9db"
+      "bytes": 310780,
+      "sha256": "823fd2dff15fe628526f7b30ef5b13855a5bccb7ae521fe3953296dbe5980d04"
     },
     {
       "name": "themes.js",
@@ -156,8 +156,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 200098,
-      "sha256": "980bfe1e21fa16d5e2f0e5ecfb2ae84cacf8fc25d7c98d11d8d41489887fbeea"
+      "bytes": 199918,
+      "sha256": "6e1adb003411521ece37c7b5aed5b1ad130c2f8ccbf56ef5de5380e0850c5eaf"
     },
     {
       "name": "operations.js",
@@ -216,13 +216,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 734282,
-      "sha256": "cd66ebf67832f9b3b92858bebc3d9f90fdfbce45b6af610e114a48d47b5e7aa4"
+      "bytes": 735200,
+      "sha256": "b4e99a8b2f5f790ffa9557ad27428c0dbb763855fbd816278618703557394de0"
     },
     {
       "name": "version.js",
-      "bytes": 946,
-      "sha256": "9f74acc221883777946cd9136b7377fa753149265f39a7d91983a38ce00fe1d8"
+      "bytes": 703,
+      "sha256": "586f76e09e42264579484431a5fb96fad2c91f3a166e4798febca3e7bfeed29e"
     }
   ]
 }

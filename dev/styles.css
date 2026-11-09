@@ -1128,6 +1128,7 @@ button.danger:hover:not(:disabled){border-color:var(--wb-danger);color:var(--wb-
 .planning-wizard .plan-scope-section,.planning-wizard .plan-team-section{margin:0;padding:0;border:0;display:block!important}
 .planning-wizard .raid-choice-cards,.planning-wizard .tc-plan-task-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));max-height:none;overflow:visible;gap:8px;margin-top:8px;padding:2px}
 .planning-wizard .raid-choice-card{padding:8px;align-items:start}.planning-wizard .raid-choice-card[hidden],.planning-wizard .tc-plan-task-card[hidden]{display:none}
+.planning-wizard .raid-route-picker .raid-choice-cards{max-height:min(52vh,520px);overflow:auto;overscroll-behavior:contain}
 .planning-wizard .raid-route-picker{padding:0;border:0;background:none}.planning-wizard .raid-route-picker>.flex{gap:8px}.planning-wizard .raid-route-picker>.flex>.field{flex:1;max-width:360px;gap:4px}
 .raid-catalog-tags{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:5px 0}
 .raid-catalog-tags>span{font-size:12px;line-height:1.3;padding:2px 5px;border:.5px solid var(--wb-border);border-radius:4px;font-weight:500}
