@@ -11,3 +11,5 @@ require('./check-public-source.cjs');
 require('./pwa-navigation-verify.cjs');
 
 require('./jx3box-verify.cjs');
+
+require('./raid-catalog-verify.cjs');

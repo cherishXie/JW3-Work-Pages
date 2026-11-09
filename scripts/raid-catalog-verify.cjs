@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),R=require('../raid-catalog'),M=require('../model'),O=require('../operations');
+assert.equal(R.categories.length,5);assert.equal(new Set(R.guideDungeons.map(d=>d.guideKey)).size,R.guideDungeons.length);
+assert.deepEqual(R.dailyDungeons.map(d=>d.name),['南山马场','玄元观','昊渊极','大阳津']);
+assert(R.availableDungeons('daily5').every(d=>d.seasonId===R.currentSeasonId));
+for(const category of R.categories)assert(R.availableDungeons(category.id).every(d=>!R.isDispatched(d)&&d.category===category.id));
+assert(R.isDispatched({dungeonId:'zhulong',difficulty:'25人英雄'}));assert(!R.isDispatched({dungeonId:'langfeng',difficulty:'10人普通',allowCompanions:true}));
+const k=R.guideId({dungeonId:'langfeng',difficulty:'25人英雄'});assert.equal(k,'langfeng__heroic25');assert(!R.guideBosses(k).some(b=>b.note));assert.match(R.guideBosses('langfeng')[4].note,/毒刹/);
+assert.equal(R.guideId({dungeonId:'nanshan',partyRule:'daily5'}),'nanshan');
+const s=M.blank();O.ensureDefaults(s);M.validateState(s);for(const d of R.guideDungeons.filter(d=>d.raidSize!==5))assert(s.tasks.some(t=>t.dungeonId===d.id&&t.difficulty===d.difficulty),d.guideKey);
+const t=s.tasks.find(t=>t.dungeonId==='langfeng'&&t.difficulty==='25人英雄');t.gold=123;t.roleIds=[];s.plans=[];assert.equal(O.ensureDefaults(s),false);assert.equal(t.gold,123);
+const future=s.tasks.find(t=>t.dungeonId==='luoyang_challenge');assert(future.releasePending);assert(!O.planningTasks(s,'2026-11-09','teams').includes(future));
+assert(!O.planningTasks(s,'2026-11-09','teams').some(t=>t.dungeonId==='luoyang'&&t.difficulty==='25人英雄'));assert(O.planningTasks(s,'2026-11-14','teams').some(t=>t.dungeonId==='luoyang'&&t.difficulty==='25人英雄'));
+s.tasks.push({...O.defaults('daily'),id:'retired',partyRule:'raid10',dungeonId:'zhulong',difficulty:'25人英雄'});assert(!O.planningTasks(s,'2026-11-09','teams').some(t=>t.id==='retired'));assert(s.tasks.some(t=>t.id==='retired'));
+console.log('PASS five categories, seasonal daily pool, dispatch vs companions, independent guides, complete default mapping, idempotent migration, future opening and retained history');

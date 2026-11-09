@@ -138,3 +138,5 @@
 !scripts/workflow-interaction-qa.cjs
 
 !/scripts/analytics-interaction-qa.cjs
+
+!/scripts/raid-catalog-verify.cjs

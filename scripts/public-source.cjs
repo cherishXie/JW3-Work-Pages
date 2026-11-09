@@ -42,6 +42,7 @@ module.exports=[
   "package.json",
   "platform.js",
   "raid-catalog.js",
+  "scripts/raid-catalog-verify.cjs",
   "roi.js",
   "jx3box.js",
   "scripts/jx3box-verify.cjs",
