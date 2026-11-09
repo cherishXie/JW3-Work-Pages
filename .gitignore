@@ -136,3 +136,5 @@
 !storage-worker.js
 
 !scripts/workflow-interaction-qa.cjs
+
+!/scripts/analytics-interaction-qa.cjs

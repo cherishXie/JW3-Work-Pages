@@ -6,6 +6,7 @@
   "scripts": {
     "start": "npm run build:pages && node serve.cjs",
     "test": "node scripts/verify.cjs",
+    "test:analytics:browser": "node scripts/analytics-interaction-qa.cjs",
     "build": "node scripts/package-html.cjs",
     "build:pages": "node scripts/prepare-ocr.cjs && node scripts/build-pages.cjs",
     "publish:pages:public": "node scripts/push-dev.cjs",
