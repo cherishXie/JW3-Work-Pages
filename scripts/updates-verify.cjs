@@ -32,7 +32,28 @@ const {validate,hash,createUpdater}=require('../desktop/updater.cjs');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 
 {
- const {releaseNotes}=require('./update-build.cjs'),text='## [未发布]\n- 开发改进\n\n## [0.6.0]\n- 正式改进\n\n## [0.5.0]\n- 旧内容\n';
- assert.deepEqual(releaseNotes(text,'dev','0.6.0-dev.1'),{title:'未发布',items:['开发改进']});assert.deepEqual(releaseNotes(text,'main','0.6.0'),{title:'0.6.0',items:['正式改进']});assert.deepEqual(releaseNotes(text.replace('- 开发改进',''),'dev','0.6.0-dev.1').items,['正式改进']);assert.deepEqual(releaseNotes(text,'main','0.7.0').items,[]);
- console.log('PASS update notes: dev unreleased notes, main version notes, empty and older-version isolation.');
+ const {releaseNotes,generate}=require('./update-build.cjs'),cp=require('node:child_process');
+ const text='## [未发布]\n- 开发改进\n\n## [0.6.0]\n- 正式改进\n\n## [0.5.0]\n- 旧内容\n';
+ const added=text.replace('- 开发改进','- 修复任务保存\n- 开发改进'),context={previousMarkdown:text,summary:'调整副本目录颜色'};
+ assert.deepEqual(releaseNotes(added,'dev','0.6.0-dev.2',context),{title:'本次更新',items:['修复任务保存']});
+ assert.deepEqual(releaseNotes(text,'dev','0.6.0-dev.3',context).items,['调整副本目录颜色']);
+ assert.deepEqual(releaseNotes(text.replace('开发改进','修订开发说明'),'dev','0.6.0-dev.4',context).items,['修订开发说明']);
+ assert.deepEqual(releaseNotes(text.replace('- 开发改进',''),'dev','0.6.0-dev.5',context).items,['调整副本目录颜色']);
+ assert.deepEqual(releaseNotes(text,'dev','0.6.0-dev.1',{summary:'首个构建'}).items,['首个构建']);
+ assert.deepEqual(releaseNotes(text,'dev','0.6.0-dev.1').items,[]);
+ assert.deepEqual(releaseNotes(text,'main','0.6.0',context),{title:'0.6.0',items:['正式改进']});
+ assert.deepEqual(releaseNotes(text,'main','0.7.0',context).items,[]);
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'jw3-update-notes-')),out=path.join(tmp,'build'),envNames=['GITHUB_REF_NAME','GITHUB_SHA','GITHUB_RUN_NUMBER'],saved=Object.fromEntries(envNames.map(k=>[k,process.env[k]]));
+ const git=args=>cp.execFileSync('git',args,{cwd:tmp,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+ const commit=summary=>{git(['add','CHANGELOG.md']);git(['-c','user.name=Update test','-c','user.email=qa@example.invalid','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','--allow-empty','-m',summary]);process.env.GITHUB_SHA=git(['rev-parse','HEAD']);};
+ try{
+  git(['init','-b','dev']);fs.mkdirSync(out);fs.writeFileSync(path.join(tmp,'package.json'),JSON.stringify({version:'0.6.0'}));fs.writeFileSync(path.join(tmp,'pwa-worker.js'),'/* synthetic worker */');fs.writeFileSync(path.join(out,'app.js'),'/* synthetic public source */');fs.writeFileSync(path.join(tmp,'CHANGELOG.md'),text);
+  process.env.GITHUB_REF_NAME='dev';process.env.GITHUB_RUN_NUMBER='1';commit('首次构建说明');
+  assert.deepEqual(generate(tmp,out,['app.js']).releaseNotes.items,['首次构建说明']);
+  commit('修正目录主题颜色');assert.deepEqual(generate(tmp,out,['app.js']).releaseNotes.items,['修正目录主题颜色']);
+  fs.writeFileSync(path.join(tmp,'CHANGELOG.md'),added);commit('修复更新文案生成');const meta=generate(tmp,out,['app.js']);
+  assert.deepEqual(meta.releaseNotes.items,['修复任务保存']);assert.deepEqual(generate(tmp,out,['app.js']).releaseNotes,meta.releaseNotes);
+  const manifest=JSON.parse(fs.readFileSync(path.join(out,'update-manifest.json')));assert.deepEqual(manifest.releaseNotes,meta.releaseNotes);assert(fs.readFileSync(path.join(out,'version.js'),'utf8').includes(JSON.stringify(meta.releaseNotes)));assert(fs.readFileSync(path.join(out,'sw.js'),'utf8').includes(JSON.stringify(meta.releaseNotes)));
+ }finally{for(const name of envNames)if(saved[name]===undefined)delete process.env[name];else process.env[name]=saved[name];fs.rmSync(tmp,{recursive:true,force:true});}
+ console.log('PASS update notes: per-commit changelog delta, revised/removed/unchanged notes, commit-summary fallback, missing history, reproducible builds, manifest/version/worker consistency and main version isolation.');
 }
