@@ -771,14 +771,14 @@
     const completionOnly=records.some(x=>x.completionOnly),measuredCompleted=records.filter(x=>!x.completionOnly).length;
     return {...manual,target,completed,status,actualCompleted,measuredCompleted,completionOnly,manualStatus:manual?.status,source:actualCompleted?(completionOnly?'完成登记'+(measuredCompleted?' / 实测':''):'实测')+(manual?' / 手工':''):manual?.source||''};
   }
-  // Ten-player plans reserve a CD, while daily plans reserve a calendar date.
+  // Every plan remains executable until its task refreshes, including after midnight.
   function planExecutionValid(s,p,t,when,rules=t){
-    const planned=planStart(s,p,t.id),actual=when.length===10?when+'T12:00:00+08:00':when;
-    return (t.partyRule==='raid10'||dateKey(new Date(planned))===dateKey(new Date(actual)))&&cycle(rules,when)===cycle(rules,planned);
+    const planned=planStart(s,p,t.id);
+    return cycle(rules,when)===cycle(rules,planned);
   }
   function planTaskOverdue(s,p,taskId,when=new Date().toISOString()){
     const t=s.tasks.find(t=>t.id===taskId);if(!t)return false;
-    return t.partyRule==='raid10'?cycle(t,planStart(s,p,taskId))<cycle(t,when):p.date<dateKey(new Date(when));
+    return cycle(t,planStart(s,p,taskId))<cycle(t,when);
   }
   function recordedBatchIndices(s,p,taskId=p.taskId){
     const rows=executionRecords(s).filter(r=>r.planId===p.id&&r.taskId===taskId);

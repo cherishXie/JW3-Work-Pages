@@ -140,3 +140,6 @@
 !/scripts/analytics-interaction-qa.cjs
 
 !/scripts/raid-catalog-verify.cjs
+
+!scripts/task-refresh-scope-verify.cjs
+!scripts/task-refresh-scope-qa.cjs

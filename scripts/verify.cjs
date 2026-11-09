@@ -13,3 +13,5 @@ require('./pwa-navigation-verify.cjs');
 require('./jx3box-verify.cjs');
 
 require('./raid-catalog-verify.cjs');
+
+require('./task-refresh-scope-verify.cjs');

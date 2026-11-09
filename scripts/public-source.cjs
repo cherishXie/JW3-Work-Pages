@@ -1,6 +1,7 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+"scripts/task-refresh-scope-verify.cjs","scripts/task-refresh-scope-qa.cjs",
 "scripts/analytics-interaction-qa.cjs",
 "storage-worker.js","scripts/workflow-interaction-qa.cjs",
 "scripts/roster-combat-qa.cjs",
