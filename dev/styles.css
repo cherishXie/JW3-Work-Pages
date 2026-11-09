@@ -1498,7 +1498,7 @@ button[aria-busy="true"]{cursor:progress}
 /* Shared dungeon classification; use existing theme tokens and compact cards. */
 .guide-categories button.active{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
 .guide-choices button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;text-align:left;white-space:normal}
-.guide-choices button small{font-size:12px;color:var(--wb-muted)}
+.guide-choices button small{font-size:12px;color:var(--wb-text-secondary)}
 .raid-catalog{max-height:360px;overflow:auto}
 
 .guide-seasons{display:flex;gap:6px;overflow:auto;min-width:0}
