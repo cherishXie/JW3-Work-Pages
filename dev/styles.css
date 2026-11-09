@@ -1494,3 +1494,12 @@ button[aria-busy="true"]{cursor:progress}
 @media(max-width:1100px){.analysis-attention-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.comparison-row{grid-template-columns:minmax(100px,1fr) minmax(80px,1fr) minmax(100px,1fr)}.comparison-row>b{grid-column:3}}
 @media(max-width:767px){.analysis-context-strip{gap:6px;padding:10px}.analysis-context-strip small{width:100%;margin:0}.analysis-attention-grid{grid-template-columns:1fr}.comparison-row{grid-template-columns:minmax(100px,1fr) minmax(90px,1fr)}.comparison-values{grid-column:1}.comparison-row>b{grid-column:2}.analysis-waterfall{min-width:600px}.analysis-window-inputs input[type=range]{width:125px}.execution-matrix-grid{grid-template-columns:150px repeat(var(--matrix-days),105px)}.matrix-identity{max-width:150px}.analysis-window-inputs{gap:6px}.analysis-attention .segmented{flex-wrap:wrap}}
 .measurement-allocation{border:.5px solid var(--wb-border);border-radius:6px;padding:10px;display:grid;gap:8px}.measurement-allocation legend{font-size:14px}.measurement-allocation label{display:flex;gap:8px;align-items:center;padding:8px;border:.5px solid var(--wb-border);border-radius:4px}.measurement-allocation label:has(input:checked){background:var(--wb-primary-soft);border-color:var(--wb-primary)}.measurement-allocation span{display:grid;gap:4px}.measurement-allocation small{font-size:12px;color:var(--wb-text-secondary)}
+
+/* Shared dungeon classification; use existing theme tokens and compact cards. */
+.guide-categories button.active{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
+.guide-choices button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;text-align:left;white-space:normal}
+.guide-choices button small{font-size:12px;color:var(--wb-muted)}
+.raid-catalog{max-height:360px;overflow:auto}
+
+.guide-seasons{display:flex;gap:6px;overflow:auto;min-width:0}
+.guide-seasons button{flex:0 0 auto;white-space:nowrap}
