@@ -1,14 +1,14 @@
 {
-  "id": "1e84e5296069138da1bcf6be6faaf7722d5f3362b71a4ce855e80b3b85d10567",
-  "version": "0.8.0-dev.47",
+  "id": "3316c565273e656e69ffd45071cdf4a35dac8e0dc7d2d529c67b7998000f3f30",
+  "version": "0.8.0-dev.45",
   "channel": "dev",
-  "sourceCommit": "1922c7371b64be97149c39752c2eba3b105f3a3a",
-  "sourceTimestamp": 1794279377,
+  "sourceCommit": "177bd100ecb9c47e289f029b28206661e644ba07",
+  "sourceTimestamp": 1794278306,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "刷新双频道网页部署标识"
+      "发布 0.8.0：任务周期与副本安排交互优化"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 345,
-      "sha256": "56b8b32d81b943e234b58884584820443161d59d96a41d940b87f22efc641c84"
+      "bytes": 366,
+      "sha256": "a63cd42b1985f5178e52fddd11606c05e11d510d5b303107344ab6aaf15ab95a"
     }
   ]
 }
