@@ -15,6 +15,8 @@ git commit -m "说明本次修改"
 git push
 ```
 
+每次日常功能修改或修复，先在 `CHANGELOG.md` 的“未发布”段补充具体变化。dev 更新提示只取本次提交新增或修订的条目；没有新增条目时使用该提交摘要，不重复整段历史记录。相同提交重新构建时保持相同说明。
+
 也可使用 `npm run publish:pages:public` 校验后推送 dev。仅在本地 commit 不会触发 GitHub Actions。
 
 每次推送 dev 自动更新开发页面及开发客户端 Release。稳定页面和 main 保持原样。
