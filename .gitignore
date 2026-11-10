@@ -143,3 +143,5 @@
 
 !scripts/task-refresh-scope-verify.cjs
 !scripts/task-refresh-scope-qa.cjs
+
+!scripts/task-planning-scroll-qa.cjs
