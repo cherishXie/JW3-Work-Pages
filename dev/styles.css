@@ -1504,3 +1504,24 @@ button[aria-busy="true"]{cursor:progress}
 
 .guide-seasons{display:flex;gap:6px;overflow:auto;min-width:0}
 .guide-seasons button{flex:0 0 auto;white-space:nowrap}
+
+/* Task planning has one vertical scroll owner; cards and rosters use its flow. */
+body:has(.planning-wizard:not([data-stage="kind"])) .workspace{height:100dvh;display:flex;flex-direction:column;min-height:0}
+body:has(.planning-wizard:not([data-stage="kind"])) .workspace>.topbar,
+body:has(.planning-wizard:not([data-stage="kind"])) .workspace>.footer{flex:none}
+body:has(.planning-wizard:not([data-stage="kind"])) #app{flex:1;min-height:0;min-width:0;width:100%;display:flex;flex-direction:column}
+body:has(.planning-wizard:not([data-stage="kind"])) .task-center{display:flex;flex:1;flex-direction:column;min-height:0}
+body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-height:0;display:flex;flex-direction:column}
+.task-content>.tc-planning.planning-wizard:not([data-stage="kind"]){height:100%;min-height:0;flex:1;grid-template-rows:auto minmax(0,1fr) auto}
+.planning-wizard:not([data-stage="kind"])>.wizard-step-content{grid-row:2;scrollbar-gutter:stable;overscroll-behavior:contain;overflow-anchor:none}
+.planning-wizard:not([data-stage="kind"])>.wizard-actions{grid-row:3}
+.planning-wizard .wizard-step-content>.wizard-confirmed{margin-bottom:10px}
+.planning-wizard .raid-route-picker .raid-choice-cards,
+.planning-wizard .raid-library-grid,
+.planning-wizard .library-members,
+.planning-wizard .wizard-confirmed-route,
+.planning-wizard .raid-team-rows,
+.planning-wizard .plan-raid-reuse .checkbox-list{max-height:none;overflow:visible}
+.planning-wizard .route-order{max-height:none!important;overflow:visible}
+
+.planning-wizard .raid-library-grid{align-items:start}

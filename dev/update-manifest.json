@@ -1,16 +1,14 @@
 {
-  "id": "3983f8cad696f686e63cdcbd381a31afc6e37d9f77747f8cc9d539d1f599704a",
-  "version": "0.7.0-dev.43",
+  "id": "f8ddef8a5550ac829bbc2c43fdfb31c1b78594ec13761b455b085f5d7c099694",
+  "version": "0.7.0-dev.44",
   "channel": "dev",
-  "sourceCommit": "831f3eae6a2b8c5c24d0777599ff8d188b129461",
-  "sourceTimestamp": 1794241006,
+  "sourceCommit": "2b412223697da15f753d4c7d1c78f825dfed6c01",
+  "sourceTimestamp": 1794277903,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "任务安排的副本范围新增人数与难度分类，跨分类保留选择与路线顺序，过滤侠客出行秘境。",
-      "日常与周常任务按刷新 CD 判断逾期和完成资格，支持次日刷新前执行上一日任务，保留实际发生日期与原周期归属。",
-      "修复自定义队伍应用入口与人数类型切换，已有队伍无需编辑即可用于本次任务。"
+      "任务安排的副本、队伍与成员预览统一在步骤内容区滚动，移除列表内的嵌套滚动条；进度与底部操作保持可见，保留搜索、分页、选择保持与完整阵容信息。"
     ]
   },
   "files": [
@@ -136,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 310780,
-      "sha256": "823fd2dff15fe628526f7b30ef5b13855a5bccb7ae521fe3953296dbe5980d04"
+      "bytes": 312378,
+      "sha256": "c1c3d70b161e119d4d1c5eb969535f1c0cfddd49b02208d03bc3d4f07b87e8f2"
     },
     {
       "name": "themes.js",
@@ -216,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 735200,
-      "sha256": "b4e99a8b2f5f790ffa9557ad27428c0dbb763855fbd816278618703557394de0"
+      "bytes": 736017,
+      "sha256": "9c5ab45c667cc75e333df160a893e1d1e03ac65010c27b45511c1ae170043b76"
     },
     {
       "name": "version.js",
-      "bytes": 703,
-      "sha256": "586f76e09e42264579484431a5fb96fad2c91f3a166e4798febca3e7bfeed29e"
+      "bytes": 522,
+      "sha256": "d6df2a96f935cba48eb2b07ce8f65cfaa1c03b86f34a50aaa50ae82c7114e986"
     }
   ]
 }
