@@ -1527,18 +1527,18 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
 .planning-wizard .raid-library-grid{align-items:start}
 
 /* Execution: find a plan beside the active batch, keeping its clock and actions together. */
-#calendar-task-panel{width:min(1320px,calc(100vw - 24px))}
-#calendar-task-panel .execution-split{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;align-items:start}
+#calendar-task-panel{width:min(1560px,calc(100vw - 24px))}
+#calendar-task-panel .execution-split{display:grid;grid-template-columns:420px minmax(0,1fr);gap:12px;align-items:start}
 .execution-browser{min-width:0;padding:10px;border:0.5px solid var(--wb-border);border-radius:8px;background:var(--wb-surface)}
-.execution-browser-head{display:grid;gap:8px}.execution-browser h2,.execution-browser h3{font-size:14px;margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px}.execution-browser h2 small,.execution-browser h3 small{font-size:12px;font-weight:400;color:var(--wb-text-muted)}
-.execution-browser input{width:100%;min-width:0;font-size:14px;min-height:36px}.execution-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.execution-status button{font-size:12px;min-height:34px;padding:6px}
+.execution-browser-head{display:grid;gap:6px}.execution-browser h2,.execution-browser h3{font-size:14px;margin:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px}.execution-browser h2 small,.execution-browser h3 small{font-size:12px;font-weight:400;color:var(--wb-text-muted)}
+.execution-browser input{width:100%;min-width:0;font-size:14px;min-height:32px;padding:5px 6px}.execution-status{display:grid;grid-template-columns:1fr 1.4fr 1fr 1.8fr;gap:3px}.execution-status button{font-size:12px;min-height:28px;padding:4px 2px;white-space:nowrap}
 #calendar-task-panel .execution-browser .flow-task-nav,#calendar-task-panel .execution-browser .flow-batch-nav{display:block;margin:8px 0 0;padding:0;border:0}
 #calendar-task-panel .execution-browser .flow-task-rail,#calendar-task-panel .execution-browser .flow-batch-rail{display:grid;gap:6px;padding:0;overflow:visible;scroll-snap-type:none}
 #calendar-task-panel .execution-browser .flow-task{display:grid;flex:none;width:100%;min-height:0;padding:8px;gap:4px;max-height:none;text-align:left;border-radius:6px}
 #calendar-task-panel .execution-browser .flow-task-head{display:grid;gap:4px;justify-items:start}.execution-browser .flow-task-title{display:block;white-space:normal;overflow-wrap:anywhere;font-size:14px;line-height:1.5}.execution-browser .flow-task-meta,.execution-browser .flow-task-duration{white-space:normal;font-size:12px;line-height:1.5}
 .execution-browser .flow-task.is-selected,.execution-browser .flow-batch.is-selected{border-color:var(--wb-primary);background:var(--wb-primary-soft);color:var(--wb-primary-label)}
 .execution-browser button:focus-visible{outline:0.5px solid var(--wb-primary);outline-offset:2px}
-.execution-batches{border-top:0.5px solid var(--wb-border);margin-top:10px;padding-top:10px;display:grid;gap:8px}
+.execution-browser-content{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.execution-plans,.execution-batches{display:flex;flex-direction:column;min-width:0;min-height:0;gap:6px}.execution-batches{border-left:0.5px solid var(--wb-border);padding-left:8px}
 #calendar-task-panel .execution-browser .flow-batch{display:flex;align-items:center;flex:none;min-height:0;width:100%;padding:8px;gap:8px;text-align:left;border-radius:6px}.execution-browser .flow-batch>span:last-child{min-width:0}.execution-browser .flow-batch b{font-size:14px;overflow-wrap:anywhere}.execution-browser .flow-batch small{font-size:12px;white-space:normal}.execution-browser .flow-batch-dot{flex:none}
 .execution-pager{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px;font-size:12px;font-variant-numeric:tabular-nums}.execution-pager button{min-height:34px;padding:6px 8px;font-size:12px}
 .execution-split .flow-inspector{min-width:0}.execution-split .tc-v2-focus{border-radius:8px}
@@ -1554,15 +1554,15 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
   #calendar-task-panel .execution-split{flex:1;min-height:0;align-items:stretch;overflow:hidden}
   .execution-split>.execution-browser,.execution-split>.flow-inspector{overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;min-height:0}
   .execution-split>.flow-inspector{padding-right:2px}
-  #calendar-task-panel .flow-workspace>.flow-unassigned{flex:none;max-height:180px;overflow:auto;margin:0;padding:8px 10px}
+  #calendar-task-panel .flow-workspace>.flow-unassigned{flex:none;max-height:none;overflow:auto;margin:0;padding:8px 10px}
 }
-@media(min-width:1280px){#calendar-task-panel .execution-split{grid-template-columns:280px minmax(0,1fr)}#calendar-task-panel .execution-split .tc-v2-focus-layout.has-guide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media(min-width:1280px){#calendar-task-panel .execution-split{grid-template-columns:460px minmax(0,1fr)}#calendar-task-panel .execution-split .tc-v2-focus-layout.has-guide{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media(max-width:959px){
   #calendar-task-panel{inset:8px;width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
   #calendar-task-panel .execution-split{grid-template-columns:minmax(0,1fr);gap:10px}
   .execution-split>.execution-browser,.execution-split>.flow-inspector{overflow:visible}
-  #calendar-task-panel .execution-browser .flow-task-rail{max-height:220px;overflow:auto;overscroll-behavior:contain;padding:2px}
-  #calendar-task-panel .execution-browser .flow-batch-rail{max-height:180px;overflow:auto;overscroll-behavior:contain;padding:2px}
+  #calendar-task-panel .execution-browser .flow-task-rail{max-height:none;overflow:auto;overscroll-behavior:contain;padding:2px}
+  #calendar-task-panel .execution-browser .flow-batch-rail{max-height:none;overflow:auto;overscroll-behavior:contain;padding:2px}
   .execution-status{grid-template-columns:repeat(4,minmax(0,1fr))}
   .execution-dock{top:-10px;padding-top:8px}.execution-dates{gap:6px}.execution-timer b{font-size:24px}
   #calendar-task-panel .execution-dock .tc-v2-focus-actions>.primary{flex:1 1 100%}
@@ -1574,14 +1574,14 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
 @media(max-width:959px){.execution-browser-toggle{display:block;width:100%;text-align:left;padding:0;background:transparent;border:0}.execution-browser-content:not([hidden]){margin-top:10px}}
 @media(min-width:960px){
   .execution-split>.execution-browser{overflow:auto}
-  .execution-browser-content{height:100%;min-height:0;display:flex;flex-direction:column}
-  .execution-browser-head,.execution-browser-content>.execution-pager{flex:none}
-  #calendar-task-panel .execution-browser .flow-task-nav{display:flex;flex-direction:column;flex:0 1 auto;min-height:110px;overflow:hidden}
-  #calendar-task-panel .execution-browser .flow-task-rail{width:100%;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px}
-  .execution-batches{display:flex;flex-direction:column;flex:0 1 auto;min-height:140px;overflow:hidden}
+  .execution-browser-content{height:100%;min-height:0}
+  .execution-browser-head,.execution-plans>.execution-pager{flex:none}.execution-plans,.execution-batches{overflow:hidden}
+  #calendar-task-panel .execution-browser .flow-task-nav{display:flex;flex-direction:column;flex:1;min-height:110px;overflow:hidden}
+  #calendar-task-panel .execution-browser .flow-task-rail{width:100%;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;padding:2px}
+  .execution-batches{min-height:0;overflow:hidden}
   .execution-batches>h3,.execution-batches>input,.execution-batches>.execution-pager{flex:none}
-  #calendar-task-panel .execution-browser .flow-batch-nav{display:flex;flex-direction:column;min-height:110px;flex:0 1 auto;overflow:hidden}
-  #calendar-task-panel .execution-browser .flow-batch-rail{width:100%;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px}
+  #calendar-task-panel .execution-browser .flow-batch-nav{display:flex;flex-direction:column;min-height:110px;flex:1;overflow:hidden}
+  #calendar-task-panel .execution-browser .flow-batch-rail{width:100%;min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;padding:2px}
 }
 
 .execution-browser-content[hidden]{display:none!important}
@@ -1589,4 +1589,12 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
 
 #calendar-task-panel .execution-browser .flow-task-rail,#calendar-task-panel .execution-browser .flow-batch-rail{grid-auto-rows:max-content;align-content:start;touch-action:pan-y;scrollbar-gutter:stable}
 
-@media(min-width:960px){.execution-batches{min-height:170px}.execution-batches:has(>input){min-height:260px}}
+
+
+@media(max-width:959px){
+ .execution-browser-content{gap:8px}.execution-plans,.execution-batches{max-height:min(55dvh,460px);overflow:hidden}
+ #calendar-task-panel .execution-browser .flow-task-nav,#calendar-task-panel .execution-browser .flow-batch-nav{display:flex;flex-direction:column;min-height:80px;overflow:hidden;flex:0 1 auto}
+ #calendar-task-panel .execution-browser .flow-task-rail,#calendar-task-panel .execution-browser .flow-batch-rail{min-height:0;flex:0 1 auto}
+ .execution-browser-head,.execution-plans>.execution-pager,.execution-batches>h3,.execution-batches>input,.execution-batches>.execution-pager{flex:none}
+ .execution-status{grid-template-columns:repeat(2,minmax(0,1fr))}.execution-pager{gap:3px}.execution-pager button{padding:5px 4px}
+}

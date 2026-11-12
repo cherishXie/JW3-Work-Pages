@@ -1,14 +1,14 @@
 {
-  "id": "011f1c2067d64468cd4423a56665988fc3018ce01246f1cad89913834659e07b",
-  "version": "0.8.0-dev.50",
+  "id": "4472cae2ab1533503de91749165e29050558d1a95fb3ce073d699737c9c0b75a",
+  "version": "0.8.0-dev.51",
   "channel": "dev",
-  "sourceCommit": "b5dfe11862695ccc72b3647de559e199e092917e",
-  "sourceTimestamp": 1794449821,
+  "sourceCommit": "af1252f0dc4d9a4805c95e5bbe32fa745e8a6c2b",
+  "sourceTimestamp": 1794450475,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "修复并排执行区中任务队列与批次列表被外层裁切、无法上下滚动的问题：修正高度传递，卡片保持内容高度，两个列表分别滚动，保留分页、选择及窄屏展开操作。"
+      "任务队列与任务批次改为独立并排两列，各自使用完整纵向空间滚动；压缩搜索及状态筛选区域，保留执行详情、分页、选择保持与窄屏切换。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 320413,
-      "sha256": "76df10fdaf2dc8a48eb89c6f58ef3508ed3f38f3ce726678c81c29cb7f953c2e"
+      "bytes": 321238,
+      "sha256": "03f5a4263c16f4be40804f1a6919563f7a3f9d67441cc1dc998c6f5948673d32"
     },
     {
       "name": "themes.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 743609,
-      "sha256": "e822eb8d427d0d22d817ff995ce2b4510ad956d6cb59227028d4fbf80b4ef7ea"
+      "bytes": 743687,
+      "sha256": "4a14ab91f400b71beb68e404ab5b84e97105839a674756b351eef443073da607"
     },
     {
       "name": "version.js",
-      "bytes": 531,
-      "sha256": "cf7f3ebb1a3a448c0dc251d9c65b0cc770dffcb3d55bc84693886478643e617d"
+      "bytes": 501,
+      "sha256": "f365ba19a6b58789c4b39fd62e89a7ea146685761feae89f9718726bea61217f"
     }
   ]
 }
