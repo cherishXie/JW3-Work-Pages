@@ -1,14 +1,14 @@
 {
-  "id": "68dcd7ca4eed9fc1554406a4e1f0a39968fb7beb5c83e696528d10195db2f522",
-  "version": "0.8.0-dev.48",
+  "id": "ffb2c03268adafa488a420a990dab6aac2723bd9f0bb47fe094f0ef55e343b2c",
+  "version": "0.8.0-dev.49",
   "channel": "dev",
-  "sourceCommit": "945227623f2a5cdae69568c0cd2f0c76e952516c",
-  "sourceTimestamp": 1794446430,
+  "sourceCommit": "1c191a79fc932ba9e2484bdebe81a28bf861392f",
+  "sourceTimestamp": 1794449036,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "执行队列、任务日历和待补实测按安排日期展示，未完成副本不再沿 CD 出现在后续日期，跨日完成也不重复展示原排程；保留刷新周期内补录实际开始、结束时间，实测收益仍按实际执行日期计入，预计收益按原排程归属。"
+      "任务中心在宽屏并排展示任务队列与当前批次，支持任务和成员搜索、分页与跨页保留当前批次，窄屏自动单列；执行区集中显示安排日期、实际起止和 CD 刷新截止，计时与主要操作保持可见，保留阵容、攻略及管理流程，跨日补录仍归原排程。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 312378,
-      "sha256": "c1c3d70b161e119d4d1c5eb969535f1c0cfddd49b02208d03bc3d4f07b87e8f2"
+      "bytes": 319847,
+      "sha256": "f5544206a1613761fa6b1bb15264774c471a1a0eea65d487b8c60b111e101096"
     },
     {
       "name": "themes.js",
@@ -154,8 +154,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 199918,
-      "sha256": "6e1adb003411521ece37c7b5aed5b1ad130c2f8ccbf56ef5de5380e0850c5eaf"
+      "bytes": 200393,
+      "sha256": "894545cb43db8c9c7a259b4a15638a1a3834cd3754c6d511e4a28e3e7e9cd420"
     },
     {
       "name": "operations.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 735445,
-      "sha256": "6763c91c615be1b013780cf8df02bb4ba93d500153e4863eb4dbb8220acd5345"
+      "bytes": 743288,
+      "sha256": "befe1d5208ee1a537adeca7f653671b2b486f2be99c64b3e52e12c9b6784f031"
     },
     {
       "name": "version.js",
-      "bytes": 607,
-      "sha256": "2895b2ccaefc78cad63bb723503adb97a1b6e566a86b8de137d413dadc156d1e"
+      "bytes": 637,
+      "sha256": "c3b40eeab04872d6f2abac0f0fced9d73eb5767a0944f5b4463f81a90a1bb075"
     }
   ]
 }
