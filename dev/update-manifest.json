@@ -1,14 +1,14 @@
 {
-  "id": "ffb2c03268adafa488a420a990dab6aac2723bd9f0bb47fe094f0ef55e343b2c",
-  "version": "0.8.0-dev.49",
+  "id": "011f1c2067d64468cd4423a56665988fc3018ce01246f1cad89913834659e07b",
+  "version": "0.8.0-dev.50",
   "channel": "dev",
-  "sourceCommit": "1c191a79fc932ba9e2484bdebe81a28bf861392f",
-  "sourceTimestamp": 1794449036,
+  "sourceCommit": "b5dfe11862695ccc72b3647de559e199e092917e",
+  "sourceTimestamp": 1794449821,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "任务中心在宽屏并排展示任务队列与当前批次，支持任务和成员搜索、分页与跨页保留当前批次，窄屏自动单列；执行区集中显示安排日期、实际起止和 CD 刷新截止，计时与主要操作保持可见，保留阵容、攻略及管理流程，跨日补录仍归原排程。"
+      "修复并排执行区中任务队列与批次列表被外层裁切、无法上下滚动的问题：修正高度传递，卡片保持内容高度，两个列表分别滚动，保留分页、选择及窄屏展开操作。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 319847,
-      "sha256": "f5544206a1613761fa6b1bb15264774c471a1a0eea65d487b8c60b111e101096"
+      "bytes": 320413,
+      "sha256": "76df10fdaf2dc8a48eb89c6f58ef3508ed3f38f3ce726678c81c29cb7f953c2e"
     },
     {
       "name": "themes.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 743288,
-      "sha256": "befe1d5208ee1a537adeca7f653671b2b486f2be99c64b3e52e12c9b6784f031"
+      "bytes": 743609,
+      "sha256": "e822eb8d427d0d22d817ff995ce2b4510ad956d6cb59227028d4fbf80b4ef7ea"
     },
     {
       "name": "version.js",
-      "bytes": 637,
-      "sha256": "c3b40eeab04872d6f2abac0f0fced9d73eb5767a0944f5b4463f81a90a1bb075"
+      "bytes": 531,
+      "sha256": "cf7f3ebb1a3a448c0dc251d9c65b0cc770dffcb3d55bc84693886478643e617d"
     }
   ]
 }

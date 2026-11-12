@@ -1571,15 +1571,22 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
 .execution-status button[aria-pressed="true"]{background:var(--wb-primary-soft);border-color:var(--wb-primary);color:var(--wb-primary-label)}
 .execution-browser-toggle{display:none;cursor:pointer;font-size:14px;line-height:1.5}
 .execution-browser-toggle span{display:block;margin-top:4px;color:var(--wb-text-secondary);font-size:12px;overflow-wrap:anywhere}
-@media(max-width:959px){.execution-browser-toggle{display:list-item}.execution-browser[open]>.execution-browser-content{margin-top:10px}}
+@media(max-width:959px){.execution-browser-toggle{display:block;width:100%;text-align:left;padding:0;background:transparent;border:0}.execution-browser-content:not([hidden]){margin-top:10px}}
 @media(min-width:960px){
-  .execution-split>.execution-browser{overflow:hidden}
+  .execution-split>.execution-browser{overflow:auto}
   .execution-browser-content{height:100%;min-height:0;display:flex;flex-direction:column}
   .execution-browser-head,.execution-browser-content>.execution-pager{flex:none}
-  #calendar-task-panel .execution-browser .flow-task-nav{display:flex;flex-direction:column;flex:0 1 auto;min-height:64px;overflow:hidden}
+  #calendar-task-panel .execution-browser .flow-task-nav{display:flex;flex-direction:column;flex:0 1 auto;min-height:110px;overflow:hidden}
   #calendar-task-panel .execution-browser .flow-task-rail{width:100%;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px}
   .execution-batches{display:flex;flex-direction:column;flex:0 1 auto;min-height:140px;overflow:hidden}
   .execution-batches>h3,.execution-batches>input,.execution-batches>.execution-pager{flex:none}
-  #calendar-task-panel .execution-browser .flow-batch-nav{display:flex;flex-direction:column;min-height:48px;flex:0 1 auto;overflow:hidden}
+  #calendar-task-panel .execution-browser .flow-batch-nav{display:flex;flex-direction:column;min-height:110px;flex:0 1 auto;overflow:hidden}
   #calendar-task-panel .execution-browser .flow-batch-rail{width:100%;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px}
 }
+
+.execution-browser-content[hidden]{display:none!important}
+.execution-browser-toggle::before{content:"▸";margin-right:6px}.execution-browser-toggle[aria-expanded="true"]::before{content:"▾"}
+
+#calendar-task-panel .execution-browser .flow-task-rail,#calendar-task-panel .execution-browser .flow-batch-rail{grid-auto-rows:max-content;align-content:start;touch-action:pan-y;scrollbar-gutter:stable}
+
+@media(min-width:960px){.execution-batches{min-height:170px}.execution-batches:has(>input){min-height:260px}}
