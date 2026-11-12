@@ -1,14 +1,14 @@
 {
-  "id": "4472cae2ab1533503de91749165e29050558d1a95fb3ce073d699737c9c0b75a",
-  "version": "0.8.0-dev.51",
+  "id": "18fe6e78b00df38d6a83026222c072d14cfbd0eda2116fcfd5d259a31387145e",
+  "version": "0.9.0-dev.52",
   "channel": "dev",
-  "sourceCommit": "af1252f0dc4d9a4805c95e5bbe32fa745e8a6c2b",
-  "sourceTimestamp": 1794450475,
+  "sourceCommit": "51a00b3da3861bd3a90f5bd354cdb4b5fa73ca13",
+  "sourceTimestamp": 1794501773,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "任务队列与任务批次改为独立并排两列，各自使用完整纵向空间滚动；压缩搜索及状态筛选区域，保留执行详情、分页、选择保持与窄屏切换。"
+      "发布 0.9.0：任务执行布局与跨日归属修复"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 501,
-      "sha256": "f365ba19a6b58789c4b39fd62e89a7ea146685761feae89f9718726bea61217f"
+      "bytes": 366,
+      "sha256": "526f2a4dd3a587562cf8054da4b2ec1a1d15eebe39228d9da2db8ec278e4811d"
     }
   ]
 }
