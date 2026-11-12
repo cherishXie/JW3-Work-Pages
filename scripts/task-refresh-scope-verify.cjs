@@ -37,3 +37,15 @@ assert.equal(M.executionRecords(late).length,1);
 assert.equal(M.effectiveProgress(late,late.tasks[0],late.roles[0],'2026-11-11').completed,1);
 assert.throws(()=>D.registerBatch(late,'p','t',0,{date:'2026-11-11',gold:1234,minutes:30}),/重复登记/);
 console.log('PASS late completion and measurement: planned forecast, actual-date income, no duplicate income/completion/CD');
+
+for(const [period,resetDays,planned,expected]of [
+ ['daily',[1],'2026-11-09T20:00:00+08:00','2026-11-10T07:00:00+08:00'],
+ ['daily',[1],'2026-11-10T06:59:00+08:00','2026-11-10T07:00:00+08:00'],
+ ['weekly',[1],'2026-11-09T07:00:00+08:00','2026-11-16T07:00:00+08:00'],
+ ['weekly',[1,5],'2026-11-11T20:00:00+08:00','2026-11-13T07:00:00+08:00'],
+ ['weekly',[1,5],'2026-11-13T07:00:00+08:00','2026-11-16T07:00:00+08:00']
+]){
+ const s=fixture('none',period),p=s.plans[0],t=s.tasks[0];t.resetDays=resetDays;p.date=planned.slice(0,10);p.startedAt=planned;
+ const deadline=M.planExecutionDeadline(s,p,t);assert.equal(Date.parse(deadline),Date.parse(expected));assert(M.planExecutionValid(s,p,t,new Date(Date.parse(deadline)-1).toISOString()));assert(!M.planExecutionValid(s,p,t,deadline));
+}
+console.log('PASS displayed CD deadline equals daily/weekly/multiple-reset eligibility boundary, including before-reset starts');

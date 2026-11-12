@@ -145,3 +145,5 @@
 !scripts/task-refresh-scope-qa.cjs
 
 !scripts/task-planning-scroll-qa.cjs
+
+!scripts/task-execution-split-qa.cjs
