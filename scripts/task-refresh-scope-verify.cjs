@@ -16,3 +16,24 @@ const weekly=fixture('none','weekly');assert(M.planExecutionValid(weekly,weekly.
 const s=fixture();O.ensureDefaults(s);for(const d of R.dispatchDungeons)for(const difficulty of d.difficulties)s.tasks.push({...s.tasks[0],id:'retired_'+d.id+difficulty,partyRule:'raid10',dungeonId:d.id,dungeonName:d.name,difficulty,enabled:true});
 const tasks=O.planningTasks(s,'2026-11-10','teams');assert(tasks.every(t=>!R.isDispatched(t)));for(const category of ['raid10','normal25','challenge25'])assert(tasks.some(t=>R.categoryOf(t)===category));
 console.log('PASS daily/weekly refresh boundaries, after-midnight completion and cycle attribution, atomic rejection after refresh, independent next cycle and dispatch exclusions');
+
+// A late execution retains its planned baseline, actual income date and one CD.
+const late=fixture('none','weekly');
+const forecast=M.summary(late,'2026-11-09','2026-11-09',{},'estimated').gold;
+assert(forecast>0);
+assert.equal(M.summary(late,'2026-11-11','2026-11-11',{},'estimated').gold,0);
+D.registerBatch(late,'p','t',0,{date:'2026-11-11',startTime:'20:00',endTime:'20:30'});
+assert.equal(late.plans[0].date,'2026-11-09');
+assert.equal(M.summary(late,'2026-11-11','2026-11-11',{},'actual').hasData,false);
+D.registerBatch(late,'p','t',0,{date:'2026-11-11',startTime:'20:00',endTime:'20:30',gold:1234,minutes:30,onlineMinutes:30});
+assert.equal(late.records[0].date,'2026-11-11');
+assert.equal(late.records[0].cycle,'2026-11-09');
+assert.equal(M.summary(late,'2026-11-09','2026-11-09',{},'actual').gold,0);
+assert.equal(M.summary(late,'2026-11-11','2026-11-11',{},'actual').gold,1234);
+assert.equal(M.summary(late,'2026-11-09','2026-11-15',{},'actual').gold,1234);
+assert.equal(M.summary(late,'2026-11-09','2026-11-09',{},'estimated').gold,forecast);
+assert.equal(M.summary(late,'2026-11-11','2026-11-11',{},'estimated').gold,0);
+assert.equal(M.executionRecords(late).length,1);
+assert.equal(M.effectiveProgress(late,late.tasks[0],late.roles[0],'2026-11-11').completed,1);
+assert.throws(()=>D.registerBatch(late,'p','t',0,{date:'2026-11-11',gold:1234,minutes:30}),/重复登记/);
+console.log('PASS late completion and measurement: planned forecast, actual-date income, no duplicate income/completion/CD');
