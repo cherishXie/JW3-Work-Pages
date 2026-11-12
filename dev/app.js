@@ -708,9 +708,8 @@
   }
   function calendarPlans(){const ids=new Set(activeRoles().map(r=>r.id));return state.plans.filter(p=>p.batches?.some(b=>b.some(id=>ids.has(id))));}
   function calendarIndex(){
-    const index=new Map();const add=(date,p)=>{if(!index.has(date))index.set(date,new Map());index.get(date).set(p.id,p);};
-    const plans=calendarPlans(),byId=new Map(plans.map(p=>[p.id,p]));for(const p of plans)add(p.date,p);
-    for(const r of M.executionRecords(state)){const p=byId.get(r.planId);if(p)add(r.date,p);}return index;
+    const index=new Map();
+    for(const p of calendarPlans()){if(!index.has(p.date))index.set(p.date,new Map());index.get(p.date).set(p.id,p);}return index;
   }
   function calendarMonthStart(date){return date.slice(0,7)+'-01';}
   let calendarPreview=null,calendarPreviewAnchor=null,calendarPreviewTimer=null,calendarPreviewReturningFocus=false;
@@ -747,7 +746,7 @@
   window.addEventListener('blur',()=>closeCalendarPreview());
   function calendarMove(date,months){const d=new Date(date.slice(0,7)+'-01T12:00:00+08:00');d.setUTCMonth(d.getUTCMonth()+months);return M.dateKey(d);}
   function calendarDaySummary(date,plans){
-    const rows=plans.filter(p=>!p.cancelled).flatMap(p=>scopedPlanRows(p).filter(x=>p.date===date||x.actualEntry?.date===date));
+    const rows=plans.filter(p=>!p.cancelled&&p.date===date).flatMap(scopedPlanRows);
     const live=rows.filter(x=>!x.closed),done=live.filter(x=>!x.pending).length,total=live.length,pending=total-done,overdue=live.filter(x=>x.pending&&M.planTaskOverdue(state,x.p,x.id)).length;
     const status=overdue?'overdue':pending&&done?'progress':pending?'pending':done?'done':plans.length?'closed':'empty';
     const label={overdue:'逾期 '+overdue,progress:'完成 '+done+'/'+total,pending:'待做 '+pending,done:'已完成',closed:'已结束',empty:''}[status];
@@ -765,7 +764,7 @@
     let grid='';
     if(ui.calendarView==='year')grid='<div class="tc-cal-year">'+Array.from({length:12},(_,i)=>{const month=date.slice(0,4)+'-'+String(i+1).padStart(2,'0')+'-01',first=M.weekStart(month),last=M.addDays(calendarMove(month,1),-1),count=M.dates(month,last).reduce((n,d)=>n+(index.get(d)?.size||0),0);return `<section class="tc-cal-mini"><header>${button((i+1)+' 月','calendar-month','ghost small',`data-date="${month}"`)}<small>${count} 项安排</small></header>${weekdays}<div class="tc-cal-grid">${Array.from({length:42},(_,j)=>{const d=M.addDays(first,j);return d.slice(0,7)===month.slice(0,7)?calendarDay(d,index,true):'<span></span>';}).join('')}</div></section>`;}).join('')+'</div>';
     else {const first=ui.calendarView==='week'?start:M.weekStart(start),count=ui.calendarView==='week'?7:Math.ceil((M.dates(first,end).length)/7)*7;grid=weekdays+`<div class="tc-cal-grid ${ui.calendarView==='week'?'is-week':'is-month'}">${Array.from({length:count},(_,i)=>calendarDay(M.addDays(first,i),index,false,date.slice(0,7))).join('')}</div>`;}
-    return `<section class="card tc-calendar" aria-label="任务日历"><header class="tc-cal-toolbar"><div class="flex"><h2>${title}</h2><div class="flex">${button('‹','calendar-step','small','data-offset="-1" aria-label="上一日历周期"')}${button('今天','calendar-today','small')}${button('›','calendar-step','small','data-offset="1" aria-label="下一日历周期"')}</div></div>${tabs([['week','周'],['month','月'],['year','年']],ui.calendarView,'calendar-view')}</header><div class="tc-cal-selection"><div class="segmented">${[['day','单日'],['range','日期范围']].map(([v,l])=>button(l,'calendar-select',ui.calendarSelect===v?'active small':'small',`data-value="${v}" aria-pressed="${ui.calendarSelect===v}"`)).join('')}</div><div class="tc-cal-legend" aria-label="日历状态图例"><span data-state="pending">待做</span><span data-state="progress">部分完成</span><span data-state="done">完成</span><span data-state="overdue">逾期</span></div><span class="muted" role="status">${ui.calendarSelect==='range'?(ui.calendarAnchor?ui.calendarAnchor+' 起，选择结束日期':'选择开始日期'):queueRangeLabel()}</span>${ui.calendarSelect==='range'?button('取消选择','calendar-cancel-range','small'):button('任务详情','calendar-open','small')}${ui.calendarSelect!=='range'&&ui.queueRange!=='all'&&queueBounds().start!==queueBounds().end?button('清除范围','calendar-reset','small'):''}<details class="tc-cal-custom" data-task-fold="calendar-range" ${taskFold('calendar-range')}><summary>自定义日期</summary>${taskRangePicker()}</details></div><div class="tc-cal-body">${grid}</div><footer class="tc-cal-footer"><small>显示已保存排程与实际执行日；跨日执行的同一任务可出现在多个日期。</small>${button('创建排程','calendar-create','primary small')}</footer></section>`;
+    return `<section class="card tc-calendar" aria-label="任务日历"><header class="tc-cal-toolbar"><div class="flex"><h2>${title}</h2><div class="flex">${button('‹','calendar-step','small','data-offset="-1" aria-label="上一日历周期"')}${button('今天','calendar-today','small')}${button('›','calendar-step','small','data-offset="1" aria-label="下一日历周期"')}</div></div>${tabs([['week','周'],['month','月'],['year','年']],ui.calendarView,'calendar-view')}</header><div class="tc-cal-selection"><div class="segmented">${[['day','单日'],['range','日期范围']].map(([v,l])=>button(l,'calendar-select',ui.calendarSelect===v?'active small':'small',`data-value="${v}" aria-pressed="${ui.calendarSelect===v}"`)).join('')}</div><div class="tc-cal-legend" aria-label="日历状态图例"><span data-state="pending">待做</span><span data-state="progress">部分完成</span><span data-state="done">完成</span><span data-state="overdue">逾期</span></div><span class="muted" role="status">${ui.calendarSelect==='range'?(ui.calendarAnchor?ui.calendarAnchor+' 起，选择结束日期':'选择开始日期'):queueRangeLabel()}</span>${ui.calendarSelect==='range'?button('取消选择','calendar-cancel-range','small'):button('任务详情','calendar-open','small')}${ui.calendarSelect!=='range'&&ui.queueRange!=='all'&&queueBounds().start!==queueBounds().end?button('清除范围','calendar-reset','small'):''}<details class="tc-cal-custom" data-task-fold="calendar-range" ${taskFold('calendar-range')}><summary>自定义日期</summary>${taskRangePicker()}</details></div><div class="tc-cal-body">${grid}</div><footer class="tc-cal-footer"><small>任务按安排日显示，可在刷新周期内补录实际执行时间。</small>${button('创建排程','calendar-create','primary small')}</footer></section>`;
   }
   function calendarChoose(start,end){
     if(!start||!end||start>end)throw new Error('请填写有效日期，结束不能早于开始');
@@ -805,11 +804,11 @@
   const recentCompletedPlan=(a,b)=>Daily.completedTime(state,b)-Daily.completedTime(state,a);
   function planFacts(p){return M.completionRecords(state).filter(r=>r.planId===p.id);}
   function planOverdue(p){return (p.routeTaskIds||[p.taskId]).some(id=>Daily.remaining(state,p,id).length&&M.planTaskOverdue(state,p,id));}
-  function planInRange(p,start,end){return p.date>=start&&p.date<=end||M.executionRecords(state).some(r=>r.planId===p.id&&r.date>=start&&r.date<=end)||(p.routeTaskIds||[p.taskId]).some(id=>{const t=state.tasks.find(t=>t.id===id);return t?.partyRule==='raid10'&&Daily.remaining(state,p,id).length&&M.dates(start,end).some(d=>M.planExecutionValid(state,p,t,d===today?new Date().toISOString():d));});}
+  function planInRange(p,start,end){return p.date>=start&&p.date<=end;}
   function scopedPlanRows(p){const ids=new Set(activeRoles().map(r=>r.id));return planBatchRows(p).filter(x=>x.members.some(id=>ids.has(id)));}
   function queueFacts(p){
     const {start,end}=queueBounds();
-    return planFacts(p).filter(r=>(ui.queueRange==='all'||r.date>=start&&r.date<=end)&&M.selectedRecordRoles(state,r,scope()).length);
+    return planFacts(p).filter(r=>(ui.queueRange==='all'||planInRange(p,start,end))&&M.selectedRecordRoles(state,r,scope()).length);
   }
   function visiblePlans(includeAllDates=false){
     const {start,end}=queueBounds(),roleIds=new Set(activeRoles().map(r=>r.id)),q=ui.search.trim().toLowerCase();

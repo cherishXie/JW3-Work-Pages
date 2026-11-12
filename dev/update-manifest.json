@@ -1,14 +1,14 @@
 {
-  "id": "1e84e5296069138da1bcf6be6faaf7722d5f3362b71a4ce855e80b3b85d10567",
-  "version": "0.8.0-dev.47",
+  "id": "68dcd7ca4eed9fc1554406a4e1f0a39968fb7beb5c83e696528d10195db2f522",
+  "version": "0.8.0-dev.48",
   "channel": "dev",
-  "sourceCommit": "1922c7371b64be97149c39752c2eba3b105f3a3a",
-  "sourceTimestamp": 1794279377,
+  "sourceCommit": "945227623f2a5cdae69568c0cd2f0c76e952516c",
+  "sourceTimestamp": 1794446430,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "刷新双频道网页部署标识"
+      "执行队列、任务日历和待补实测按安排日期展示，未完成副本不再沿 CD 出现在后续日期，跨日完成也不重复展示原排程；保留刷新周期内补录实际开始、结束时间，实测收益仍按实际执行日期计入，预计收益按原排程归属。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 736017,
-      "sha256": "9c5ab45c667cc75e333df160a893e1d1e03ac65010c27b45511c1ae170043b76"
+      "bytes": 735445,
+      "sha256": "6763c91c615be1b013780cf8df02bb4ba93d500153e4863eb4dbb8220acd5345"
     },
     {
       "name": "version.js",
-      "bytes": 345,
-      "sha256": "56b8b32d81b943e234b58884584820443161d59d96a41d940b87f22efc641c84"
+      "bytes": 607,
+      "sha256": "2895b2ccaefc78cad63bb723503adb97a1b6e566a86b8de137d413dadc156d1e"
     }
   ]
 }
