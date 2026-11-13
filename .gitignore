@@ -147,3 +147,5 @@
 !scripts/task-planning-scroll-qa.cjs
 
 !scripts/task-execution-split-qa.cjs
+
+!/scripts/life-skills-analysis-qa.cjs

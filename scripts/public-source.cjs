@@ -1,6 +1,7 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+"scripts/life-skills-analysis-qa.cjs",
 "scripts/task-execution-split-qa.cjs",
 "scripts/task-planning-scroll-qa.cjs",
 "scripts/task-refresh-scope-verify.cjs","scripts/task-refresh-scope-qa.cjs",

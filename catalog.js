@@ -33,6 +33,8 @@
     companion('mu-qingrou','沐晴柔',['heal'],'ranged','常驻共鸣'),
     companion('tang-xiaoke','唐小珂',['dps'],'ranged','常驻共鸣'),
     companion('yue-jiahe','月嘉禾',['dps'],'ranged','常驻共鸣'),
+    // 剑网3官方微博 2026-10-20：https://www.sina.cn/news/detail/5356042898639894.html
+    {...companion('he-qixian','何其鲜',['dps'],'melee','常驻共鸣','2026-10-29 苍生铸世上线；外功近战输出；红尘侠影使用上品茶饼或上品茶饼·兑结识'),season:'苍生铸世',source:'https://www.sina.cn/news/detail/5356042898639894.html'},
     companion('he-xian','贺闲',['dps'],'melee','常驻共鸣'),
     companion('li-xingyun','李星云',['dps'],'melee','常驻共鸣'),
     companion('bai-que','白鹊',['dps'],'melee','常驻共鸣'),
@@ -58,5 +60,5 @@
   function stances(name){return [...(school(name)?.stances||[]),...extraStances];}
   function profile(role){const known=stances(role.school).find(x=>x.name===role.stance);return known?{...known,verified:true}:{duty:role.duty||'unknown',range:role.range||'unknown',verified:false};}
   function owned(role){const ids=Array.isArray(role.companionIds)?role.companionIds:String(role.companion||'').split(/[,，、;；\s]+/).map(name=>companions.find(c=>c.name===name)?.id).filter(Boolean);return [...new Set(ids)].map(id=>companions.find(c=>c.id===id)).filter(Boolean).map(c=>({...c,duties:role.companionDutyOverrides?.[c.id]||c.duties}));}
-  return {checkedAt:'2026-10-14',schools,extraStances,companions,school,stances,profile,owned};
+  return {checkedAt:'2026-10-14',companionsCheckedAt:'2026-11-13',companionsSeason:'苍生铸世',schools,extraStances,companions,school,stances,profile,owned};
 });

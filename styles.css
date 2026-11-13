@@ -1598,3 +1598,19 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
  .execution-browser-head,.execution-plans>.execution-pager,.execution-batches>h3,.execution-batches>input,.execution-batches>.execution-pager{flex:none}
  .execution-status{grid-template-columns:repeat(2,minmax(0,1fr))}.execution-pager{gap:3px}.execution-pager button{padding:5px 4px}
 }
+
+/* Life skills share the directory scope and theme tokens. */
+.life-analysis{display:grid;gap:12px;padding:12px}
+.life-analysis h2{font-size:16px;margin:0}.life-analysis h3{font-size:14px;margin:0}.life-analysis small{font-size:12px;color:var(--wb-text-secondary)}
+.life-analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.life-analysis-skill{min-width:0;display:grid;gap:8px;padding:10px;border:0.5px solid var(--wb-border);border-radius:8px}
+.life-analysis-skill.is-selected{border-color:var(--wb-primary)}
+.life-specialization{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.life-count{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px;min-width:0;text-align:left;font-size:12px}
+.life-count .roster-track,.life-level .roster-track{grid-column:1/-1;width:100%}
+.life-level-summary{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;text-align:left}
+.life-drilldown{display:grid;gap:8px;min-width:0;scroll-margin-top:12px}
+.life-level-distribution{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px;max-height:210px;overflow:auto;padding:2px}
+.life-level{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px;text-align:left;font-size:12px}
+.life-role{min-width:0}.life-role .pill{justify-self:start}.life-analysis b{font-variant-numeric:tabular-nums}
+@media(max-width:767px){.life-analysis-grid{grid-template-columns:minmax(0,1fr)}}
