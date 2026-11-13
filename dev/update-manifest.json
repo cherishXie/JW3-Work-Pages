@@ -1,14 +1,14 @@
 {
-  "id": "18fe6e78b00df38d6a83026222c072d14cfbd0eda2116fcfd5d259a31387145e",
-  "version": "0.9.0-dev.52",
+  "id": "b044814959b4df3259c2b9f7186e58dcbb6a22f1b3571f390acf7e99865a2ec4",
+  "version": "0.9.0-dev.54",
   "channel": "dev",
-  "sourceCommit": "51a00b3da3861bd3a90f5bd354cdb4b5fa73ca13",
-  "sourceTimestamp": 1794501773,
+  "sourceCommit": "bb5d04cd0275fe43e3aa31d0b104a97fb01418ec",
+  "sourceTimestamp": 1794554668,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "发布 0.9.0：任务执行布局与跨日归属修复"
+      "角色侠客配置标明苍生铸世赛季，纳入新增侠客何其鲜并标注赛季来源；账号角色分析同级新增生活技艺分析，按技艺查看专精、未专精、待补与等级分布，点击分布可搜索、分页查看角色及编辑档案，区分未知和零等级，沿用模块独立范围。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 321238,
-      "sha256": "03f5a4263c16f4be40804f1a6919563f7a3f9d67441cc1dc998c6f5948673d32"
+      "bytes": 322709,
+      "sha256": "ea274c41e903ebd5a708d0a7fb54c23fdf9d8dcaa046fc1346b4a924c49217cb"
     },
     {
       "name": "themes.js",
@@ -144,8 +144,8 @@
     },
     {
       "name": "catalog.js",
-      "bytes": 5109,
-      "sha256": "abdfa827d823a5a0826a7eeae5d58c655e0d7eca5c661e5ed949fd0a3a48164a"
+      "bytes": 5541,
+      "sha256": "e9f87929bdddfc877490c91ec4622598019fd1b515457f8b215edf22afe0545d"
     },
     {
       "name": "raid-catalog.js",
@@ -154,8 +154,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 200393,
-      "sha256": "894545cb43db8c9c7a259b4a15638a1a3834cd3754c6d511e4a28e3e7e9cd420"
+      "bytes": 201347,
+      "sha256": "554104063e218b9ee9b3f048041e498f96fe079a1c7a2dbfb48984bd196df75f"
     },
     {
       "name": "operations.js",
@@ -179,8 +179,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 43086,
-      "sha256": "1c94826db1e9d7c8b7a279d26390e8c1f21f4ca8afeaf25b524ac7e7f44c4fc6"
+      "bytes": 44248,
+      "sha256": "280473cb102045b26416ef252dd2c8fb0f55f6c240efd79853e40f559690f1fa"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 743687,
-      "sha256": "4a14ab91f400b71beb68e404ab5b84e97105839a674756b351eef443073da607"
+      "bytes": 749900,
+      "sha256": "fe6e2d1ec6b20f031a42756d5c9e3ded896d5f27f20dc9899f7fe991443001fc"
     },
     {
       "name": "version.js",
-      "bytes": 366,
-      "sha256": "526f2a4dd3a587562cf8054da4b2ec1a1d15eebe39228d9da2db8ec278e4811d"
+      "bytes": 633,
+      "sha256": "97b4103951f52750abc1eecade56f45c8f217f21809d3f72ddbf2e61848a9482"
     }
   ]
 }
