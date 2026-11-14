@@ -49,3 +49,22 @@ for(const [period,resetDays,planned,expected]of [
  const deadline=M.planExecutionDeadline(s,p,t);assert.equal(Date.parse(deadline),Date.parse(expected));assert(M.planExecutionValid(s,p,t,new Date(Date.parse(deadline)-1).toISOString()));assert(!M.planExecutionValid(s,p,t,deadline));
 }
 console.log('PASS displayed CD deadline equals daily/weekly/multiple-reset eligibility boundary, including before-reset starts');
+
+// Fixed membership is exclusive across capacities; temporary templates never reserve it.
+{const teams=M.blank();teams.accounts=[{id:'a0',enabled:true},{id:'a1',enabled:true}];teams.roles=[{id:'r0',accountId:'a0',enabled:true},{id:'r1',accountId:'a1',enabled:true}];const save=input=>D.saveTeamTemplate(teams,{name:'测试队伍',raidSize:5,batches:[['r0']],...input});
+ const fixed=save({});assert.equal(fixed.teamKind,'fixed');delete fixed.teamKind;
+ const sibling={...teams.roles[0],id:'sibling'};teams.roles.push(sibling);
+ const before=JSON.stringify(teams.notes);
+ assert.throws(()=>save({raidSize:10,batches:[['r0']]}),/固定队伍/);
+ assert.throws(()=>save({raidSize:25,batches:[['sibling']]}),/固定队伍/);
+ assert.equal(JSON.stringify(teams.notes),before);
+ const temporary=save({teamKind:'temporary',batches:[['r0','sibling']]});assert.equal(temporary.teamKind,'temporary');
+ assert.throws(()=>save({id:temporary.id,teamKind:'fixed'}),/固定队伍/);assert.equal(temporary.teamKind,'temporary');
+ save({id:fixed.id,name:'重命名'});assert.equal(fixed.name,'重命名');
+ fixed.deletedAt='2026-11-14T00:00:00Z';save({batches:[['sibling']]});
+ assert.throws(()=>save({teamKind:'other'}),/请选择/);
+ assert.throws(()=>save({teamKind:'fixed',batches:[['r1'],['r1']]}),/重复/);
+ assert.throws(()=>save({teamKind:'temporary',batches:[['missing']]}),/未创建/);
+ assert.equal(JSON.parse(JSON.stringify(teams)).notes.find(n=>n.id===temporary.id).teamKind,'temporary');
+}
+console.log('PASS fixed/temporary team templates: account/role exclusion across capacities, legacy defaults, temporary sharing, atomic rejection, deleted teams and persistence');
