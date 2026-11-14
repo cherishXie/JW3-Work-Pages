@@ -1,14 +1,14 @@
 {
-  "id": "f5ef67303f6a93cac23d7585361898838a82ee33f693524f35530d8998da3fb7",
-  "version": "0.9.0-dev.55",
+  "id": "4736f892f3cdfcc96883759a9f79922fd6ed73f01b906de240b8edb60ecb7586",
+  "version": "0.9.0-dev.56",
   "channel": "dev",
-  "sourceCommit": "deb19b8d6c19b006259fbff111cd98d0675889ea",
-  "sourceTimestamp": 1794632432,
+  "sourceCommit": "ab0571439187532c82dc38614d5359c62b530414",
+  "sourceTimestamp": 1794634368,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "大战自动分批先尽量沿用相邻批次账号、减少重新登录与角色切换，再组合当前赛季可核实的门派增益和输出协同，远近战比例降为末级参考；同类效果去重、阵法只选一个，条件奇穴以低权重潜力参考，阵容复核可查看提供者、受益角色与版本依据；保留职责、共战、账号互斥、区服、固定成员和原有历史排程。"
+      "大战分批规则支持拖拽、键盘与上下移动排序，默认依次为账号连续使用、门派增益与 DPS 协同、T 分散、装分均衡、远近战均衡；可恢复默认并记住偏好，生成与复核使用相同顺序，已保存排程保留当时规则；账号互斥、资格、CD、区服、职责及共战等约束始终校验。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 322843,
-      "sha256": "7194c9a4800f38d7e25aeb92caa5bb09e88a49a0f0c2444203e869c1840ea573"
+      "bytes": 324425,
+      "sha256": "554464503e96a25f96842bf11d8637267310bc6ac271aabd8f84f1f67c421ef8"
     },
     {
       "name": "themes.js",
@@ -154,8 +154,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 203617,
-      "sha256": "850e7a9b00ee05e71d594a23ebbe90f83d0ce804c52f26d08fdfc75e211b4c0b"
+      "bytes": 205737,
+      "sha256": "8e9f098d2f545c4d85dcb14b45771aba24c6d2f798974773eb2ebf198ed8947a"
     },
     {
       "name": "operations.js",
@@ -179,8 +179,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 48586,
-      "sha256": "9636f97cf09ad182c21683a76e0cc00037ff768c9d3ff30bdcc2a1d72fb3eb96"
+      "bytes": 51043,
+      "sha256": "0a6aaedf54b8401d96fa0ba636c619a584feb90592f179c2202a0e726061401b"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 751602,
-      "sha256": "30121f1bac3f6ba06234913c7684fd5838c5d52cb8da480985ff2ada5fad3958"
+      "bytes": 757970,
+      "sha256": "8f9ee57563f7934ea20f1a7678c14bdba0b0c37032f769624f15fe2a1ef93829"
     },
     {
       "name": "version.js",
-      "bytes": 729,
-      "sha256": "02a858176f9d389772d3c1493deee37fe2d7b26ec4693276b288428295069645"
+      "bytes": 666,
+      "sha256": "296a331b0804abb1ae15c49bf6cac636335e966f3b9982ec8a24496589fe9c86"
     }
   ]
 }
