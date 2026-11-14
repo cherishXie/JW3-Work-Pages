@@ -1,14 +1,14 @@
 {
-  "id": "7a4837e6bfef014d8a76ec2826539ae6a95250ac65a63e4e0f7135338f463101",
-  "version": "0.9.0-dev.59",
+  "id": "a47ab15f4f424f0dc9b44f9d2c76d53978402ab4e803fa59d97bfead7536c40c",
+  "version": "0.10.0-dev.60",
   "channel": "dev",
-  "sourceCommit": "01eaa1c80f942715f357b21cc3e56353973f36e8",
-  "sourceTimestamp": 1794636681,
+  "sourceCommit": "7bc6e3baafddfb46012926d73e741816f176dd72",
+  "sourceTimestamp": 1794636983,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "修复新建或编辑自定义队伍后任务安排列表未立即显示的问题：保存成功后同步队伍性质、人数与所在分页，清除旧搜索条件并刷新列表，可直接应用到当前任务与副本。"
+      "发布 0.10.0：队伍分类、任务安排与大战分批优化"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 537,
-      "sha256": "7cbbc12f02ebe000df8ea1e2f4316532dfd0bef3008cfa1ad3b8a35b98cb32b1"
+      "bytes": 377,
+      "sha256": "49ecbc9933a030542fdfda8fa0fa7157d48478620407254f1924f2dcb7bc106c"
     }
   ]
 }
