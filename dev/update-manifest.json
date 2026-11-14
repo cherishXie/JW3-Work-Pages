@@ -1,14 +1,14 @@
 {
-  "id": "57d1d35cc6c78d3e17019cca48ba90c1a8e36994b0f95827676f84b1e256c937",
-  "version": "0.9.0-dev.57",
+  "id": "0b0b97aae7a32e2964aae56b44f123fbab0d3d2d7478c92163232b97247d83c2",
+  "version": "0.9.0-dev.58",
   "channel": "dev",
-  "sourceCommit": "b0102d18de4aacd60fee562c7d2196e0c311f7ab",
-  "sourceTimestamp": 1794635508,
+  "sourceCommit": "d1303bbd1bff7bd41e3392592b6bab27f48aaffa",
+  "sourceTimestamp": 1794635755,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "自定义队伍分为固定与临时两类：固定队伍跨人数检查账号与角色占用，临时队伍允许复用；旧队伍按固定队伍保留，实际排程仍检查同队登录、资格、区服、职责和 CD。任务安排压缩顶部与操作区，已确认信息默认折叠，宽屏并排展示副本池与路线、队伍筛选与列表，保留四步流程及选择。"
+      "test: cover fixed membership and temporary team reuse"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 699,
-      "sha256": "6967ec610d12583b0eb27a4c0ffe5410fc4d219b46be3befa6100cadccb81131"
+      "bytes": 365,
+      "sha256": "9d05ce1b84e2c07a56d51c878fd147a92e95599c671dbef6ce3de62898acddc1"
     }
   ]
 }
