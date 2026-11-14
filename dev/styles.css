@@ -1614,3 +1614,5 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
 .life-level{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px;text-align:left;font-size:12px}
 .life-role{min-width:0}.life-role .pill{justify-self:start}.life-analysis b{font-variant-numeric:tabular-nums}
 @media(max-width:767px){.life-analysis-grid{grid-template-columns:minmax(0,1fr)}}
+
+.tc-party-synergy{font-size:12px}.tc-party-synergy>.stack{gap:6px;padding:6px 0}.tc-party-synergy p{margin:0;overflow-wrap:anywhere}

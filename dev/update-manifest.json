@@ -1,14 +1,14 @@
 {
-  "id": "b044814959b4df3259c2b9f7186e58dcbb6a22f1b3571f390acf7e99865a2ec4",
-  "version": "0.9.0-dev.54",
+  "id": "f5ef67303f6a93cac23d7585361898838a82ee33f693524f35530d8998da3fb7",
+  "version": "0.9.0-dev.55",
   "channel": "dev",
-  "sourceCommit": "bb5d04cd0275fe43e3aa31d0b104a97fb01418ec",
-  "sourceTimestamp": 1794554668,
+  "sourceCommit": "deb19b8d6c19b006259fbff111cd98d0675889ea",
+  "sourceTimestamp": 1794632432,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "角色侠客配置标明苍生铸世赛季，纳入新增侠客何其鲜并标注赛季来源；账号角色分析同级新增生活技艺分析，按技艺查看专精、未专精、待补与等级分布，点击分布可搜索、分页查看角色及编辑档案，区分未知和零等级，沿用模块独立范围。"
+      "大战自动分批先尽量沿用相邻批次账号、减少重新登录与角色切换，再组合当前赛季可核实的门派增益和输出协同，远近战比例降为末级参考；同类效果去重、阵法只选一个，条件奇穴以低权重潜力参考，阵容复核可查看提供者、受益角色与版本依据；保留职责、共战、账号互斥、区服、固定成员和原有历史排程。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 322709,
-      "sha256": "ea274c41e903ebd5a708d0a7fb54c23fdf9d8dcaa046fc1346b4a924c49217cb"
+      "bytes": 322843,
+      "sha256": "7194c9a4800f38d7e25aeb92caa5bb09e88a49a0f0c2444203e869c1840ea573"
     },
     {
       "name": "themes.js",
@@ -144,8 +144,8 @@
     },
     {
       "name": "catalog.js",
-      "bytes": 5541,
-      "sha256": "e9f87929bdddfc877490c91ec4622598019fd1b515457f8b215edf22afe0545d"
+      "bytes": 10552,
+      "sha256": "f3ddfc8ecb06d4eb74f102e1dde8faa3221eaec4fff3d31fe4eecd3c98cc3166"
     },
     {
       "name": "raid-catalog.js",
@@ -154,8 +154,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 201347,
-      "sha256": "554104063e218b9ee9b3f048041e498f96fe079a1c7a2dbfb48984bd196df75f"
+      "bytes": 203617,
+      "sha256": "850e7a9b00ee05e71d594a23ebbe90f83d0ce804c52f26d08fdfc75e211b4c0b"
     },
     {
       "name": "operations.js",
@@ -179,8 +179,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 44248,
-      "sha256": "280473cb102045b26416ef252dd2c8fb0f55f6c240efd79853e40f559690f1fa"
+      "bytes": 48586,
+      "sha256": "9636f97cf09ad182c21683a76e0cc00037ff768c9d3ff30bdcc2a1d72fb3eb96"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 749900,
-      "sha256": "fe6e2d1ec6b20f031a42756d5c9e3ded896d5f27f20dc9899f7fe991443001fc"
+      "bytes": 751602,
+      "sha256": "30121f1bac3f6ba06234913c7684fd5838c5d52cb8da480985ff2ada5fad3958"
     },
     {
       "name": "version.js",
-      "bytes": 633,
-      "sha256": "97b4103951f52750abc1eecade56f45c8f217f21809d3f72ddbf2e61848a9482"
+      "bytes": 729,
+      "sha256": "02a858176f9d389772d3c1493deee37fe2d7b26ec4693276b288428295069645"
     }
   ]
 }
