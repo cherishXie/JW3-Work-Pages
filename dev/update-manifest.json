@@ -1,14 +1,14 @@
 {
-  "id": "4736f892f3cdfcc96883759a9f79922fd6ed73f01b906de240b8edb60ecb7586",
-  "version": "0.9.0-dev.56",
+  "id": "57d1d35cc6c78d3e17019cca48ba90c1a8e36994b0f95827676f84b1e256c937",
+  "version": "0.9.0-dev.57",
   "channel": "dev",
-  "sourceCommit": "ab0571439187532c82dc38614d5359c62b530414",
-  "sourceTimestamp": 1794634368,
+  "sourceCommit": "b0102d18de4aacd60fee562c7d2196e0c311f7ab",
+  "sourceTimestamp": 1794635508,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "大战分批规则支持拖拽、键盘与上下移动排序，默认依次为账号连续使用、门派增益与 DPS 协同、T 分散、装分均衡、远近战均衡；可恢复默认并记住偏好，生成与复核使用相同顺序，已保存排程保留当时规则；账号互斥、资格、CD、区服、职责及共战等约束始终校验。"
+      "自定义队伍分为固定与临时两类：固定队伍跨人数检查账号与角色占用，临时队伍允许复用；旧队伍按固定队伍保留，实际排程仍检查同队登录、资格、区服、职责和 CD。任务安排压缩顶部与操作区，已确认信息默认折叠，宽屏并排展示副本池与路线、队伍筛选与列表，保留四步流程及选择。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 324425,
-      "sha256": "554464503e96a25f96842bf11d8637267310bc6ac271aabd8f84f1f67c421ef8"
+      "bytes": 328626,
+      "sha256": "a1d5e1e4ad55217168684f123e3b011f179a64ed6d371e730ff005b08ebec003"
     },
     {
       "name": "themes.js",
@@ -189,8 +189,8 @@
     },
     {
       "name": "daily.js",
-      "bytes": 57187,
-      "sha256": "9fe7ca3b6d729e37d14910d8b5a52332f683bd22fc70707ee955ba15d962f1c9"
+      "bytes": 57531,
+      "sha256": "322632c06431cda735e9d04571193a112a0fe66426a2128790ea6b88512ab026"
     },
     {
       "name": "execution.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 757970,
-      "sha256": "8f9ee57563f7934ea20f1a7678c14bdba0b0c37032f769624f15fe2a1ef93829"
+      "bytes": 759899,
+      "sha256": "528a14f68db0453d67deef428b7ff8a3ace5296b4a88182c9e6803ecba2f4c9b"
     },
     {
       "name": "version.js",
-      "bytes": 666,
-      "sha256": "296a331b0804abb1ae15c49bf6cac636335e966f3b9982ec8a24496589fe9c86"
+      "bytes": 699,
+      "sha256": "6967ec610d12583b0eb27a4c0ffe5410fc4d219b46be3befa6100cadccb81131"
     }
   ]
 }
