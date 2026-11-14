@@ -1,14 +1,14 @@
 {
-  "id": "0b0b97aae7a32e2964aae56b44f123fbab0d3d2d7478c92163232b97247d83c2",
-  "version": "0.9.0-dev.58",
+  "id": "7a4837e6bfef014d8a76ec2826539ae6a95250ac65a63e4e0f7135338f463101",
+  "version": "0.9.0-dev.59",
   "channel": "dev",
-  "sourceCommit": "d1303bbd1bff7bd41e3392592b6bab27f48aaffa",
-  "sourceTimestamp": 1794635755,
+  "sourceCommit": "01eaa1c80f942715f357b21cc3e56353973f36e8",
+  "sourceTimestamp": 1794636681,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "test: cover fixed membership and temporary team reuse"
+      "修复新建或编辑自定义队伍后任务安排列表未立即显示的问题：保存成功后同步队伍性质、人数与所在分页，清除旧搜索条件并刷新列表，可直接应用到当前任务与副本。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 759899,
-      "sha256": "528a14f68db0453d67deef428b7ff8a3ace5296b4a88182c9e6803ecba2f4c9b"
+      "bytes": 760481,
+      "sha256": "b754eb87795439eb83211a9f616638fb3f0bddd98b112fe9c52845d939ab03e4"
     },
     {
       "name": "version.js",
-      "bytes": 365,
-      "sha256": "9d05ce1b84e2c07a56d51c878fd147a92e95599c671dbef6ce3de62898acddc1"
+      "bytes": 537,
+      "sha256": "7cbbc12f02ebe000df8ea1e2f4316532dfd0bef3008cfa1ad3b8a35b98cb32b1"
     }
   ]
 }
