@@ -1598,3 +1598,77 @@ body:has(.planning-wizard:not([data-stage="kind"])) .task-content{flex:1;min-hei
  .execution-browser-head,.execution-plans>.execution-pager,.execution-batches>h3,.execution-batches>input,.execution-batches>.execution-pager{flex:none}
  .execution-status{grid-template-columns:repeat(2,minmax(0,1fr))}.execution-pager{gap:3px}.execution-pager button{padding:5px 4px}
 }
+
+/* Life skills share the directory scope and theme tokens. */
+.life-analysis{display:grid;gap:12px;padding:12px}
+.life-analysis h2{font-size:16px;margin:0}.life-analysis h3{font-size:14px;margin:0}.life-analysis small{font-size:12px;color:var(--wb-text-secondary)}
+.life-analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.life-analysis-skill{min-width:0;display:grid;gap:8px;padding:10px;border:0.5px solid var(--wb-border);border-radius:8px}
+.life-analysis-skill.is-selected{border-color:var(--wb-primary)}
+.life-specialization{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.life-count{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px;min-width:0;text-align:left;font-size:12px}
+.life-count .roster-track,.life-level .roster-track{grid-column:1/-1;width:100%}
+.life-level-summary{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;text-align:left}
+.life-drilldown{display:grid;gap:8px;min-width:0;scroll-margin-top:12px}
+.life-level-distribution{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:6px;max-height:210px;overflow:auto;padding:2px}
+.life-level{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px;text-align:left;font-size:12px}
+.life-role{min-width:0}.life-role .pill{justify-self:start}.life-analysis b{font-variant-numeric:tabular-nums}
+@media(max-width:767px){.life-analysis-grid{grid-template-columns:minmax(0,1fr)}}
+
+.tc-party-synergy{font-size:12px}.tc-party-synergy>.stack{gap:6px;padding:6px 0}.tc-party-synergy p{margin:0;overflow-wrap:anywhere}
+
+.daily-priorities{margin-top:10px}.daily-priorities h3,.daily-priorities p{margin:0}.daily-priorities>.panel-sub{margin-top:6px}.daily-priority-list{list-style:none;padding:0;margin:6px 0;display:grid;gap:6px}.daily-priority-list li{display:flex;align-items:center;gap:8px;padding:6px 8px;border:.5px solid var(--wb-border);border-radius:6px;background:var(--wb-panel)}.daily-priority-list li>span{flex:1;min-width:0}.daily-priority-list strong{font-size:14px}.daily-priority-list small{display:block;font-size:12px;color:var(--wb-text-secondary);line-height:1.4}.daily-priority-list li>b{font-variant-numeric:tabular-nums;min-width:12px}.daily-priority-list button{min-height:40px;min-width:40px;padding:4px}.daily-priority-handle{touch-action:none;cursor:grab;flex-shrink:0}.daily-priority-handle:active{cursor:grabbing}.daily-priority-list li.daily-priority-target{border-color:var(--wb-primary-label);outline:.5px solid var(--wb-primary-label)}.daily-priority-list .flex{gap:4px;flex-shrink:0}@media(max-width:600px){.daily-priority-list li{gap:6px;padding:6px}.daily-priority-list button{min-width:40px;min-height:40px}}
+
+.wizard-daily-config:has(.daily-priorities){display:grid;grid-template-columns:minmax(260px,.8fr) minmax(390px,1.2fr);gap:12px;align-items:start}.wizard-daily-config:has(.daily-priorities) .raid-mode-picker{margin-top:0}.wizard-daily-config .daily-priorities{margin-top:0}.daily-auto-basics{display:grid;gap:8px}.daily-auto-basics>button{justify-self:start}@media(max-width:1100px){.wizard-daily-config:has(.daily-priorities){grid-template-columns:1fr}}
+
+/* Planning prioritizes the task pool and teams over repeated context. */
+body:has(.planning-wizard) .tc-heading{display:none}
+body:has(.planning-wizard) .tc-command{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+body:has(.planning-wizard) .tc-command-top{flex:1;min-width:0;padding:6px 10px}
+body:has(.planning-wizard) .tc-command-filters{padding:6px 10px;border:0}
+body:has(.planning-wizard) .workspace>.footer{padding:2px 10px;gap:6px;margin-top:4px;font-size:12px}
+body:has(.planning-wizard) .workspace>.footer #app-version{flex-basis:auto}
+body:has(.planning-wizard) .workspace>.footer #update-check{min-height:24px;padding:2px 6px}
+.planning-wizard .wizard-progress{min-height:36px;padding:0 0 4px;gap:6px}
+.planning-wizard .wizard-progress>button{display:flex;gap:6px;padding:4px 6px;min-height:32px}
+.planning-wizard .wizard-progress>button>b{width:20px;height:20px}
+.planning-wizard .wizard-confirmed{display:block;padding:0;background:transparent;border:0;border-radius:0;margin-bottom:6px}
+.planning-wizard .wizard-confirmed>summary{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;cursor:pointer;padding:4px 0;font-size:12px;color:var(--wb-text-secondary)}
+.planning-wizard .wizard-confirmed>summary>span{color:var(--wb-primary-label)}
+.planning-wizard .wizard-confirmed[open]>summary{margin-bottom:6px}
+.planning-wizard .wizard-confirmed-route{margin-top:6px}
+.planning-wizard .wizard-actions{padding:6px 8px;flex-wrap:nowrap;align-items:center}
+.planning-wizard .tc-plan-action-context{width:auto;max-width:none;flex:1;min-width:0;font-size:12px}
+.planning-wizard .tc-plan-action-context>summary{cursor:pointer;color:var(--wb-text-secondary);padding:6px 0}
+.planning-wizard .tc-plan-action-context[open]>b,.planning-wizard .tc-plan-action-context[open]>small{display:block;overflow-wrap:anywhere}
+.planning-wizard .wizard-actions>.flex{width:auto;min-width:0;margin-left:auto}
+.planning-wizard .wizard-step-content h2{margin-bottom:6px}
+.planning-wizard .raid-library{margin-top:6px}
+.planning-wizard .library-search{margin-top:6px}
+@media(min-width:1000px){
+ .planning-wizard .raid-route-picker{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.4fr);column-gap:12px;align-items:start}
+ .planning-wizard .raid-route-picker>.guide-categories,.planning-wizard .raid-route-picker>.flex,.planning-wizard .raid-route-picker>.raid-choice-cards,.planning-wizard .raid-route-picker>.planning-search-status{grid-column:1}
+ .planning-wizard .raid-route-picker>.route-selection{grid-column:2;grid-row:1/5;margin:0;padding-left:12px;border-left:.5px solid var(--wb-border);min-width:0}
+ .planning-wizard .raid-route-picker .route-order>li{flex-wrap:wrap}
+ .planning-wizard .raid-route-picker .route-order>li>.flex{margin-left:auto}
+ .planning-wizard .raid-library{display:grid;grid-template-columns:210px minmax(0,1fr);column-gap:12px;align-items:start}
+ .planning-wizard .raid-library>.flex,.planning-wizard .raid-library>.library-search{grid-column:1;margin-top:0;margin-bottom:8px}
+ .planning-wizard .raid-library>.raid-library-grid{grid-column:2;grid-row:1/6;margin:0}
+ .planning-wizard .raid-library>.directory-pager{grid-column:2}
+}
+@media(max-width:600px){
+ body:has(.planning-wizard) .tc-command-top{padding:6px;gap:4px;flex-wrap:nowrap}
+ body:has(.planning-wizard) .tc-command-top>.tabs{width:auto;flex:1;min-width:0}
+ body:has(.planning-wizard) .tc-command-top>.flex{width:auto}
+ body:has(.planning-wizard) .tc-command-top>.tabs button{padding:6px;font-size:12px;min-height:32px}
+ body:has(.planning-wizard) .tc-command-filters{padding:0 6px 6px;width:100%}
+ .planning-wizard .wizard-progress>button{flex-wrap:wrap;gap:3px;padding:4px 2px}
+ .planning-wizard .wizard-actions{gap:6px}
+ .planning-wizard .wizard-actions>.flex{gap:4px}
+}
+@media(max-width:600px){
+ .planning-wizard .raid-library{display:grid;grid-template-columns:1fr;gap:6px}
+ .planning-wizard .raid-library>.flex,.planning-wizard .raid-library>.library-search,.planning-wizard .raid-library>.raid-library-grid{margin:0}
+ .planning-wizard .raid-library>.flex{gap:6px}
+ .planning-wizard .raid-library>.flex>button{padding:6px 10px;min-height:34px}
+}
