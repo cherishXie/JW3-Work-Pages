@@ -308,13 +308,37 @@
     const known=players.filter(r=>Number.isFinite(r.score)&&r.score>0),profiles=players.map(r=>Catalog.profile(r)),dps=profiles.filter(p=>p.duty==='dps');
     return {averageScore:known.length?known.reduce((n,r)=>n+r.score,0)/known.length:null,knownScores:known.length,unknownScores:players.length-known.length,melee:dps.filter(p=>p.range==='melee').length,ranged:dps.filter(p=>p.range==='ranged').length,unknownRange:dps.filter(p=>!['melee','ranged'].includes(p.range)).length};
   }
-  // Spread player tanks before score/range balance; retain feasibility and gongzhan coverage.
+  function dailyPartySynergy(players,weights=new Map()){
+    if(Catalog.teamBuffSeason!==LEVEL_SEASON)return {score:0,effects:[],formation:null,season:Catalog.teamBuffSeason,checkedAt:Catalog.teamBuffCheckedAt,unknown:players.length};
+    const available=players.filter(r=>r.enabled!==false&&r.creationStatus!=='planned'&&Catalog.profile(r).verified),dps=available.filter(r=>Catalog.profile(r).duty==='dps'),families=new Map(),effects=[];
+    const fits=(r,type)=>Catalog.damageType(r)!=='unknown'&&(type==='all'||Catalog.damageType(r)===type);
+    for(const buff of Catalog.teamBuffCatalog){
+      const providers=available.filter(r=>buff.stances.includes(r.stance));if(!providers.length)continue;
+      // Conditional talents are potential only. Missing build/range/uptime data must
+      // never become a claimed DPS percentage or a hard feasibility requirement.
+      const recipients=dps.filter(r=>fits(r,buff.damage)&&providers.some(p=>p.id!==r.id));
+      if(!recipients.length)continue;
+      const points=buff.condition ? 0.25 : 1;
+      for(const r of recipients){const key=buff.family+'|'+r.id;families.set(key,Math.max(families.get(key)||0,points*(weights.get(r.id)??1)));}
+      effects.push({...buff,providerIds:providers.map(r=>r.id),recipientIds:recipients.map(r=>r.id),potential:!!buff.condition});
+    }
+    // Exactly one formation per party; fifth/sixth-layer self benefits are excluded.
+    let formation=null,formationScore=0;
+    for(const r of available){const entry=Catalog.dailyFormations.find(x=>x.stance===r.stance);if(!entry)continue;const recipients=dps.filter(x=>x.id!==r.id&&fits(x,entry.damage)),score=recipients.reduce((n,x)=>n+(weights.get(x.id)??1),0);
+      if(score>formationScore){formationScore=score;formation={...entry,providerId:r.id,recipientIds:recipients.map(x=>x.id)};}
+    }
+    return {score:[...families.values()].reduce((a,b)=>a+b,0)+formationScore,effects,formation,season:Catalog.teamBuffSeason,checkedAt:Catalog.teamBuffCheckedAt,unknown:dps.filter(r=>Catalog.damageType(r)==='unknown').length};
+  }
+  // Adjacent account reuse dominates soft tank distribution, DPS synergy and range balance.
+
   function balanceDailyParties(input,rebuild,locked=[]){
     if(input.length<2)return input;
-    let parties=input,budget=batchSwitchCost(input.map(p=>p.players));
+    let parties=input;
     const groups=new Map();for(const r of input.flatMap(p=>p.players)){const key=r.server;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
     const targets=new Map([...groups].map(([key,players])=>[key,{...partyStats(players),size:players.length}]));
-    const score=ps=>{const tanks=ps.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),tankOverflow=tanks.reduce((n,v)=>n+Math.max(0,v-1),0),tankVariance=tanks.reduce((n,v)=>n+v*v,0);let range=0,unknown=0,gear=0;for(const p of ps){const a=partyStats(p.players),t=targets.get(p.players[0]?.server),dps=a.melee+a.ranged,total=t.melee+t.ranged;if(total)range+=(a.melee-dps*t.melee/total)**2;unknown+=(a.unknownScores-p.players.length*t.unknownScores/t.size)**2;if(a.averageScore!==null&&t.averageScore)gear+=((a.averageScore-t.averageScore)/t.averageScore)**2;}return [tankOverflow,tankVariance,range,unknown,gear];};
+    const all=input.flatMap(p=>p.players),basis=raidPowerBasis(all),peak=Math.max(1,...all.map(r=>roleOutputPower(r,basis))),weights=new Map(all.map(r=>[r.id,1+roleOutputPower(r,basis)/peak])),synergyCache=new Map();
+    const synergy=players=>{const key=JSON.stringify(players.map(r=>r.id).sort());if(!synergyCache.has(key))synergyCache.set(key,dailyPartySynergy(players,weights).score);return synergyCache.get(key);};
+    const score=ps=>{const tanks=ps.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),tankOverflow=tanks.reduce((n,v)=>n+Math.max(0,v-1),0),tankVariance=tanks.reduce((n,v)=>n+v*v,0);let range=0,unknown=0,gear=0;for(const p of ps){const a=partyStats(p.players),t=targets.get(p.players[0]?.server),dps=a.melee+a.ranged,total=t.melee+t.ranged;if(total)range+=(a.melee-dps*t.melee/total)**2;unknown+=(a.unknownScores-p.players.length*t.unknownScores/t.size)**2;if(a.averageScore!==null&&t.averageScore)gear+=((a.averageScore-t.averageScore)/t.averageScore)**2;}const switching=batchSwitchCost(ps.map(p=>p.players));return [switching.logins,switching.switches,tankOverflow,tankVariance,-ps.reduce((n,p)=>n+synergy(p.players),0),unknown,gear,range];};
     const better=(a,b)=>{for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-10)return a[i]<b[i];}return false;};
     let current=score(parties),attempts=0;
     for(let pass=0;pass<12&&attempts<20000;pass++){
@@ -327,11 +351,11 @@
           if(new Set(left.map(r=>r.accountId)).size!==left.length||new Set(right.map(r=>r.accountId)).size!==right.length)continue;
           next[i]={...parties[i],players:left};next[j]={...parties[j],players:right};
           if(!locked.every(id=>next[0].players.some(r=>r.id===id)))continue;
-          const candidate=score(next);if(!better(candidate,bestScore)||next.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)continue;const tankImproved=candidate[0]<current[0]||candidate[0]===current[0]&&candidate[1]<current[1],switching=batchSwitchCost(next.map(p=>p.players));if(!tankImproved&&(switching.logins>budget.logins||switching.logins===budget.logins&&switching.switches>budget.switches))continue;
+          const candidate=score(next);if(!better(candidate,bestScore)||next.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)continue;
           const first=rebuild(next[i]),second=rebuild(next[j]);if(!first||!second)continue;next[i]=first;next[j]=second;best=next;bestScore=candidate;
         }
       }
-      if(!best)break;if(bestScore[0]<current[0]||bestScore[0]===current[0]&&bestScore[1]<current[1])budget=batchSwitchCost(best.map(p=>p.players));parties=best;current=bestScore;
+      if(!best)break;parties=best;current=bestScore;
     }
     return parties;
   }
@@ -403,7 +427,7 @@
     const source=batches.map((players,i)=>{const p={...parties[i],players};if(!hasParty||parties[i])return p;const valid=rebuild(p);if(!valid)throw new Error('原批次不满足队伍条件');return valid;});
     const spread=spreadGongzhanParties(source,p=>rebuild(p,true),locked,!hasParty&&task.type!=='team');
     let optimized=optimizeBatchSwitching(spread,{rebuild,reorder:!task.raidTeams?.length,locked});
-    if(task.partyRule==='daily5')optimized=balanceDailyParties(optimized,rebuild,locked);
+    if(task.partyRule==='daily5'){optimized=balanceDailyParties(optimized,rebuild,locked);optimized=optimizeBatchSwitching(optimized,{rebuild,reorder:!task.raidTeams?.length,locked});}
     return {batches:optimized.map(p=>p.players),parties:hasParty?optimized.map((p,i)=>({...p,teamIndex:task.raidTeams?.length?p.teamIndex:i})):[]};
   }
   function raid25Candidates(task,roles,locked=[],capacity=Infinity){
@@ -1444,5 +1468,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {lifeSkillsAnalysis,confirmMeasurements,matchedTaskComparison,executionMatrix,reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionDeadline,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {dailyPartySynergy,lifeSkillsAnalysis,confirmMeasurements,matchedTaskComparison,executionMatrix,reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionDeadline,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
