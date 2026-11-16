@@ -7,6 +7,7 @@
     "start": "npm run build:pages && node serve.cjs",
     "test": "node scripts/verify.cjs",
     "test:analytics:browser": "node scripts/analytics-interaction-qa.cjs",
+    "test:ocr:matrix": "node scripts/screenshot-matrix-qa.cjs",
     "build": "node scripts/package-html.cjs",
     "build:pages": "node scripts/prepare-ocr.cjs && node scripts/build-pages.cjs",
     "publish:pages:public": "node scripts/push-dev.cjs",
@@ -21,7 +22,9 @@
     "release:main": "node scripts/promote-main.cjs",
     "setup": "node scripts/setup-git.cjs",
     "test:updates": "node scripts/updates-verify.cjs",
-    "test:updates:browser": "node scripts/updates-browser-qa.cjs"
+    "test:updates:browser": "node scripts/updates-browser-qa.cjs",
+    "test:ocr:private": "node scripts/screenshot-private-qa.cjs",
+    "test:ui:contracts": "node scripts/ui-ux-contract-qa.cjs"
   },
   "devDependencies": {
     "electron": "45.0.0",

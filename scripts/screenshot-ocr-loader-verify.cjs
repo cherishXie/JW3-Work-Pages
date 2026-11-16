@@ -8,7 +8,7 @@ global.location={protocol:'https:'};
 global.document={
   baseURI:'https://example.test/JW3-Work-Pages/',
   createElement:()=>({width:0,height:0,getContext:()=>({
-    drawImage(){},fillRect(){},getImageData:()=>({data:new Uint8ClampedArray(4)}),putImageData(){}
+    drawImage(){},fillRect(){},createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),getImageData:()=>({data:new Uint8ClampedArray(4)}),putImageData(){}
   })})
 };
 global.createImageBitmap=async()=>({width:80,height:80,close(){closed++;}});

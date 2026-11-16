@@ -127,6 +127,11 @@
 !/recovery.js
 !/scripts/pwa-navigation-verify.cjs
 
+!/scripts/screenshot-matrix-qa.cjs
+!/scripts/screenshot-private-qa.cjs
+!/scripts/screenshot-similar-name-verify.cjs
+!/scripts/screenshot-private-qa-verify.cjs
+
 !/scripts/experience-desktop-qa.cjs
 !/scripts/roster-combat-qa.cjs
 
@@ -151,3 +156,5 @@
 !/scripts/life-skills-analysis-qa.cjs
 
 !/scripts/planning-interactions-qa.cjs
+
+!/scripts/ui-ux-contract-qa.cjs

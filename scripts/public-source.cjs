@@ -1,6 +1,7 @@
 /* Explicit public development file allowlist. Never add private inputs. */
 'use strict';
 module.exports=[
+"scripts/ui-ux-contract-qa.cjs",
 "scripts/planning-interactions-qa.cjs",
 "scripts/life-skills-analysis-qa.cjs",
 "scripts/task-execution-split-qa.cjs",
@@ -73,6 +74,10 @@ module.exports=[
   "scripts/publish-desktop-release.cjs",
   "scripts/push-dev.cjs",
   "scripts/screenshot-batch-live.cjs",
+  "scripts/screenshot-matrix-qa.cjs",
+  "scripts/screenshot-private-qa.cjs",
+  "scripts/screenshot-private-qa-verify.cjs",
+  "scripts/screenshot-similar-name-verify.cjs",
   "scripts/screenshot-ocr-loader-verify.cjs",
   "scripts/setup-git.cjs",
   "scripts/startup-verify.cjs",
