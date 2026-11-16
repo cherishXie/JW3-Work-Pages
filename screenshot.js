@@ -1,8 +1,8 @@
 /* Local-only OCR for the Mingyi character statistics table. No screenshot leaves the browser. */
 (function(root,factory){const api=factory(typeof module!=='undefined'&&module.exports?require('./model.js'):root.Workbench);if(typeof module==='object')module.exports=api;else root.WorkbenchScreenshot=api;})(typeof globalThis==='object'?globalThis:this,(M)=>{
   'use strict';
-  const fields=['name','school','gold','tongbao','level','achievement','petCount','xiaxing','weeklyXiaxing'];
-  const labels=['截图角色名','门派','金币（G）','通宝','等级','资历','宠物','侠行','侠行周'];
+  const fields=['name','school','gold','tongbao','level','achievement','petCount','xiaxing','weeklyXiaxing','prestige','chivalry','contribution'];
+  const labels=['截图角色名','门派','金币（G）','通宝','等级','资历','宠物','侠行','侠行周','威名点','侠义值','江湖贡献'];
   const numeric=fields.slice(2),clean=s=>String(s||'').normalize('NFKC').replace(/\s/g,''),base=s=>clean(s).split('@')[0];
   function editDistance(a,b){
     if(a===b)return 0;
@@ -176,7 +176,7 @@
     next.sourceArchives??=[];next.sourceArchives.push({id,name,date,format:allowReimport?'mingyi-role-screenshot-review-v1':incoming.length>1?'mingyi-role-screenshot-batch-v1':'mingyi-role-screenshot-v1',counts:{roles:changes.length,files:incoming.length,rawRows:rawRows??rows.length,duplicates:duplicates??0},files:incoming.map(f=>({name:f.name,sha256:f.sha256})),rows:changes,reviewedDigests:repeated.map(f=>f.sha256),issues:['采集时间由用户确认，截图相对快照计时不作为绝对时间。','图标金币单位需人工核对；仅更新观测余额，不计收入。',...(repeated.length?['复核已导入截图：保留原导入档案，新建更正记录；观测余额不计收入。']:[])],updatedAt:now,capturedAt});
     next.imports.push({id,name:'角色截图 · '+name,date,stats:{added:0,updated:changes.length,skipped:rows.length-changes.length,old:0}});return next;
   }
-  function lines(tsv){return tsv.split('\n').slice(1).map(l=>l.split('\t')).filter(a=>a[0]==='5'&&a[11]?.trim()).map(a=>({text:a.slice(11).join('\t').trim(),x:Number(a[6]),y:Number(a[7])+Number(a[9])/2,confidence:Number(a[10])}));}
+  function lines(tsv){return tsv.split('\n').slice(1).map(l=>l.split('\t')).filter(a=>a[0]==='5'&&a[11]?.trim()).map(a=>({text:a.slice(11).join('\t').trim(),x:Number(a[6]),y:Number(a[7])+Number(a[9])/2,width:Number(a[8]),height:Number(a[9]),confidence:Number(a[10])}));}
   // Resolve from the script's own URL, not the page route (Pages lives under /JW3-Work-Pages/).
   const scriptBase=typeof document!=='undefined'&&document.currentScript?.src||'';
   const readableError=e=>e instanceof Error&&e.message?e.message:typeof e==='string'&&e.trim()?e.trim():e&&typeof e.message==='string'&&e.message.trim()?e.message:'浏览器未提供详细错误';
@@ -225,8 +225,10 @@
       throw new Error('OCR 引擎无法启动；SIMD：'+simdError+'；兼容模式：'+readableError(e)+'。请检查 '+asset('tesseract-core-simd-lstm.wasm.js')+' 和 '+asset('tesseract-core-lstm.wasm.js')+' 是否可访问（HTTP 200），刷新后重试');
     }
   }
-  function currencySegments(pixels,w,h,cy,spacing,scale){
-    const left=Math.round(w*.185),right=Math.round(w*.38);
+  // Match explicit header names only: 侠行 is not 侠义值, and 等级 is not 资历.
+  const headerAliases={名字:'name',角色名:'name',门派:'school',金钱:'gold',金币:'gold',通宝:'tongbao',等级:'level',资历:'achievement',江湖资历:'achievement',宠物:'petCount',侠行:'xiaxing',侠行周:'weeklyXiaxing',威名:'prestige',威名点:'prestige',侠义:'chivalry',侠义值:'chivalry',江湖贡献:'contribution',江湖贡献值:'contribution'};
+  function currencySegments(pixels,w,h,cy,spacing,scale,bounds){
+    const left=Math.round(bounds?bounds[0]+scale*2:w*.185),right=Math.round(bounds?bounds[1]-scale*2:w*.38);
     const y0=Math.max(0,Math.round(cy-spacing*.4)),y1=Math.min(h,Math.round(cy+spacing*.4));
     const runs=[];
     for(let x=left;x<right;x++){
@@ -272,14 +274,54 @@
       if(!worker)worker=await createOcrWorker(progress);
       // Normalize large uploads to the reference table geometry before OCR.
       // Currency crops and OCR row spacing must share the same working scale.
-      const scale=3,workingWidth=Math.min(bitmap.width,978),workingHeight=bitmap.height*workingWidth/bitmap.width;
+      const scale=3,workingWidth=Math.min(978,bitmap.width*2),workingHeight=bitmap.height*workingWidth/bitmap.width;
       const h=Math.round(workingHeight*(bottom-top)/100)*scale,w=workingWidth*scale;
       const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,bitmap.height*top/100,bitmap.width,h/scale*bitmap.width/workingWidth,0,0,w,h);
       // Dark game UI: turn light glyphs into dark glyphs for OCR, retaining geometry.
-      const cuts=[.014,.128,.178,.398,.491,.561,.628,.708,.792,.875],columns=[];
+      let cuts=[.014,.128,.178,.398,.491,.561,.628,.708,.792,.875],columnFields=fields.slice(0,9);
+      const columns=[];let columnRights,grayName;
+      // Read the header above the selected data area before assigning any values.
+      if(top>=10){
+        progress('正在识别表头与字段位置…');
+        const header=document.createElement('canvas');header.width=w;header.height=Math.round(workingHeight*top/100*scale);
+        const hx=header.getContext('2d',{willReadFrequently:true});
+        hx.drawImage(bitmap,0,0,bitmap.width,bitmap.height*top/100,0,0,w,header.height);
+        const data=hx.getImageData(0,0,w,header.height);
+        for(let i=0;i<data.data.length;i+=4){const light=Math.max(data.data[i],data.data[i+1],data.data[i+2]),v=light>120?255-light:255;data.data[i]=data.data[i+1]=data.data[i+2]=v;}
+        hx.putImageData(data,0,0);
+        const raw=ctx.getImageData(0,0,w,h).data,ruleRuns=[];
+        for(let x=scale;x<w-scale;x++){
+          let count=0,total=0;
+          for(let y=4;y<h-4;y+=7){const k=(y*w+x)*4;if(Math.max(...[0,1,2].flatMap(c=>[raw[k+scale*4+c],raw[k-scale*4+c]]))<120&&Math.max(...[0,1,2].map(c=>Math.abs(raw[k+scale*4+c]-raw[k-scale*4+c])))>9)count++;total++;}
+          if(count/total>.65){const last=ruleRuns.at(-1);if(last&&x-last[1]<=scale*2)last[1]=x;else ruleRuns.push([x,x]);}
+        }
+        const rules=ruleRuns.map(([a,b])=>Math.round((a+b)/2));
+        if(rules.length>=5&&rules.length<=20){
+          const layout=[];
+          await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:Object.keys(headerAliases).join(''),preserve_interword_spaces:'0'});
+          const ch=Math.min(header.height,Math.round(workingHeight*.06*scale));
+          for(let i=0;i<rules.length-1;i++){
+            const c=document.createElement('canvas');c.width=rules[i+1]-rules[i]+20;c.height=ch+20;
+            const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
+            cx.drawImage(header,rules[i]+scale,header.height-ch,rules[i+1]-rules[i]-scale*2,ch,10,10,c.width-20,ch);
+            const response=await worker.recognize(c),text=clean(response.data.text);
+            const field=headerAliases[text];
+            if(field)layout.push({field,left:rules[i]/w,right:rules[i+1]/w});
+          }
+          if(['name','school','level'].every(k=>layout.some(x=>x.field===k))&&new Set(layout.map(x=>x.field)).size===layout.length){
+            columnFields=layout.map(x=>x.field);
+            // Keep each recognized cell's true bounds, including gaps from unknown headers.
+            cuts=layout.map(x=>x.left);cuts.push(layout.at(-1).right);
+            columnRights=layout.map(x=>x.right);
+          }else{
+            throw new Error('表头识别不完整，请保留清晰的名字、门派、等级与资源列标题');
+          }
+        }
+      }
+      const nameIndex=columnFields.indexOf('name'),schoolIndex=columnFields.indexOf('school'),goldIndex=columnFields.indexOf('gold'),levelIndex=columnFields.indexOf('level');
       // Color-aware name image: all colored glyphs on this UI become black text,
       // while the low-intensity blue/gray table background remains white.
-      const nameLeft=Math.round(cuts[0]*w),nameWidth=Math.round((cuts[1]-cuts[0])*w);
+      const nameLeft=Math.round(cuts[nameIndex]*w)+scale*2,nameWidth=Math.round(((columnRights?.[nameIndex]??cuts[nameIndex+1])-cuts[nameIndex])*w)-scale*4;
       const bin=document.createElement('canvas');bin.width=nameWidth;bin.height=h;
       const binCtx=bin.getContext('2d',{willReadFrequently:true});
       const binData=ctx.getImageData(nameLeft,0,nameWidth,h);
@@ -296,23 +338,44 @@
       // The regular grayscale path is preserved for numeric OCR.
       for(let i=0;i<pixels.data.length;i+=4){const light=Math.max(pixels.data[i],pixels.data[i+1],pixels.data[i+2]);const c=255-light;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=c;}
       ctx.putImageData(pixels,0,0);
-      for(let i=0;i<9;i++){
-        if(i===2){columns.push([]);continue;}
-        progress('正在识别 '+labels[i]+'（'+(i+1)+'/9）…');
-        await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:i===0?'':i===1?'霸刀七秀藏剑纯阳五毒长歌药宗衍天唐门蓬莱苍云明教天策万花少林丐帮凌雪刀宗万灵段氏无方相知北傲太玄':'0123456789',preserve_interword_spaces:'1'});
-        const c=document.createElement('canvas');c.width=Math.round((cuts[i+1]-cuts[i])*w);c.height=h;c.getContext('2d').drawImage(canvas,Math.round(cuts[i]*w),0,c.width,h,0,0,c.width,h);
-        const result=await worker.recognize(c,{}, {tsv:true});columns.push(lines(result.data.tsv||''));
+      for(let i=0;i<columnFields.length;i++){
+        if(columnFields[i]==='gold'){columns.push([]);continue;}
+        progress('正在识别 '+labels[fields.indexOf(columnFields[i])]+'（'+(i+1)+'/'+columnFields.length+'）…');
+        await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:i===nameIndex?'':i===schoolIndex?'霸刀七秀藏剑纯阳五毒长歌药宗衍天唐门蓬莱苍云明教天策万花少林丐帮凌雪刀宗万灵段氏无方相知北傲太玄':'0123456789',preserve_interword_spaces:'1'});
+        const c=document.createElement('canvas');c.width=Math.round(((columnRights?.[i]??cuts[i+1])-cuts[i])*w);c.height=h;c.getContext('2d').drawImage(canvas,Math.round(cuts[i]*w),0,c.width,h,0,0,c.width,h);
+        if(i===nameIndex){
+          grayName=c;
+          // Preserve the established name pass for the original Mingyi layout.
+          // It can recover an @ glyph clipped by the table rule; only profile-supported candidates are used.
+          if(columnFields.join(',')===fields.slice(0,9).join(',')){
+            grayName=document.createElement('canvas');grayName.width=Math.round(w*.114);grayName.height=h;
+            grayName.getContext('2d').drawImage(canvas,Math.round(w*.014),0,grayName.width,h,0,0,grayName.width,h);
+          }
+        }
+        const result=await worker.recognize(i===nameIndex?bin:c,{}, {tsv:true});columns.push(lines(result.data.tsv||''));
       }
-      const anchors=columns[4].filter(x=>/^\d{2,3}$/.test(x.text)&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
-      const spacing=anchors.length>1?Math.min(...anchors.slice(1).map((a,i)=>a.y-anchors[i].y)):h;
-      const parsed=anchors.map(a=>{const row={};for(let i=0;i<9;i++){const words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);if(i<2)row[fields[i]]=i===1?canonicalSchool(words.map(x=>x.text).join(''),roles,row.name):words.map(x=>x.text).join('').replace(/\s/g,'');else if(i===2)row.gold='';else row[fields[i]]=words.length===1&&/^\d+$/.test(words[0].text)?words[0].text:'';}row.name=clean(row.name);return row;});
+      const anchors=columns[levelIndex].filter(x=>/^\d{1,3}$/.test(x.text)&&Number(x.text)>=1&&Number(x.text)<=200);if(!anchors.length)throw new Error('未识别到等级列，请调整表格上下边界，保持完整表格列');
+      const gaps=anchors.slice(1).map((a,i)=>a.y-anchors[i].y).sort((a,b)=>a-b);
+      const spacing=gaps.length?gaps[Math.floor(gaps.length/2)]:h;
+      const parsed=anchors.map(a=>{
+        const row=Object.fromEntries(fields.map(k=>[k,'']));
+        for(let i=0;i<columnFields.length;i++){
+          const key=columnFields[i],words=columns[i].filter(x=>Math.abs(x.y-a.y)<spacing*.42).sort((a,b)=>a.x-b.x);
+          if(key==='name')row.name=clean(words.map(x=>x.text).join(''));
+          else if(key==='school')row.school=canonicalSchool(words.map(x=>x.text).join(''),roles,row.name);
+          else if(key!=='gold')row[key]=words.length===1&&/^\d+$/.test(words[0].text)&&words[0].confidence>=60?words[0].text:'';
+        }
+        return row;
+      });
       // Column segmentation occasionally drops one otherwise readable number.
-      // Retry only blank numeric cells, with padding and the row background removed.
+      // Retry missing cells and independently verify numbers from reduced-resolution sources.
       await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'0123456789',preserve_interword_spaces:'0'});
-      for(let row=0;row<parsed.length;row++)for(let col=3;col<9;col++){
-        if(parsed[row][fields[col]]!=='')continue;
-        progress('正在复核遗漏数值（'+(row+1)+'/'+parsed.length+' · '+labels[col]+'）…');
-        const left=Math.round(cuts[col]*w),width=Math.round((cuts[col+1]-cuts[col])*w),height=Math.round(spacing*.72);
+      for(let row=0;row<parsed.length;row++)for(let col=0;col<columnFields.length;col++){
+        if(!numeric.includes(columnFields[col])||columnFields[col]==='gold')continue;
+        const previous=parsed[row][columnFields[col]];
+        if(previous!==''&&bitmap.width>=978)continue;
+        progress('正在复核遗漏数值（'+(row+1)+'/'+parsed.length+' / '+labels[fields.indexOf(columnFields[col])]+'）…');
+        const left=Math.round(cuts[col]*w),width=Math.round(((columnRights?.[col]??cuts[col+1])-cuts[col])*w),height=Math.round(spacing*.72);
         const sy=Math.max(0,Math.min(h-height,Math.round(anchors[row].y-height/2)));
         const c=document.createElement('canvas');c.width=width+24;c.height=height+24;
         const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
@@ -323,12 +386,23 @@
           const v=light>120?255-light:255;patch.data[dst]=patch.data[dst+1]=patch.data[dst+2]=v;patch.data[dst+3]=255;
         }
         cx.putImageData(patch,12,12);
-        try{const result=await worker.recognize(c),text=clean(result.data.text);if(/^\d+$/.test(text))parsed[row][fields[col]]=text;}catch{ /* Leave uncertain values blank. */ }
+        try{
+          const result=await worker.recognize(c),text=clean(result.data.text);
+          const valid=/^\d+$/.test(text)&&(result.data.confidence??100)>=60&&(columnFields[col]!=='level'||Number(text)>=1&&Number(text)<=200);
+          if(valid&&(!previous||text===previous))parsed[row][columnFields[col]]=text;
+          else if(previous){
+            // A smaller source needs an independent binary check before accepting a changed digit.
+            for(let k=0;k<patch.data.length;k+=4){const v=patch.data[k]<105?0:255;patch.data[k]=patch.data[k+1]=patch.data[k+2]=v;}
+            cx.putImageData(patch,12,12);
+            const check=await worker.recognize(c),confirmed=clean(check.data.text);
+            parsed[row][columnFields[col]]=valid&&confirmed===text&&(check.data.confidence??0)>=60?text:confirmed===previous?previous:'';
+          }
+        }catch{if(bitmap.width<978)parsed[row][columnFields[col]]='';} // Preserve uncertainty for review.
       }
       // Locate currency icons in each row before OCR: their positions move with
       // the number of digits. The silver ingot has the same silhouette as the
       // gold ingot, so correlate it within the same image (no shipped template).
-      const currency=anchors.map(a=>currencySegments(originalPixels,w,h,a.y,spacing,scale));
+      const currency=anchors.map(a=>goldIndex<0?null:currencySegments(originalPixels,w,h,a.y,spacing,scale,[cuts[goldIndex]*w,(columnRights?.[goldIndex]??cuts[goldIndex+1])*w]));
       await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789',preserve_interword_spaces:'1'});
       const currencyWords=[];
       for(let unit=0;unit<4;unit++){
@@ -356,14 +430,14 @@
         if(nums.every(x=>/^\d+$/.test(x))&&Number(nums[1])<10000&&Number(nums[2])<100&&Number(nums[3])<100)
           parsed[i].gold=String((Number(nums[0])*100000000+Number(nums[1])*10000+Number(nums[2])*100+Number(nums[3]))/10000);
       }
-      // A second whole-column OCR pass uses the color-aware binary image.
+      // Compare the color-aware first pass with an independent grayscale pass.
       // Compare both passes with the WORKBENCH character names (never use a
       // raw OCR guess to rename a stored role).
       if(roles.length){
         progress('正在用角色档案校对彩色角色名…');
         await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
         try{
-          const nameResult=await worker.recognize(bin,{}, {tsv:true});
+          const nameResult=await worker.recognize(grayName,{}, {tsv:true});
           const alternatives=lines(nameResult.data.tsv||'');
           for(let i=0;i<parsed.length;i++){
             const a=anchors[i],text=alternatives.filter(x=>Math.abs(x.y-a.y)<spacing*.42)
