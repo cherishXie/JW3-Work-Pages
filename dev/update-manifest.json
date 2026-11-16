@@ -1,14 +1,14 @@
 {
-  "id": "a47ab15f4f424f0dc9b44f9d2c76d53978402ab4e803fa59d97bfead7536c40c",
-  "version": "0.10.0-dev.60",
+  "id": "0b7c9ba632b0b3631dbb7639ed59a6a48c85fde41c3ec3e36c26488908d42479",
+  "version": "0.10.0-dev.62",
   "channel": "dev",
-  "sourceCommit": "7bc6e3baafddfb46012926d73e741816f176dd72",
-  "sourceTimestamp": 1794636983,
+  "sourceCommit": "243d73dd3225a58bbba1f73406c5a037f98f865f",
+  "sourceTimestamp": 1794791084,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "发布 0.10.0：队伍分类、任务安排与大战分批优化"
+      "修复确认任务安排后只切回日历、未展开执行列表的问题：保存成功后打开对应日期的排程并选中新方案，清除旧批次搜索与分页；适用于临时队伍、固定队伍和自动生成方案。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 760481,
-      "sha256": "b754eb87795439eb83211a9f616638fb3f0bddd98b112fe9c52845d939ab03e4"
+      "bytes": 760608,
+      "sha256": "165612a940ff3748b34daf22e81086ec8c6c0c86e76b57bf2d24c6f1203222f7"
     },
     {
       "name": "version.js",
-      "bytes": 377,
-      "sha256": "49ecbc9933a030542fdfda8fa0fa7157d48478620407254f1924f2dcb7bc106c"
+      "bytes": 547,
+      "sha256": "991c69b72a78935fb2171291e99c097347fd29ae8d0e9dd7e819135015ef8d2f"
     }
   ]
 }
