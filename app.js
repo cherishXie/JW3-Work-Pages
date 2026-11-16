@@ -1348,7 +1348,7 @@
   }
   function dailyDualTeamSettings(){
     const enabled=state.config.dailyDualTeams===true,locked=!!ui.generated?.lockedBatches?.length;
-    return `<section class="daily-dual-teams" aria-label="大战双队模式"><h3>双队同时执行</h3><div class="segmented" role="group" aria-label="大战双队开关">${[[false,'关闭'],[true,'开启 / 10 开']].map(([value,label])=>button((enabled===value?'✓ ':'')+label,'daily-dual-teams',enabled===value?'active':'',`data-value="${value}" aria-pressed="${enabled===value}" ${locked?'disabled':''}`)).join('')}</div><p class="panel-sub">记住本次选择。每队最多 5 名自有角色，两队账号互斥；不能配对的队伍单独执行。</p>${enabled&&state.config.concurrency<10?`<p class="panel-sub">当前全局并行上限 ${state.config.concurrency} 开，双队需至少 10 开。</p>${button('将全局并行上限设为 10','use-ten','small')}`:''}</section>`;
+    return `<section class="daily-dual-teams" aria-label="大战双队模式"><h3>双队同时执行</h3><div class="segmented" role="group" aria-label="大战双队开关">${[[false,'关闭'],[true,'开启 / 10 开']].map(([value,label])=>button((enabled===value?'✓ ':'')+label,'daily-dual-teams',enabled===value?'active':'',`data-value="${value}" aria-pressed="${enabled===value}" ${locked?'disabled':''}`)).join('')}</div><p class="panel-sub">记住本次选择。每队最多 5 名自有角色，两队账号互斥；不能配对的队伍单独执行。</p>${enabled&&state.config.concurrency<10?`<p class="panel-sub">当前全局并行上限 ${state.config.concurrency} 开，双队需至少 10 开。</p>${button('将全局并行上限设为 10','use-ten','small',locked?'disabled':'')}`:''}</section>`;
   }
   function dailyWaveNote(t,batches,index,config=state.config){
     if(t?.partyRule!=='daily5'||t.dailyDualTeams!==true||M.externalParty(t))return '';
@@ -2812,7 +2812,7 @@
     'custom-team-plan':b=>customTeamPlan(b.dataset.id),
     'plan-stage':b=>planningGo(b.dataset.value),
     'daily-dual-teams':b=>commit(()=>{if(ui.generated?.lockedBatches?.length)throw new Error('请先解锁候选队伍');state.config.dailyDualTeams=b.dataset.value==='true';ui.generated=null;ui.planStage='team';},'大战双队偏好已保存'),
-    'use-ten':()=>commit(()=>{state.config.concurrency=10;ui.generated=null;},'全局并行上限已设为 10'),
+    'use-ten':()=>commit(()=>{if(ui.generated?.lockedBatches?.length)throw new Error('请先解锁候选队伍');state.config.concurrency=10;ui.generated=null;},'全局并行上限已设为 10'),
     'daily-priority-reset':()=>saveDailyPriorities(M.dailyBatchPriorities()),
     'daily-priority-move':b=>moveDailyPriority(b.dataset.id,M.dailyBatchPriorities(state.config.dailyBatchPriorities).indexOf(b.dataset.id)+Number(b.dataset.step)),
     'plan-kind':b=>{if(ui.planTab!==b.dataset.value){ui.planTab=b.dataset.value;ui.planTask='';ui.teamSelectedIds=null;ui.routeTaskIds=[];ui.generated=null;ui.locks=[];ui.planTaskQuery='';}ui.planStage='kind';render();},
