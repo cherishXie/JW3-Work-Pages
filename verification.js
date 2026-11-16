@@ -7,6 +7,13 @@
   const C=typeof module!=='undefined'&&module.exports?require('./catalog.js'):JX3Catalog;
   function partyFixture(n=8){const {s,t}=fixture(n);s.config.concurrency=8;t.partyRule='daily5';Object.assign(t,M.withPartyRule(t));t.target=1;t.runs=2;for(const r of s.roles){r.school='万花';r.stance='花间游';r.companionIds=['kang-yanbie','mu-qingrou','tang-xiaoke'];}return {s,t,c:s.config,roles:s.roles};}
   const cases=[
+    ['DS11','散点排布保持原始角色和值，密集点聚合可还原，零值有效且结果稳定',()=>{
+      const rows=Array.from({length:270},(_,i)=>({role:{id:'s'+i},value:i<150?0:i%20})),before=JSON.stringify(rows),a=M.distributionSwarm(rows,{width:84,height:230,min:0,max:20}),b=M.distributionSwarm(rows,{width:84,height:230,min:0,max:20});
+      equal(a,b);equal(a.flatMap(p=>p.rows.map(x=>x.role.id)).sort(),rows.map(x=>x.role.id).sort());equal(JSON.stringify(rows),before);
+      equal(a.every(p=>p.x>=0&&p.x<=84&&p.y>=0&&p.y<=230),true);equal(a.some(p=>p.rows.length>1),true);equal(M.distributionSwarm([]),[]);
+      const valid=M.distributionSwarm([{role:{id:'zero'},value:0},{role:{id:'missing'},value:null}],{min:0,max:1});equal(valid.flatMap(p=>p.rows).map(x=>x.role.id),['zero']);
+    }],
+
     ['DS10','蜡烛分布按角色计数，零值保留，空样本与重复等级不虚构范围',()=>{
       equal(M.distributionStats([]),null);equal(M.distributionStats([null,undefined,NaN]),null);
       equal(M.distributionStats([0]),{count:1,min:0,q1:0,median:0,q3:0,max:0});
