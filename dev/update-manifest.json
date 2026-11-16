@@ -1,14 +1,18 @@
 {
-  "id": "eb59ec05dc234d45f940d813d74ff826fc7c3bd475acab2c198c7c928945a561",
-  "version": "0.10.0-dev.66",
+  "id": "9a4dbd4c807df5b5e803dfe6e149afba3a6a5a7a2e7a6d7516b857539cd37ced",
+  "version": "0.10.0-dev.67",
   "channel": "dev",
-  "sourceCommit": "14af7ab129d2672fa7e147a62c1e7b31a291467f",
-  "sourceTimestamp": 1794809479,
+  "sourceCommit": "cccdbaf6c3bfc65edf2387bc42ab0953e312db58",
+  "sourceTimestamp": 1794813464,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "总览首批 UI 改进：核心指标调整为经济净收益、操作时间、净时薪与完成进度，普通指标回归中性卡片；毛收益和成本收为次级摘要，全空间现金摘要独立展示并可进入本期流水。保留收益口径、缺失与负值提示；无任务目标时完成率显示不适用，执行数量明确角色次与批次。"
+      "完成工作台 UI / UX 清单逐模块复核：导航与任务工具区降低整块强调色，1024px 收起导航；全局复选跨页与条件冲突保留选择，角色、账号和回顾下钻保留原范围与返回状态，生活技艺深链支持刷新。",
+      "任务查漏补充状态卡片，修复重绘时清空任务和状态条件的问题；角色候选支持搜索分页与方向键，历史执行采用有界摘要卡与可展开成员，回收记录可搜索分页。保留四步安排、资格、CD、计时与保存撤销。",
+      "周期回顾增加日期及任务记录下钻、全部角色检索和实测归属核对；账号贡献改为局部条件，报价目录展示全部匹配记录，组合候选可搜索分页。工资增加到账状态筛选，现金方向卡片化，保存后定位新记录；攻略目录与笔记宽屏并排。",
+      "截图导入增加四阶段进度、逐图状态和失败重试，复用成功识别结果；裁剪设置按需展开并显示范围。加强相似名与来源证据核对，保留零值、冲突、重复导入、金币观测与撤销保护。",
+      "表单取消后可恢复草稿，嵌套角色编辑可返回详情；经营参数展示新旧值，主题预览包含正文与控件，减少动态效果支持手动选择及系统实时变化；导出隐私边界与计算验收状态更明确。新增合成数据交互合同并接入网页 CI。"
     ]
   },
   "files": [
@@ -49,8 +53,8 @@
     },
     {
       "name": "screenshot.js",
-      "bytes": 33036,
-      "sha256": "c5e24693e1971c0dd12a22fa10c419f8358fa86d74ad9bee6c027aa279e4f87e"
+      "bytes": 38757,
+      "sha256": "fcf4bda1e29e5361380a4ba6b9c8bc887e331e87d7a86b92c3abb3a6f9a4d276"
     },
     {
       "name": "vendor/ocr/CORE-LICENSE.txt",
@@ -119,8 +123,8 @@
     },
     {
       "name": "index.html",
-      "bytes": 6377,
-      "sha256": "10907f0b21a2425cc8dbe8ad06f978c0f4fd79efb3b392ace21912f4122b4d06"
+      "bytes": 6376,
+      "sha256": "d0fdcbb1b8028c6cb1ee7817c0423d8ea84a3219010e713f7a5a2e199477c66c"
     },
     {
       "name": "boot.js",
@@ -134,8 +138,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 342777,
-      "sha256": "92e2a8bc1d9891a6a81767eb2d0de0bf72859772fa360dd95185db48c0c0bc64"
+      "bytes": 350499,
+      "sha256": "6fffdad1b91afa4ecdc58a0867dc51bf4e19760442da571ec765b83f7b074013"
     },
     {
       "name": "themes.js",
@@ -179,8 +183,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 54176,
-      "sha256": "5c6d71c07595dec761d7b2f6a02636a908db743a309f35ecd1f2b00017a1a0eb"
+      "bytes": 55288,
+      "sha256": "3e84ac92754db9b6e9adb5b445f858e78b1fdfde363306ad6d6149296506e09b"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -214,13 +218,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 771742,
-      "sha256": "bc988e9c90a0dff9237fb9f17b893c7d54fab991e9b3390e13fc079e44a81819"
+      "bytes": 801516,
+      "sha256": "acb75c01e2c2c380118942c42247da716499c12008a02f077cf4c70fbb7b811e"
     },
     {
       "name": "version.js",
-      "bytes": 680,
-      "sha256": "110b5e918f4f12a8fb1008b1afa7dfdb30694b720c9caa65faa2f5e957fb64c4"
+      "bytes": 1714,
+      "sha256": "9fe218562b5829d00dd7d20bb727fe112a49c4b3d6eda384d4d6c45f347e8023"
     }
   ]
 }
