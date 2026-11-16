@@ -149,3 +149,5 @@
 !scripts/task-execution-split-qa.cjs
 
 !/scripts/life-skills-analysis-qa.cjs
+
+!/scripts/planning-interactions-qa.cjs

@@ -9,13 +9,19 @@
   // or specialization quota. Store observed values without inferring either.
   const lifeSkillCatalog=[['caijin','采金','采集'],['shennong','神农','采集'],['paoding','庖丁','采集'],['zhuzao','铸造','制造'],['yishu','医术','制造'],['pengren','烹饪','制造'],['fengren','缝纫','制造'],['zijiang','梓匠','制造']].map(([id,name,group])=>({id,name,group}));
   const lifeSkillSource='https://jx3.xoyo.com/show-2458-7509-1.html';
+  function distributionStats(values){
+    const sorted=values.filter(Number.isFinite).slice().sort((a,b)=>a-b),n=sorted.length;
+    if(!n)return null;
+    const quantile=p=>{const at=(n-1)*p,low=Math.floor(at),fraction=at-low;return sorted[low]+(sorted[Math.min(n-1,low+1)]-sorted[low])*fraction;};
+    return {count:n,min:sorted[0],q1:quantile(.25),median:quantile(.5),q3:quantile(.75),max:sorted[n-1]};
+  }
   function lifeSkillsAnalysis(roles,accounts){
     const accountIds=new Set(accounts.map(a=>a.id)),created=roles.filter(r=>accountIds.has(r.accountId)&&r.creationStatus!=='planned');
     return {created:created.length,skills:lifeSkillCatalog.map(skill=>{
       const rows=created.map(role=>({role,value:role.lifeSkills?.skills?.[skill.id]||{}})),levels=new Map();
       for(const {value} of rows)if(Number.isInteger(value.level)&&value.level>=0)levels.set(value.level,(levels.get(value.level)||0)+1);
       const known=[...levels.values()].reduce((a,b)=>a+b,0);
-      return {...skill,rows,known,missing:created.length-known,specialized:rows.filter(x=>x.value.specialized===true).length,notSpecialized:rows.filter(x=>x.value.specialized===false).length,unknown:rows.filter(x=>x.value.specialized!==true&&x.value.specialized!==false).length,levels:[...levels].sort((a,b)=>a[0]-b[0]).map(([level,count])=>({level,count}))};
+      return {...skill,rows,known,distribution:distributionStats(rows.map(x=>x.value.level).filter(v=>Number.isInteger(v)&&v>=0)),missing:created.length-known,specialized:rows.filter(x=>x.value.specialized===true).length,notSpecialized:rows.filter(x=>x.value.specialized===false).length,unknown:rows.filter(x=>x.value.specialized!==true&&x.value.specialized!==false).length,levels:[...levels].sort((a,b)=>a[0]-b[0]).map(([level,count])=>({level,count}))};
     })};
   }
   function validateLifeSkills(value){
@@ -274,15 +280,37 @@
     let logins=0,switches=0;for(let i=0;i<batches.length;i++){const change=batchTransition(batches[i-1]||[],batches[i]);logins+=change.login.length;switches+=change.switchRole.length;}
     return {logins,switches};
   }
+  // Exact minimum transition order for up to 12 batches. Keep the size at every
+  // position and first-batch locks; named teams opt out of reordering entirely.
+  function minimumSwitchOrder(parties,locked=[],weight=1){
+    const n=parties.length;if(n<2||n>12)return parties;
+    const edge=(before,after)=>{const c=batchTransition(before,after),login=c.login.length;return (login+c.switchRole.length)*weight+login;};
+    const size=1<<n,cost=new Float64Array(size*n).fill(Infinity),prev=new Int16Array(size*n).fill(-1),counts=new Uint8Array(size);
+    for(let mask=1;mask<size;mask++)counts[mask]=counts[mask>>1]+(mask&1);
+    for(let i=0;i<n;i++)if(parties[i].players.length===parties[0].players.length&&locked.every(id=>parties[i].players.some(r=>r.id===id)))cost[(1<<i)*n+i]=edge([],parties[i].players);
+    const edges=parties.map(a=>parties.map(b=>edge(a.players,b.players)));
+    for(let mask=1;mask<size;mask++){
+      const at=counts[mask];if(at===n)continue;
+      for(let last=0;last<n;last++){const value=cost[mask*n+last];if(!Number.isFinite(value))continue;
+        for(let next=0;next<n;next++)if(!(mask&(1<<next))&&parties[next].players.length===parties[at].players.length){const key=(mask|(1<<next))*n+next,valueNext=value+edges[last][next];if(valueNext<cost[key]){cost[key]=valueNext;prev[key]=last;}}
+      }
+    }
+    let mask=size-1,last=0;for(let i=1;i<n;i++)if(cost[mask*n+i]<cost[mask*n+last])last=i;
+    if(!Number.isFinite(cost[mask*n+last]))return parties;
+    const result=[];while(mask){result.push(parties[last]);const previous=prev[mask*n+last];mask^=1<<last;last=previous;}
+    return result.reverse();
+  }
   // Improve an already feasible allocation without changing coverage, batch sizes or quotas.
-  // Login changes dominate character-select switches; bounded local search keeps large pools responsive.
+  // Minimize total login/character transitions, then prefer character selection to re-login.
+  // Allocation search is bounded for large pools; small fixed-batch orders are exact.
   function optimizeBatchSwitching(input,{rebuild=p=>p,reorder=true,locked=[]}={}){
     let parties=input.map(p=>({...p,players:[...p.players]}));if(parties.length<2)return parties;
     const weight=parties.reduce((n,p)=>n+p.players.length,0)+1;
-    const score=ps=>{const c=batchSwitchCost(ps.map(p=>p.players));return c.logins*weight+c.switches;};
+    const score=ps=>{const c=batchSwitchCost(ps.map(p=>p.players));return (c.logins+c.switches)*weight+c.logins;};
+    if(reorder)parties=minimumSwitchOrder(parties,locked,weight);
     let current=score(parties),attempts=0;
     const players=parties.flatMap(p=>p.players),accounts=new Set(players.map(r=>r.accountId)).size;
-    const lower=accounts*weight+(new Set(players.map(r=>r.id)).size===players.length?players.length-accounts:0);
+    const lower=new Set(players.map(r=>r.id)).size*weight+accounts;
     for(let pass=0;pass<8&&attempts<6000&&current>lower;pass++){
       let best=null,bestScore=current;
       const consider=(candidate,changed)=>{
@@ -301,6 +329,7 @@
       }
       if(!best)break;parties=best;current=bestScore;
     }
+    if(reorder)parties=minimumSwitchOrder(parties,locked,weight);
     // List retained accounts in the same relative order to make each transition easy to scan.
     for(let i=1;i<parties.length;i++){const order=new Map(parties[i-1].players.map((r,n)=>[r.accountId,n]));parties[i].players.sort((a,b)=>(order.get(a.accountId)??Infinity)-(order.get(b.accountId)??Infinity));}
     return parties;
@@ -331,7 +360,7 @@
     return {score:[...families.values()].reduce((a,b)=>a+b,0)+formationScore,effects,formation,season:Catalog.teamBuffSeason,checkedAt:Catalog.teamBuffCheckedAt,unknown:dps.filter(r=>Catalog.damageType(r)==='unknown').length};
   }
   const dailyBatchRules=[
-    {id:'accountReuse',name:'账号连续使用',description:'优先减少相邻批次重新登录，再减少角色切换'},
+    {id:'accountReuse',name:'账号连续使用',description:'始终先减少登录与换角总次数，再减少重新登录；其他规则不增加切换'},
     {id:'synergy',name:'门派增益与 DPS 协同',description:'匹配可核实增益、阵法与输出角色，奇穴潜力低权重参考'},
     {id:'tankSpread',name:'T 分散',description:'尽量每队一名玩家 T，减少多 T 集中'},
     {id:'gearBalance',name:'装分均衡',description:'分散装分待补角色，再均衡各队平均装分'},
@@ -347,7 +376,7 @@
     const targets=new Map([...groups].map(([key,players])=>[key,{...partyStats(players),size:players.length}]));
     const all=input.flatMap(p=>p.players),basis=raidPowerBasis(all),peak=Math.max(1,...all.map(r=>roleOutputPower(r,basis))),weights=new Map(all.map(r=>[r.id,1+roleOutputPower(r,basis)/peak])),synergyCache=new Map();
     const synergy=players=>{const key=JSON.stringify(players.map(r=>r.id).sort());if(!synergyCache.has(key))synergyCache.set(key,dailyPartySynergy(players,weights).score);return synergyCache.get(key);};
-    const score=ps=>{const tanks=ps.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),tankOverflow=tanks.reduce((n,v)=>n+Math.max(0,v-1),0),tankVariance=tanks.reduce((n,v)=>n+v*v,0);let range=0,unknown=0,gear=0;for(const p of ps){const a=partyStats(p.players),t=targets.get(p.players[0]?.server),dps=a.melee+a.ranged,total=t.melee+t.ranged;if(total)range+=(a.melee-dps*t.melee/total)**2;unknown+=(a.unknownScores-p.players.length*t.unknownScores/t.size)**2;if(a.averageScore!==null&&t.averageScore)gear+=((a.averageScore-t.averageScore)/t.averageScore)**2;}const switching=batchSwitchCost(ps.map(p=>p.players));const values={accountReuse:[switching.logins,switching.switches],synergy:[-ps.reduce((n,p)=>n+synergy(p.players),0)],tankSpread:[tankOverflow,tankVariance],gearBalance:[unknown,gear],rangeBalance:[range]};return dailyBatchPriorities(priorities).flatMap(id=>values[id]);};
+    const score=ps=>{const tanks=ps.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),tankOverflow=tanks.reduce((n,v)=>n+Math.max(0,v-1),0),tankVariance=tanks.reduce((n,v)=>n+v*v,0);let range=0,unknown=0,gear=0;for(const p of ps){const a=partyStats(p.players),t=targets.get(p.players[0]?.server),dps=a.melee+a.ranged,total=t.melee+t.ranged;if(total)range+=(a.melee-dps*t.melee/total)**2;unknown+=(a.unknownScores-p.players.length*t.unknownScores/t.size)**2;if(a.averageScore!==null&&t.averageScore)gear+=((a.averageScore-t.averageScore)/t.averageScore)**2;}const switching=batchSwitchCost(ps.map(p=>p.players));const values={accountReuse:[switching.logins,switching.switches],synergy:[-ps.reduce((n,p)=>n+synergy(p.players),0)],tankSpread:[tankOverflow,tankVariance],gearBalance:[unknown,gear],rangeBalance:[range]};return [switching.logins+switching.switches,switching.logins,...dailyBatchPriorities(priorities).filter(id=>id!=='accountReuse').flatMap(id=>values[id])];};
     const better=(a,b)=>{for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-10)return a[i]<b[i];}return false;};
     let current=score(parties),attempts=0;
     for(let pass=0;pass<12&&attempts<20000;pass++){
@@ -397,8 +426,8 @@
     const covered=ps=>ps.filter(p=>raidGongzhanStatus(p.players).covered).length;
     const objective=ps=>{
       const powers=ps.map(p=>raidPartyStats(p.players,basis).outputIndex),total=powers.reduce((n,x)=>n+x,0),mean=total/ps.length,variance=powers.reduce((n,x)=>n+(x-mean)**2,0),switching=batchSwitchCost(ps.map(p=>p.players));
-      if(mode==='mentor')return [-covered(ps),-ps.filter(p=>anchors(p)&&novices(p)>0).length,-ps.reduce((n,p)=>n+(anchors(p)?novices(p):0),0),-ps.filter(anchors).length,-total,switching.logins,switching.switches];
-      return [-covered(ps),-total,mode==='balanced'?variance:-variance,switching.logins,switching.switches];
+      if(mode==='mentor')return [-covered(ps),switching.logins+switching.switches,switching.logins,-ps.filter(p=>anchors(p)&&novices(p)>0).length,-ps.reduce((n,p)=>n+(anchors(p)?novices(p):0),0),-ps.filter(anchors).length,-total,switching.logins,switching.switches];
+      return [-covered(ps),switching.logins+switching.switches,switching.logins,-total,mode==='balanced'?variance:-variance];
     };
     const better=(a,b)=>{for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-7)return a[i]<b[i];}return false;};
     const rebuild=p=>{try{validateDailyGongzhan(task,p.players);const t=partyTask(task,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),companions=companionAssignments(t,p.players,10);if(!companions)return null;validateParty(t,p.players,companions,capacity);for(const other of task.routePartyTasks||[])validateParty(partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,partyCompanions(partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,companions),capacity);return {...p,companions,totalSlots:raidCapacity(task)===25?25:p.players.length+companions.length};}catch{return null;}};
@@ -414,14 +443,19 @@
       for(let i=0;i<parties.length&&attempts<16000;i++)for(let a=0;a<parties[i].players.length&&attempts<16000;a++)for(const r of spare){if(attempts>=16000)break;const crossDuty=Catalog.profile(r).duty!==Catalog.profile(parties[i].players[a]).duty;const next=[...parties],players=[...parties[i].players];players[a]=r;next[i]={...parties[i],players};if(!crossDuty||covered(next)>covered(parties))consider(next,[i]);}
       if(!best)break;parties=best;current=bestScore;
     }
-    if(mode==='output'){const fixed=locked.length?parties.slice(0,1):[],rest=parties.slice(fixed.length);parties=[...fixed,...rest.sort((a,b)=>raidPartyStats(b.players,basis).outputIndex-raidPartyStats(a.players,basis).outputIndex)];}
+    parties=optimizeBatchSwitching(parties,{rebuild,reorder:!task.raidTeams?.length,locked});
     return parties.map(p=>({...p,powerStats:raidPartyStats(p.players,basis),strongDps:p.players.filter(r=>Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold).map(r=>r.id),noviceIds:p.players.filter(r=>Number.isFinite(r.score)&&r.score>0&&r.score<=lowThreshold&&!(Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold)).map(r=>r.id)}));
   }
   // New candidate plans require full raids; legacy templates and saved plans keep their own rules.
   function planningTask(task){return task.partyRule==='raid10'&&!externalParty(task)?{...task,fillCompanionSlots:true}:task;}
   function savedPartyTask(task,plan){const snapshot=plan.taskSnapshots?.[task.id];if(snapshot)task={...task,...Object.fromEntries(['dailyBatchPriorities','raidMode','partyRule','difficulty','dungeonId','dungeonName','raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'].filter(k=>snapshot[k]!==undefined).map(k=>[k,snapshot[k]])),...(snapshot.partyRule==='raid10'?{raidSize:raidCapacity(snapshot)}:{})};if(externalParty(plan.rulesSnapshot)||plan.teamConfigs?.length&&plan.teamConfigs.every(externalParty))task={...task,raidMode:'external'};return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
   function optimizeTaskBatches(task,batches,capacity,parties=[],locked=[]){
-    if(externalParty(task))return {batches,parties};
+    if(externalParty(task)){
+      const source=batches.map((players,i)=>({...parties[i],players,companions:[]}));
+      const rebuild=p=>{try{validateParty(partyTask(task,p.teamConfig),p.players,[],capacity);for(const other of task.routePartyTasks||[])validateParty(partyTask(other,p.teamConfig),p.players,[],capacity);return p;}catch{return null;}};
+      const optimized=optimizeBatchSwitching(source,{rebuild,reorder:!task.raidTeams?.length,locked});
+      return {batches:optimized.map(p=>p.players),parties:optimized};
+    }
     const policy=gongzhanAllocationPolicy(batches),cache=new Map(),hasParty=['daily5','raid10'].includes(task.partyRule);
     const rebuild=(p,relaxGongzhan=false)=>{
       if(!p.players.length||p.players.length>Math.min(capacity,task.maxParallel??Infinity))return null;
@@ -440,7 +474,7 @@
     const source=batches.map((players,i)=>{const p={...parties[i],players};if(!hasParty||parties[i])return p;const valid=rebuild(p);if(!valid)throw new Error('原批次不满足队伍条件');return valid;});
     const spread=spreadGongzhanParties(source,p=>rebuild(p,true),locked,!hasParty&&task.type!=='team');
     let optimized=task.partyRule==='daily5'?spread:optimizeBatchSwitching(spread,{rebuild,reorder:!task.raidTeams?.length,locked});
-    if(task.partyRule==='daily5'){if(dailyBatchPriorities(task.dailyBatchPriorities)[0]==='accountReuse')optimized=optimizeBatchSwitching(optimized,{rebuild,reorder:!task.raidTeams?.length,locked});optimized=balanceDailyParties(optimized,rebuild,locked,task.dailyBatchPriorities,!task.raidTeams?.length);}
+    if(task.partyRule==='daily5'){optimized=optimizeBatchSwitching(optimized,{rebuild,reorder:!task.raidTeams?.length,locked});optimized=balanceDailyParties(optimized,rebuild,locked,task.dailyBatchPriorities,!task.raidTeams?.length);}
     return {batches:optimized.map(p=>p.players),parties:hasParty?optimized.map((p,i)=>({...p,teamIndex:task.raidTeams?.length?p.teamIndex:i})):[]};
   }
   function raid25Candidates(task,roles,locked=[],capacity=Infinity){
@@ -456,8 +490,8 @@
   }
   function partyCompanions(task,players,saved=[]){return raidCapacity(task)===25?[]:saved.length?saved:companionAssignments(task,players,task.partyRule==='daily5'?5:10);}
   function externalCandidates(task,roles,locked,capacity,coverAll){
-    const t=withPartyRule(task),total=t.partyRule==='daily5'?5:raidCapacity(t),seats=number(t.externalPlayerSeats??1,'外部团队自有角色上限',{min:1,max:total,integer:true}),parties=[],reasons=[];
-    let pool=[...new Map(roles.map(r=>[r.id,r])).values()].filter(r=>r.accountId&&r.server&&r.enabled!==false&&r.creationStatus!=='planned'&&(!t.levelCap||r.level===t.levelCap)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));
+    const t=withPartyRule(task),total=t.partyRule==='daily5'?5:raidCapacity(t),seats=number(t.externalPlayerSeats??1,'外部团队自有角色上限',{min:1,max:total,integer:true}),reasons=[];
+    let parties=[],pool=[...new Map(roles.map(r=>[r.id,r])).values()].filter(r=>r.accountId&&r.server&&r.enabled!==false&&r.creationStatus!=='planned'&&(!t.levelCap||r.level===t.levelCap)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));
     if(locked.length>Math.min(seats,capacity)||locked.some(id=>!pool.some(r=>r.id===id)))return {teams:[],parties:[],unassigned:roles,reasons:['首队锁定成员超过自有角色上限或不在可用范围']};
     while(pool.length&&(coverAll||parties.length<t.runs)){
       const required=parties.length?[]:locked,players=required.map(id=>pool.find(r=>r.id===id)),limit=Math.min(seats,capacity,t.maxParallel);
@@ -469,6 +503,7 @@
     }
     if(!coverAll&&parties.length<t.runs)reasons.push('目标 '+t.runs+' 队，仅生成 '+parties.length+' 队；请检查可用角色、账号、区服与 CD。');
     reasons.push('仅记录自有角色参与；外部成员、职责和共战待游戏内确认，外部成员不计入收益、点卡或 CD。');
+    parties=optimizeTaskBatches(t,parties.map(p=>p.players),capacity,parties,locked).parties;
     return {teams:parties.map(p=>p.players),parties,reasons,unassigned:roles.filter(r=>!parties.some(p=>p.players.includes(r)))};
   }
   function partyCandidates(task,roles,locked=[],capacity=Infinity,coverAll=task.partyRule==='daily5'){
@@ -592,7 +627,7 @@
     if(searchLimited||limited)reasons.push('搜索达到上限，当前建议未保证完整或最优；请调整逐队配置或缩小角色范围后重算。');
     if(!coverAll)for(const [i,c]of configs.entries())if(!parties.some(p=>p.teamIndex===i))reasons.push(c.name+' 未生成：需要 '+c.playerSeats+' 名玩家（'+({auto:'自动补 T',player:'玩家 T',companion:'侠客 T'}[c.tankMode]||'自动补 T')+'），请复核剩余 CD、召请者和并行上限 '+cap+'。');
     if(!solution&&!coverAll){reasons.push('目标 '+configs.length+' 队，仅生成 '+parties.length+' 队。');if(t.fillCompanionSlots)reasons.push('每队必须由玩家与已拥有侠客补满 10 席；请检查侠客数量、同名互斥、召请上限和所需职责。');}
-    if(t.partyRule==='raid10'&&t.raidMode&&t.raidMode!=='legacy'){if(available.some(r=>Catalog.profile(r).duty==='dps'&&!Number.isFinite(r.referenceDps)))reasons.push('部分角色缺少参考 DPS，输出指数使用装分参考；未推算真实 DPS，也不计侠客或共战增益。');if(t.raidMode==='mentor'&&parties.some(p=>!p.strongDps?.length||!p.noviceIds?.length))reasons.push('部分队伍无法同时安排强力 DPS 与已知低装分角色，请复核成员、账号和职责限制。');if(t.raidMode==='output'&&locked.length)reasons.push('首队固定成员保持在首队，其余队伍按输出指数降序排列。');}
+    if(t.partyRule==='raid10'&&t.raidMode&&t.raidMode!=='legacy'){if(available.some(r=>Catalog.profile(r).duty==='dps'&&!Number.isFinite(r.referenceDps)))reasons.push('部分角色缺少参考 DPS，输出指数使用装分参考；未推算真实 DPS，也不计侠客或共战增益。');if(t.raidMode==='mentor'&&parties.some(p=>!p.strongDps?.length||!p.noviceIds?.length))reasons.push('部分队伍无法同时安排强力 DPS 与已知低装分角色，请复核成员、账号和职责限制。');if(t.raidMode==='output'&&locked.length)reasons.push('首队固定成员保持在首队，在不增加登录与换角次数的前提下优先配置输出。');}
     return {teams:parties.map(p=>p.players),parties,unassigned,reasons,powerBasis:t.partyRule==='raid10'&&t.raidMode&&t.raidMode!=='legacy'?modeBasis:undefined};
   }
   function splitBatches(roles,capacity) {
@@ -1482,5 +1517,5 @@
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
     validateState(next);return {next,stats};
   }
-  return {dailyBatchRules,dailyBatchPriorities,dailyPartySynergy,lifeSkillsAnalysis,confirmMeasurements,matchedTaskComparison,executionMatrix,reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionDeadline,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {distributionStats,dailyBatchRules,dailyBatchPriorities,dailyPartySynergy,lifeSkillsAnalysis,confirmMeasurements,matchedTaskComparison,executionMatrix,reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionDeadline,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });

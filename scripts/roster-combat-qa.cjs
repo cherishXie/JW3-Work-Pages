@@ -1,9 +1,9 @@
 /* Browser regression; private fixture is opt-in and never copied into public assets. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const {chromium}=require('playwright'),M=require('../model');
-const base=process.argv[2]||'http://127.0.0.1:4173/',privateQA=process.env.JX3_PRIVATE_QA==='1';
-const fixture=privateQA?path.resolve(__dirname,'../data/JX3_Workbench_2026-10-30.json'):null;
+const {chromium}=require('playwright'),M=require('../model'),Store=require('../storage');
+const base=process.argv[2]||'http://127.0.0.1:4176/',privateQA=process.env.JX3_PRIVATE_QA==='1';
+const fixture=privateQA?path.resolve(__dirname,'../data/JX3_Workbench_2026-11-16.json'):null;
 const bytes=fixture?fs.readFileSync(fixture):null,raw=bytes?JSON.parse(bytes):null,seed=raw?(raw.active||raw):M.demo();
 const out=path.resolve(__dirname,'../output/playwright/roster-combat');fs.mkdirSync(out,{recursive:true});
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -13,8 +13,9 @@ async function navigate(page,id){
 }
 (async()=>{const browser=await chromium.launch({headless:true,...(process.env.JX3_CHROMIUM_PATH?{executablePath:process.env.JX3_CHROMIUM_PATH}:{})});try{
   const errors=[],context=await browser.newContext({viewport:{width:1440,height:1000},timezoneId:'Asia/Shanghai',reducedMotion:'reduce'});
-  await context.addInitScript(s=>{if(!localStorage.getItem('jx3-workbench-data-v2'))localStorage.setItem('jx3-workbench-data-v2',JSON.stringify({storeVersion:1,active:s,snapshots:[]}));},seed);
+  await context.addInitScript(s=>{if(!localStorage.getItem('jx3-workbench-data-v2'))localStorage.setItem('jx3-workbench-data-v2',s);},JSON.stringify(Store.pack({storeVersion:1,active:seed,snapshots:[]})));
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});await navigate(page,'roles');assert.equal(await page.locator('nav [data-page="roster"]').count(),0);assert.equal(await page.locator('nav [data-page="roles"]').innerText(),'账号与角色');assert.equal(await page.locator('.roster-analysis').count(),0);await navigate(page,'roster');await page.locator('.combat-grid').waitFor();assert.equal(await page.locator('.account-archive').count(),0);
+  const candle=page.locator('[aria-label="角色装分蜡烛图"]');assert.equal(await page.locator('.combat-histogram').count(),0);assert(await candle.locator('.distribution-body').count()>0);const hit=candle.locator('.distribution-hit').first();await hit.locator('.distribution-level').focus();assert(await hit.locator('[role="tooltip"]').isVisible());const member=hit.locator('[data-action="combat-role"]').first(),roleId=await member.getAttribute('data-id');await member.click();assert.equal(await page.locator('.combat-rank-row.active').getAttribute('data-id'),roleId);
   const metrics=[];
   for(const theme of ['deep-ocean','cloud-blue','jade-green','warm-sand','amethyst-night']){await page.evaluate(theme=>WorkbenchThemes.apply(theme),theme);for(const width of [1440,1024,390]){
     await page.setViewportSize({width,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),theme+' '+width);
