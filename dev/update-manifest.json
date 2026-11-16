@@ -1,15 +1,14 @@
 {
-  "id": "de86ffd312497fcc3c93fac86f8de0acb6cf109d157c4785e5b9171bc855131a",
-  "version": "0.10.0-dev.65",
+  "id": "eb59ec05dc234d45f940d813d74ff826fc7c3bd475acab2c198c7c928945a561",
+  "version": "0.10.0-dev.66",
   "channel": "dev",
-  "sourceCommit": "2ae4cea588b357a6b7a98409fcdbec7ccbe4f5bc",
-  "sourceTimestamp": 1794804058,
+  "sourceCommit": "14af7ab129d2672fa7e147a62c1e7b31a291467f",
+  "sourceTimestamp": 1794809479,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "生活技艺与装备分析采用成对的蜡烛图、蜂群散点图，按分组使用一致的色彩与数轴；散点支持角色搜索、键盘移动、点选联动和密集点展开。装分排名并入散点悬浮信息及选中角色，不再单独列榜，搜索保留当前范围的同分并列名次；装备属性、同场景 DPS 也采用散点查看原始角色样本。",
-      "分析界面默认移除数据缺失说明与解释段落，缺失值显示“—”；统计口径与影响计算结果的说明收在详情中，保留角色编辑、保存恢复、采集与制造分类和专精数量。"
+      "总览首批 UI 改进：核心指标调整为经济净收益、操作时间、净时薪与完成进度，普通指标回归中性卡片；毛收益和成本收为次级摘要，全空间现金摘要独立展示并可进入本期流水。保留收益口径、缺失与负值提示；无任务目标时完成率显示不适用，执行数量明确角色次与批次。"
     ]
   },
   "files": [
@@ -135,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 341005,
-      "sha256": "d66cfa8383c35d790aaa4b7f78c4babfed91ffee96bc3ba3e4c3b48015efad9c"
+      "bytes": 342777,
+      "sha256": "92e2a8bc1d9891a6a81767eb2d0de0bf72859772fa360dd95185db48c0c0bc64"
     },
     {
       "name": "themes.js",
@@ -215,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 770768,
-      "sha256": "00de53922beeaacb9a07cd12ecff004bf8dd89c777bad4aa91f2a54658ecdf41"
+      "bytes": 771742,
+      "sha256": "bc988e9c90a0dff9237fb9f17b893c7d54fab991e9b3390e13fc079e44a81819"
     },
     {
       "name": "version.js",
-      "bytes": 921,
-      "sha256": "689cdf66a13141c531c67e2e121887df5d6c8563954bc8e5dccd6767a4e9fcc7"
+      "bytes": 680,
+      "sha256": "110b5e918f4f12a8fb1008b1afa7dfdb30694b720c9caa65faa2f5e957fb64c4"
     }
   ]
 }
