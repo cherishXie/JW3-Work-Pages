@@ -1,14 +1,15 @@
 {
-  "id": "e2306d0c460aec7d865309781f9d0ea8b0825513dda8eda7c08325a6bdf1ce3f",
-  "version": "0.10.0-dev.64",
+  "id": "de86ffd312497fcc3c93fac86f8de0acb6cf109d157c4785e5b9171bc855131a",
+  "version": "0.10.0-dev.65",
   "channel": "dev",
-  "sourceCommit": "f4c8d663b05213e1a057ce4e7c0ecfa2c4f997b8",
-  "sourceTimestamp": 1794798977,
+  "sourceCommit": "2ae4cea588b357a6b7a98409fcdbec7ccbe4f5bc",
+  "sourceTimestamp": 1794804058,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "Seed explicit levels for synthetic candle chart checks"
+      "生活技艺与装备分析采用成对的蜡烛图、蜂群散点图，按分组使用一致的色彩与数轴；散点支持角色搜索、键盘移动、点选联动和密集点展开。装分排名并入散点悬浮信息及选中角色，不再单独列榜，搜索保留当前范围的同分并列名次；装备属性、同场景 DPS 也采用散点查看原始角色样本。",
+      "分析界面默认移除数据缺失说明与解释段落，缺失值显示“—”；统计口径与影响计算结果的说明收在详情中，保留角色编辑、保存恢复、采集与制造分类和专精数量。"
     ]
   },
   "files": [
@@ -134,8 +135,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 335045,
-      "sha256": "d427961a0ab359174d95eae6bbe77f011de1bbec4ebfe8268f52a8f59e0ff8c5"
+      "bytes": 341005,
+      "sha256": "d66cfa8383c35d790aaa4b7f78c4babfed91ffee96bc3ba3e4c3b48015efad9c"
     },
     {
       "name": "themes.js",
@@ -154,8 +155,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 208650,
-      "sha256": "b803a376a87d6d87a65a422eb5089dbdf55d78266da433b60a79ac4e88153032"
+      "bytes": 210046,
+      "sha256": "45329670ced555777374a7a5fe84b5be0a4639ad8e5005dfbaf5a294171d7755"
     },
     {
       "name": "operations.js",
@@ -179,8 +180,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 53361,
-      "sha256": "6bb87abd3cf4f58229b8bfd37c342b936a1d20d3b1b6b026115533d4fe897e01"
+      "bytes": 54176,
+      "sha256": "5c6d71c07595dec761d7b2f6a02636a908db743a309f35ecd1f2b00017a1a0eb"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -214,13 +215,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 769376,
-      "sha256": "e9251597a3efb19b6627d950366f507f78e19756e2cae363493ce08fdd954ce1"
+      "bytes": 770768,
+      "sha256": "00de53922beeaacb9a07cd12ecff004bf8dd89c777bad4aa91f2a54658ecdf41"
     },
     {
       "name": "version.js",
-      "bytes": 367,
-      "sha256": "4d6aed23df0d3fab87e9da4efefe1ebce0e6ea32137937dd7a444b2a6b9ab686"
+      "bytes": 921,
+      "sha256": "689cdf66a13141c531c67e2e121887df5d6c8563954bc8e5dccd6767a4e9fcc7"
     }
   ]
 }
