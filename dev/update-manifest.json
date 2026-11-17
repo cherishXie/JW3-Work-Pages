@@ -1,14 +1,14 @@
 {
-  "id": "764ea3f7e17dec2a025a0334c11a629076f9fe8e96f79bc8248b1df47077728f",
-  "version": "0.11.0-dev.70",
+  "id": "754b81a8333680c490f7fb1a059edefdc7558942e85a196c6ef2082933c5d0ab",
+  "version": "0.12.0-dev.71",
   "channel": "dev",
-  "sourceCommit": "da61174168039aed5b5b207403051a3a435846f5",
-  "sourceTimestamp": 1794835092,
+  "sourceCommit": "4dadc36b94433fcfe70a3752680edcfdef0b8349",
+  "sourceTimestamp": 1794883489,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "保护锁定队伍的十开容量设置"
+      "Release 0.12.0 with dual-team mode and synchronized README"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 352,
-      "sha256": "15df9983ff22df6bfec01057d0245b0450f185bdc3f10d2a62c05090519d4108"
+      "bytes": 371,
+      "sha256": "677157b91b0a461d6e89b420d82787f49eae4ca0bed631218844746a66557ccd"
     }
   ]
 }

@@ -2,6 +2,8 @@
 
 面向多账号、多角色的剑网三任务与收益管理工具。集中管理角色档案、日常与副本排程、执行记录、金币资产和收益分析，支持网页与 Electron 桌面版、本机保存与 JSON 备份。
 
+当前网页正式版本：**0.12.0**（2026-11-17）。本次新增大战 10 开双队同时执行，更新说明见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 在线访问
 
 **[打开 GitHub Pages 工作台](https://cherishxie.github.io/JW3-Work-Pages/)**
@@ -18,17 +20,17 @@
 
 网页与桌面数据相互独立，目前没有云同步。首次迁移请从网页导出 JSON，再在桌面版「工作台设置 → 数据管理」导入。当前构建没有发布者签名和 Apple 公证。0.2.1 起，界面与业务资源支持应用内检查并点击更新；原生壳升级需安装对应平台的安装包。
 
-当前正式版为 **0.6.0**：[正式版发布说明](https://github.com/cherishXie/JW3-Work-Pages/releases/tag/v0.6.0)。安装包由自动发布工作流生成；生成前可在[已发布版本](https://github.com/cherishXie/JW3-Work-Pages/releases/latest)选择可用安装包。按系统选择：
+客户端安装包由自动发布工作流生成，只有构建与校验成功后才会出现在 [最新正式发布](https://github.com/cherishXie/JW3-Work-Pages/releases/latest)。网页上线与客户端安装包发布分开验收，网页版本号不代表同版本客户端已经可下载。请按系统从正式发布页选择附件：
 
-| 系统 | 正式版下载 |
+| 系统 | 选择的安装包 |
 | --- | --- |
-| Windows x64 | [下载 EXE](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/JW3-Workbench-Windows-x64-v0.6.0.exe) |
-| macOS Apple Silicon | [下载 arm64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/JW3-Workbench-macOS-arm64-v0.6.0.dmg) |
-| macOS Intel | [下载 x64 DMG](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/JW3-Workbench-macOS-x64-v0.6.0.dmg) |
+| Windows x64 | `JW3-Workbench-Windows-x64-v版本号.exe` |
+| macOS Apple Silicon | `JW3-Workbench-macOS-arm64-v版本号.dmg` |
+| macOS Intel | `JW3-Workbench-macOS-x64-v版本号.dmg` |
 
-[下载 SHA-256 校验清单](https://github.com/cherishXie/JW3-Work-Pages/releases/download/v0.6.0/SHA256SUMS.txt)。无需下载合集压缩包或 Source code。
+同一发布页提供 `SHA256SUMS.txt` 校验清单。无需下载合集压缩包或 Source code。
 
-[开发版与历史版本](https://github.com/cherishXie/JW3-Work-Pages/releases)单独列出。dev 客户端版本为 `0.6.0-dev.<构建号>`，标记为预发布；main 正式客户端为 `0.6.0`。每次推送 dev 仅更新开发网页与开发客户端，正式发布按 [CONTRIBUTING.md](CONTRIBUTING.md) 执行。
+[开发版与历史版本](https://github.com/cherishXie/JW3-Work-Pages/releases)单独列出。当前 dev 构建采用 `0.12.0-dev.<构建号>`，标记为预发布；main 构建采用 `0.12.0`。每次推送 dev 仅更新开发网页与开发客户端，正式发布按 [CONTRIBUTING.md](CONTRIBUTING.md) 执行。
 
 ## 主要功能
 
@@ -36,7 +38,7 @@
 | --- | --- |
 | 总览与收益分析 | 查看任务进度、排程预测、历史实测、收益占比、时薪与 ROI，对比币价、点卡成本和并行配置 |
 | 账号与角色 | 模块内查看独立于全局范围；维护账号、区服、角色、等级、门派、心法、定位、侠客与生活技艺资料，管理任务参与资格 |
-| 日常与副本安排 | 按“任务类型 → 任务与范围 → 组队配置 → 阵容复核”四步安排任务，支持副本多选、路线排序、队伍复用与外部团队参团 |
+| 日常与副本安排 | 按“任务类型 → 任务与范围 → 组队配置 → 阵容复核”四步安排任务，支持大战 10 开双队同时执行、副本多选、路线排序、队伍复用与外部团队参团 |
 | 组队与资格检查 | 检查同账号互斥、区服、角色资格、职责、侠客与 CD，显示未安排原因，支持调整成员 |
 | 排程与执行 | 按日期查看批次，保存执行草稿、计时、登记完成，记录或补录金币收益与耗时 |
 | 角色查漏与历史 | 按角色、账号和任务检查周期进度，查看任务历史、每周轨迹与副本 CD |
@@ -55,12 +57,14 @@
 4. 执行时登记每批完成情况，按实际情况填写或补录收益、操作时间与账号在线时间。
 5. 在总览、历史分析与资产台账查看结果，定期导出 JSON 备份。
 
+大战双队模式在「任务中心 → 安排任务 → 大战任务 → 组队配置 → 双队同时执行」单独开启，默认关闭，开启后会记住选择。全局并行上限需至少为 10，可在该设置旁调整；每队最多 5 名自有角色，账号互不冲突的两队同轮执行，不能配对的队伍单独执行。预计操作耗时按轮次计算，收益与各账号在线分钟仍完整累计；成员编辑与完成登记继续逐队进行，已有排程保留当时设置。
+
 确认排程不会自动产生收益。仅登记完成而未填写收益或耗时的记录会保留待补状态；预测与实测应分开理解，ROI 依赖实际填写的参数与数据。
 
 ## 数据保存与隐私
 
 - 网页业务数据保存在当前浏览器的本地存储中，桌面版保存在本机应用数据目录；站点不会自动上传账号、角色、截图或备份文件到 GitHub。
-- 不同浏览器、设备和访问地址使用独立的数据区。换设备、换地址或清理浏览器数据前，请先导出 JSON，再在目标环境导入。
+- 不同浏览器、设备和网页来源使用独立的数据区；上述 main 与 dev 地址同源，共用浏览器业务数据。换设备、换来源或清理浏览器数据前，请先导出 JSON，再在目标环境导入。
 - 支持按北京时间保存每日快照与导出全部日期档案；本地快照不能替代外部备份。网页普通保存不会自动回写导出的 JSON 文件；桌面版自动写入自己的应用数据文件。
 - 截图识别在本地进行，文字和金额仍需人工核对。分享战报前请检查隐私选项。
 - 这是辅助规划与记账工具。游戏规则、角色资格、CD 与收益参数需按实际情况维护；目前不会自动启动模拟器、登录游戏或执行游戏操作。
@@ -98,7 +102,7 @@ npm run build:pages          # 生成经过白名单检查的 .pages-dist 静态
 npm run publish:pages:public # 验证并推送 dev，触发独立开发页面与客户端发布
 ```
 
-正式发布执行 `npm run release:main`，通过版本与构建检查后将 dev 快进至 main。GitHub Actions 将两个频道的静态快照合并部署，稳定版在根目录，开发版在 dev/，互不覆盖；客户端使用工作流的受限 GitHub token 发布。
+每次正式发布必须同步更新 README.md 中的版本、功能与使用说明，并核对发布入口。执行 `npm run release:main`，通过版本升级、CHANGELOG、README 同步、测试与 dev 网页发布检查后将 dev 快进至 main。默认仅等待并验收网页，不等待、下载或安装客户端。GitHub Actions 将两个频道的静态快照合并部署，稳定版在根目录，开发版在 dev/，互不覆盖；客户端使用工作流的受限 GitHub token 发布。
 
 公开源码与网页产物均使用显式白名单，不包含个人数据、备份、凭据或 `data/`、`output/`、`docs/` 目录。
 
