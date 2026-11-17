@@ -57,7 +57,7 @@
     const roleRows=new Map(s.roles.map(role=>[role.id,{role,minutes:0,billable:0,covered:0,card:0,gross:0,net:0,gold:0,netGold:0,hasIncome:false,missingTime:0,unallocated:0,accountIds:new Set()}]));
     const accountRows=new Map(s.accounts.map(account=>[account.id,{account,minutes:0,billable:0,covered:0,card:0,gross:0,net:0,gold:0,netGold:0,hasIncome:false,missingTime:0,unallocated:0}]));
     const matches=(roleId,accountId,group)=>{const a=s.accounts.find(a=>a.id===accountId);return M.scopeMatches(roleId,scope.role)&&M.scopeMatches(accountId,scope.account)&&(!scope.group||(group??a?.group)===scope.group);};
-    const visitUsage=(entry,member,batchIndex)=>{const account=s.accounts.find(a=>a.id===member.accountId),minutes=entry.onlinePerVisit,at=Date.parse(entry.startedAt)+(entry.prepare+batchIndex*entry.batchMinutes)*60000,expiry=account?.monthlyExpiresAt?Date.parse(account.monthlyExpiresAt):null;
+    const visitUsage=(entry,member,batchIndex)=>{const account=s.accounts.find(a=>a.id===member.accountId),minutes=entry.onlinePerVisit,at=Date.parse(entry.startedAt)+(entry.prepare+(entry.batchWaveIndices?.[batchIndex]??batchIndex)*entry.batchMinutes)*60000,expiry=account?.monthlyExpiresAt?Date.parse(account.monthlyExpiresAt):null;
       const covered=account?.billingType==='monthly'&&expiry!==null?Math.min(minutes,Math.max(0,(expiry-at)/60000)):0,billable=minutes-covered;return {minutes,billable,covered,card:billable*s.config.cardPrice*s.config.discount/s.config.cardMinutes};};
     const pendingRoles=new Map();
     for(const entry of forecast.participation){const plan=s.plans.find(p=>p.id===entry.planId),pending=new Set(M.pendingBatchIndices(s,plan,entry.taskId));
