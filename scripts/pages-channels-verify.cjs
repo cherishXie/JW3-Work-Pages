@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
-const {merge}=require('./pages-channels.cjs'),{validate}=require('./stable-version.cjs');
+const {merge}=require('./pages-channels.cjs'),{validate,validateReadme}=require('./stable-version.cjs');
 const files=[...require('./public-assets.cjs').publicFiles,...require('./public-assets.cjs').publicDocuments,'.nojekyll'];
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'jw3-channels-')),source=path.join(tmp,'source'),target=path.join(tmp,'target');
 try{
@@ -17,5 +17,9 @@ try{
  fs.writeFileSync(path.join(target,'private.json'),'secret');assert.throws(()=>merge(source,target,'dev','a'.repeat(40),'1.0.0'));
  validate('0.3.0','0.2.0','## [0.3.0]\n- Release notes');
  for(const [v,notes]of [['0.2.0','- no bump'],['0.2.1','## [0.2.1]\n- patch'],['0.3.0','## [0.3.0]']])assert.throws(()=>validate(v,'0.2.0',notes));
- console.log('PASS Pages channels: dev preserves main bytes, main preserves dev bytes, private files rejected; main requires version upgrade and changelog.');
+ validateReadme('0.3.0','# Workbench 0.3.0\nNew feature instructions','# Workbench 0.2.0');
+ assert.throws(()=>validateReadme('0.3.0','# Workbench 0.3.0','# Workbench 0.3.0'));
+ assert.throws(()=>validateReadme('0.3.0','# Updated feature instructions','# Workbench 0.2.0'));
+ assert.throws(()=>validateReadme('0.3.0','# Workbench 0.3.00','# Workbench 0.2.0'));
+ console.log('PASS Pages channels: dev preserves main bytes, main preserves dev bytes, private files rejected; main requires version upgrade, changelog and updated README with the release version.');
 }finally{fs.rmSync(tmp,{recursive:true,force:true});}
