@@ -2305,3 +2305,22 @@ th.num,td.num,.table-wrap th:last-child,td.num-cell{text-align:right;font-varian
 .insight-metric .metric-delta{font-size:12px;line-height:1.5;color:var(--wb-text-muted);margin-top:-2px}
 .insight-metric .metric-delta.positive{color:var(--wb-success)}
 .insight-metric .metric-delta.negative{color:var(--wb-danger)}
+
+/* 14 覆盖静态样板遗留的 248 / 20px 尺寸，统一回设计规范的外壳令牌 */
+html[data-theme] .sidebar{width:var(--ds-sidebar-w);padding:20px 12px 16px}
+html[data-theme] .workspace{margin-left:var(--ds-sidebar-w)}
+html[data-theme] #app{padding:var(--ds-page-pad);max-width:var(--ds-content-max)}
+html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header-h)}
+.tc-plan-actions{left:var(--ds-sidebar-w)}
+@media(max-width:1024px){
+  html[data-theme] .sidebar{width:var(--ds-sidebar-w)}
+  html[data-theme] #app{padding:16px}
+  html[data-theme] .topbar{padding:0 16px}
+  .tc-plan-actions{left:16px}
+}
+
+/* 15 页头高度：48/64 的旧写法用 ID 选择器，需同权重覆盖为 64px 且无额外内边距 */
+#topbar.topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header-h)}
+#topbar.topbar .global-bar-summary{min-height:var(--ds-header-h)}
+@media(max-width:1024px){#topbar.topbar{padding:0 16px}}
+@media(max-width:1024px){html[data-theme] .workspace{margin-left:0}}
