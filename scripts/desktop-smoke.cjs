@@ -23,8 +23,8 @@ async function launch(){
     assert.equal(await page.locator('footer [data-storage-label]').textContent(),'数据保存在此电脑');
     const security=await app.evaluate(({BrowserWindow})=>{const p=BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();return {sandbox:p.sandbox,contextIsolation:p.contextIsolation,nodeIntegration:p.nodeIntegration};});
     assert.deepEqual(security,{sandbox:true,contextIsolation:true,nodeIntegration:false});
-    for(const theme of ['deep-ocean','cloud-blue','jade-green','warm-sand','amethyst-night']){
-      await page.locator('#theme-select').selectOption(theme,{force:true});
+    for(const theme of await page.locator('#theme-select option').evaluateAll(options=>options.map(option=>option.value))){
+      await page.locator('#theme-select').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));},theme);
       for(const width of [1440,1024,390]){
         await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,900),width);
         await page.waitForTimeout(100);

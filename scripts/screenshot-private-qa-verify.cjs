@@ -48,8 +48,12 @@ const dir = fs.mkdtempSync(path.join(output, 'synthetic-ocr-runner-'));
 try {
   const input = path.join(dir, 'labels.json'), existing = path.join(dir, 'existing.json'), newReport = path.join(dir, 'new.json');
   fs.writeFileSync(input, JSON.stringify(labels)); fs.writeFileSync(existing, 'preserve');
-  fs.symlinkSync('/tmp', path.join(dir, 'outside'));
-  assert.throws(() => Q.privatePath(path.join(dir, 'outside', 'escape.json')));
+  // Junctions avoid the Windows privilege requirement for directory symlinks.
+  const outside = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'jw3-outside-'));
+  try {
+    fs.symlinkSync(outside, path.join(dir, 'outside'), process.platform === 'win32' ? 'junction' : 'dir');
+    assert.throws(() => Q.privatePath(path.join(dir, 'outside', 'escape.json')));
+  } finally { fs.rmSync(outside, {recursive: true, force: true}); }
   for (const args of [[input, input], [input, existing], [input, newReport, input]]) {
     const result = spawnSync(process.execPath, [path.join(__dirname, 'screenshot-private-qa.cjs'), ...args], {encoding: 'utf8', timeout: 5000});
     assert.equal(result.status, 2, result.stderr);
