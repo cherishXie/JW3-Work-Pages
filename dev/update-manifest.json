@@ -1,14 +1,15 @@
 {
-  "id": "404fba9f026c5e050878cac248a015ee556142aec83ac758e267bf91f0a5e46a",
-  "version": "0.12.0-dev.79",
+  "id": "32d4dbf41ae67029822b338158fa59c61484efd765fa017441de9c102522644d",
+  "version": "0.12.0-dev.80",
   "channel": "dev",
-  "sourceCommit": "11f7b1a51e2fe5069fbe78a6d2388e9d0956a248",
-  "sourceTimestamp": 1795148105,
+  "sourceCommit": "3c195aa764389061ecc4862e5aad2b92e54ee887",
+  "sourceTimestamp": 1795150050,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "重新发布网页端：Pages 部署步骤再次失败"
+      "图表卡支持单独导出 PNG：净收益演化、角色效率散点、每日登记批次右上角新增导出按钮，按当前主题底色与 2 倍分辨率输出。",
+      "角色效率散点与每日登记批次按卡片实际宽度重排坐标与刻度，桌面不再需要横向滚动，坐标轴标题与刻度分离，日期标签不再重叠。"
     ]
   },
   "files": [
@@ -134,8 +135,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 393212,
-      "sha256": "e6cb6777aac110e7afc9cb9f6929e7831481b3c7dda33e37181cddbf63d9b4af"
+      "bytes": 393411,
+      "sha256": "0769bac5aad9880e2d8a6c1136de0fa34a83518abcd25141f8aa1db1b8ae60d1"
     },
     {
       "name": "themes.js",
@@ -214,13 +215,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 844653,
-      "sha256": "cc9ad466c7b919175827ac2e7bfb2096dcf9639dd5f70142ffcd55454fe69ad4"
+      "bytes": 847957,
+      "sha256": "70214235c6f49cb14fc6e0364a97fae4359a3749eddec240c13627032d166458"
     },
     {
       "name": "version.js",
-      "bytes": 367,
-      "sha256": "f002e584ac8dff5ea892fc08774eab675e66e57bfcf54aa2d166229e8b8db7a0"
+      "bytes": 662,
+      "sha256": "93c92acd6ed2382764626fd9b47437faac067a96f171fa0b14473e205c280fc4"
     }
   ]
 }
