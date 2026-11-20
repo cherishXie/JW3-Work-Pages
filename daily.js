@@ -408,6 +408,32 @@
   const events=planEvents(copy,p);if(syncProgress)retractProgress(copy,events);removeLinked(copy,new Set(copy.records.filter(r=>r.planId===planId).map(r=>r.id)));copy.plans=copy.plans.filter(p=>p.id!==planId);
   const entry=archiveChange(s,copy,'删除排程 · '+(p.taskName||copy.tasks.find(t=>t.id===p.taskId)?.name||p.taskId)+' · '+p.date,reason);M.validateState(copy);Object.assign(s,copy);return entry;
  }
+ function removePendingBatches(s,planId,taskId,indices,reason=''){
+  const p=s.plans.find(x=>x.id===planId);if(!p)throw new Error('排程不存在');
+  assertPlanUnlocked(p);
+  const pending=remaining(s,p,taskId);
+  if(!indices.length||new Set(indices).size!==indices.length||indices.some(i=>!pending.includes(i)))throw new Error('只能删除尚未执行的批次');
+  if(p.lockedBatches?.some(i=>indices.includes(i)))throw new Error('第 '+indices.map(i=>i+1).join('、')+' 批队伍已锁定，请先解锁');
+  const covered=s.records.filter(r=>r.planId===planId&&Array.isArray(r.planBatchIndices)&&r.planBatchIndices.some(i=>indices.includes(i)));
+  if(covered.length)throw new Error('所选批次已包含在实测记录中，请先撤销完成再删除');
+  const keep=p.batches.map((_,i)=>i).filter(i=>!indices.includes(i));
+  if(!keep.length)return deletePlan(s,planId,{reason:reason.trim()||'删除全部未执行批次'});
+  const remap=new Map(keep.map((old,now)=>[old,now])),mapIndices=list=>(list||[]).filter(i=>remap.has(i)).map(i=>remap.get(i));
+  const next=JSON.parse(JSON.stringify(p));
+  next.batches=keep.map(i=>p.batches[i]);
+  if(p.teamConfigs)next.teamConfigs=keep.map(i=>p.teamConfigs[i]);
+  if(p.companionAssignments)next.companionAssignments=keep.map(i=>p.companionAssignments[i]);
+  if(p.lockedBatches)next.lockedBatches=mapIndices(p.lockedBatches);
+  if(p.closedBatches){next.closedBatches={};for(const [key,value] of Object.entries(p.closedBatches))next.closedBatches[key]=mapIndices(value);}
+  if(p.completionFacts)next.completionFacts=p.completionFacts.map(f=>({...f,planBatchIndices:mapIndices(f.planBatchIndices)})).filter(f=>f.planBatchIndices.length);
+  if(p.changes)next.changes=p.changes.map(c=>({...c,indices:mapIndices(c.indices)})).filter(c=>c.indices.length||c.action==='move');
+  next.updatedAt=new Date().toISOString();
+  const copy=JSON.parse(JSON.stringify(s));
+  copy.plans=copy.plans.map(x=>x.id===planId?next:x);
+  for(const r of copy.records)if(r.planId===planId&&Array.isArray(r.planBatchIndices))r.planBatchIndices=mapIndices(r.planBatchIndices);
+  const entry=archiveChange(s,copy,'删除批次 · '+next.date+' · 第 '+indices.map(i=>i+1).join('、')+' 批',reason.trim()||'删除未执行批次');
+  M.validateState(copy);Object.assign(s,copy);return entry;
+ }
  function deletePendingBatch(s,planId,taskId,index,reason=''){
   const copy=JSON.parse(JSON.stringify(s)),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');changeRemaining(copy,p,taskId,[index],{action:'stop',reason:reason.trim()||'删除未执行批次'});archiveChange(s,copy,'删除批次 · '+p.date+' · 第 '+(index+1)+' 批',reason);M.validateState(copy);Object.assign(s,copy);
  }
@@ -440,5 +466,5 @@
   const list=s.plans.filter(p=>isPendingPlan(s,p)).sort((a,b)=>queueCompare(s,a,b)),from=list.indexOf(source),to=list.indexOf(target);list.splice(from,1);list.splice(to,0,source);
   list.forEach((p,i)=>{p.queuePosition=i;p.updatedAt=new Date().toISOString();});return list.map(p=>p.id);
  }
- return {saveTeamTemplate,validatePendingGongzhan,transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,restoreDeleted};
+ return {saveTeamTemplate,validatePendingGongzhan,transitionRaidTimer,rosterRoleIssue,isPendingPlan,queueCompare,reorderQueue,batchAccountSlots,completedTime,canRegisterPlannedRole,executionTiming,saveExecutionDraft,openExecutionDraft,reuseRaidTeams,assertBatchEditable,assertPlanUnlocked,setBatchLocked,lockedRoleIds,setBatchRosters,replaceBatchRole,removeBatchRole,registerBatch,checkBatch,reusePlan,hasExecution,changeRemaining,expense,doneIndices,remaining,reconcile,wage,inventory,uniqueEvent,receipt,sale,cdRows,executionGroup,editExecution,reopenExecution,deletePlan,deletePendingBatch,removePendingBatches,restoreDeleted};
 });

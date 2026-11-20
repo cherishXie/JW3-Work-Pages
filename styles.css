@@ -2363,3 +2363,10 @@ html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header
 .chart-skeleton i:nth-child(3n+2){height:34px;border-radius:6px}
 .insight-metrics>.chart-skeleton{min-height:96px}
 @media(prefers-reduced-motion:reduce){.chart-skeleton i{transition:none}}
+
+/* 22 账号筛选条：全部账号铺开，不分页 */
+.directory-account-list{max-height:none;overflow:visible}
+.account-layout .account-tree .directory-account-list{display:flex;flex-wrap:wrap;gap:6px}
+.directory-account-total{display:block;margin:2px 0 0;color:var(--wb-text-muted);font-size:12px}
+@media(min-width:768px){.directory-account-total{position:absolute;right:10px;bottom:8px;margin:0}}
+.account-layout .account-tree{position:relative}
