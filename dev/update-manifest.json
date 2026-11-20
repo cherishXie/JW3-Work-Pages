@@ -1,14 +1,14 @@
 {
-  "id": "6661c7bee3e6cdcf288643828ef6c0394f62604dcfec4dbaabc33f899f2d9933",
-  "version": "0.12.0-dev.89",
+  "id": "3a071a0039791425b450074b163f3f76823625d18bcd436d006dc39181de49eb",
+  "version": "0.12.0-dev.90",
   "channel": "dev",
-  "sourceCommit": "b7eb59079282a4f744e43ee19dedfce121211ad4",
-  "sourceTimestamp": 1795156164,
+  "sourceCommit": "652593cdbc6930165d24c1cbb3dca20bd391abdc",
+  "sourceTimestamp": 1795157058,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "总览趋势改为先按期间净收益排序再计算前 6 名的逐日曲线，并移除指向已不存在区块的延迟填充逻辑；真实档案下首屏约 6.4 秒降到 3.1 秒，隐私遮罩等重绘从约 5 秒降到 0.15 秒。"
+      "修复选择主题色后打开总览长时间无响应：总览改为先出外壳与骨架、再分两段填充（真实档案 34 角色：33ms 出现骨架、1.5 秒填充主体与图表），主题与主题色切换直接复用缓存，实测 89ms。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 394971,
-      "sha256": "1074b31b7ea399082644a34b8485ac014704b0ce1a36aade65178eaf825d6070"
+      "bytes": 395446,
+      "sha256": "25aefe8da5b0656fe48d8cc261be3bf31c79865ac337f275b667f1bd37ff9b47"
     },
     {
       "name": "themes.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 850263,
-      "sha256": "aa463069d5b1f22278ca8748c3b420531adef43730713338c3c614efc710e124"
+      "bytes": 855459,
+      "sha256": "66bcfe4d1284b1660d5578e019bb9e6a6c0d1c58194168b15fbb92885b9a2980"
     },
     {
       "name": "version.js",
-      "bytes": 551,
-      "sha256": "653453f2f05bd066d56ac571a0d1a0a49afb71b9f0ca119d0bac0cf011a14823"
+      "bytes": 565,
+      "sha256": "531207f1a481f1fa5526df885f235116748da7d3d8782dfe615355170dabdcad"
     }
   ]
 }

@@ -186,7 +186,7 @@
   function valueBars(rows,format,action=''){
     const valid=rows.filter(r=>chartNumber(r.value)),lo=Math.min(0,...valid.map(r=>r.value)),hi=Math.max(0,...valid.map(r=>r.value)),span=hi-lo||1,zero=-lo/span*100;
     if(!valid.length)return empty('当前没有可绘制的数据','可调整筛选或补充数据；缺失值不作为零值绘制。');
-    return `<div class="value-bars" role="list" aria-label="数值对比图">${valid.map((r,i)=>{const tip=r.label+'：'+format(r.value)+(r.note?'；'+r.note:''),body=`<div class="value-bar-heading"><span>${esc(r.label)}</span><b class="number ${r.value<0?'negative':''}">${esc(format(r.value))}</b></div><div class="value-track"><span class="value-zero" style="left:${zero}%"></span><i style="left:${Math.min(zero,(r.value-lo)/span*100)}%;width:${Math.abs(r.value)/span*100}%;background:${r.value<0?'var(--wb-danger)':colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i>${r.value===0?`<em style="left:${zero}%"></em>`:''}</div>${r.note?`<small>${esc(r.note)}</small>`:''}`;return `<div role="listitem">${action?button(body,action,'value-bar-button',`data-id="${esc(r.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.id}"`):`<div class="value-bar-item" tabindex="0" title="${esc(tip)}" aria-label="${esc(tip)}">${body}</div>`}</div>`;}).join('')}</div>`;
+    return `<div class="value-bars" role="list" aria-label="数值对比图">${valid.map((r,i)=>{const tip=r.label+'：'+format(r.value)+(r.note?'；'+r.note:''),body=`<div class="value-bar-heading"><span>${esc(r.label)}</span><b class="number ${r.value<0?'negative':''}">${esc(format(r.value))}</b></div><div class="value-track"><span class="value-zero" style="left:${zero}%"></span><i style="left:${Math.min(zero,(r.value-lo)/span*100)}%;width:${Math.abs(r.value)/span*100}%;background:${r.value<0?'var(--wb-danger)':'var(--wb-chart-bg-'+(categoryIndex(r.task?.id||r.id||r.label)%6)+')'}"></i>${r.value===0?`<em style="left:${zero}%"></em>`:''}</div>${r.note?`<small>${esc(r.note)}</small>`:''}`;return `<div role="listitem">${action?button(body,action,'value-bar-button',`data-id="${esc(r.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.id}"`):`<div class="value-bar-item" tabindex="0" title="${esc(tip)}" aria-label="${esc(tip)}">${body}</div>`}</div>`;}).join('')}</div>`;
   }
   function operationCards(items,key,limit=6){
     const card=x=>`<article class="decision-card"><header><h3>${x.title}</h3>${x.tag?`<span class="pill">${x.tag}</span>`:''}</header>${x.body||''}${x.actions?`<div class="flex wrap mt">${x.actions}</div>`:''}</article>`;
@@ -288,7 +288,7 @@
   function scatterPlot(rows,key){
     const xkey=ui.analysisX,valid=rows.filter(r=>chartNumber(r[xkey]));if(!valid.length)return empty('当前没有可比较的任务','选择其他指标或任务；零成本 ROI、零时间时薪保留为不适用。');
     const W=window.innerWidth<768?Math.max(310,window.innerWidth-64):760,H=340,L=64,R=22,T=32,B=52,xmax=Math.max(1,...valid.map(r=>r[xkey])),ymin=Math.min(0,...valid.map(r=>analysisValue(r,key))),ymax=Math.max(0,...valid.map(r=>analysisValue(r,key))),yrange=ymax-ymin||1,X=v=>L+v/xmax*(W-L-R),Y=v=>H-B-(v-ymin)/yrange*(H-T-B);
-    return `<svg class="roi-scatter" viewBox="0 0 ${W} ${H}" role="group" aria-label="任务收益与投入散点图"><text x="${L}" y="18" class="chart-label">${esc({roi:'成本净 ROI（%）',hourly:'净时薪',net:'经济净收益',gross:'毛收益',cost:'成本（元）',minutes:'操作分钟'}[key])}</text>${Array.from({length:5},(_,i)=>{const y=ymin+yrange*i/4,x=xmax*i/4;return `<line x1="${L}" y1="${Y(y)}" x2="${W-R}" y2="${Y(y)}" class="chart-grid"/><text x="${L-9}" y="${Y(y)+4}" text-anchor="end" class="chart-label">${num(y,1)}</text><text x="${X(x)}" y="${H-B+22}" text-anchor="middle" class="chart-label">${num(x,1)}</text>`;}).join('')}<line x1="${L}" y1="${Y(0)}" x2="${W-R}" y2="${Y(0)}" stroke="var(--wb-text-muted)" stroke-dasharray="4 4"/><text x="${W-R}" y="${H-6}" text-anchor="end" class="chart-label">${xkey==='minutes'?'操作时间（分钟）':'综合成本（元）'}</text>${valid.map((r,i)=>{const tip=r.task.name+' / '+analysisFormat(xkey,r[xkey])+' / '+analysisFormat(key,analysisValue(r,key));return `<g class="scatter-point" tabindex="0" role="button" data-action="analysis-inspect" data-id="${esc(r.task.id)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.task.id}"><title>${esc(tip)}</title><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="15" fill="transparent"/><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="7" fill="${r.net<0?'var(--wb-danger)':colors[categoryIndex(r.task?.id||r.id||r.label)]}" stroke="var(--wb-surface)" stroke-width="2"/><text x="${X(r[xkey])}" y="${Y(analysisValue(r,key))+4}" text-anchor="middle" fill="${r.net<0?'var(--wb-chart-danger-text)':'var(--wb-chart-text-'+categoryIndex(r.task?.id||r.id||r.label)+')'}" font-size="12">${i+1}</text></g>`;}).join('')}</svg><div class="scatter-legend">${valid.map((r,i)=>button(`<i class="swatch" style="background:${r.net<0?'var(--wb-danger)':colors[categoryIndex(r.task?.id||r.id||r.label)]}"></i>${i+1}. ${esc(r.task.name)}`,'analysis-inspect','ghost small',`data-id="${esc(r.task.id)}" aria-pressed="${ui.analysisFocus===r.task.id}"`)).join('')}</div>`;
+    return `<svg class="roi-scatter" viewBox="0 0 ${W} ${H}" role="group" aria-label="任务收益与投入散点图"><text x="${L}" y="18" class="chart-label">${esc({roi:'成本净 ROI（%）',hourly:'净时薪',net:'经济净收益',gross:'毛收益',cost:'成本（元）',minutes:'操作分钟'}[key])}</text>${Array.from({length:5},(_,i)=>{const y=ymin+yrange*i/4,x=xmax*i/4;return `<line x1="${L}" y1="${Y(y)}" x2="${W-R}" y2="${Y(y)}" class="chart-grid"/><text x="${L-9}" y="${Y(y)+4}" text-anchor="end" class="chart-label">${num(y,1)}</text><text x="${X(x)}" y="${H-B+22}" text-anchor="middle" class="chart-label">${num(x,1)}</text>`;}).join('')}<line x1="${L}" y1="${Y(0)}" x2="${W-R}" y2="${Y(0)}" stroke="var(--wb-text-muted)" stroke-dasharray="4 4"/><text x="${W-R}" y="${H-6}" text-anchor="end" class="chart-label">${xkey==='minutes'?'操作时间（分钟）':'综合成本（元）'}</text>${valid.map((r,i)=>{const tip=r.task.name+' / '+analysisFormat(xkey,r[xkey])+' / '+analysisFormat(key,analysisValue(r,key));return `<g class="scatter-point" tabindex="0" role="button" data-action="analysis-inspect" data-id="${esc(r.task.id)}" aria-label="${esc(tip)}" aria-pressed="${ui.analysisFocus===r.task.id}"><title>${esc(tip)}</title><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="15" fill="transparent"/><circle cx="${X(r[xkey])}" cy="${Y(analysisValue(r,key))}" r="7" fill="${r.net<0?'var(--wb-danger)':'var(--wb-chart-bg-'+(categoryIndex(r.task?.id||r.id||r.label)%6)+')'}" stroke="var(--wb-surface)" stroke-width="2"/><text x="${X(r[xkey])}" y="${Y(analysisValue(r,key))+4}" text-anchor="middle" fill="${r.net<0?'var(--wb-chart-danger-text)':'var(--wb-chart-text-'+categoryIndex(r.task?.id||r.id||r.label)+')'}" font-size="12">${i+1}</text></g>`;}).join('')}</svg><div class="scatter-legend">${valid.map((r,i)=>button(`<i class="swatch" style="background:${r.net<0?'var(--wb-danger)':'var(--wb-chart-bg-'+(categoryIndex(r.task?.id||r.id||r.label)%6)+')'}"></i>${i+1}. ${esc(r.task.name)}`,'analysis-inspect','ghost small',`data-id="${esc(r.task.id)}" aria-pressed="${ui.analysisFocus===r.task.id}"`)).join('')}</div>`;
   }
   function priceChart(rows){
     const groups=new Map();for(const q of rows){const id=JSON.stringify([q.kind,q.server||'',q.itemId||q.name]);if(!groups.has(id))groups.set(id,[]);groups.get(id).push(q);}
@@ -672,20 +672,69 @@
     return `<div class="legend">${roleData.map((x,i)=>`<span><i style="background:var(--wb-chart-bg-${i%6})"></i>${esc(x.r.name)}</span>`).join('')}</div><div class="chart-scroll"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="角色累计净收益演化"><text x="6" y="11" text-anchor="start">金</text>${grid}${lines}${labels}</svg></div><p class="chart-note">榜单前 ${roleData.length} 名角色的累计净收益；缺失日期不补零。</p>`;
   }
 
-  function overview(){
-    const s=summaryView(state,ui.start,ui.end,scope(),ui.mode),complete=completionView(state,ui.start,ui.end,scope()),roles=activeRoles(),cash=M.cashSummary(state,ui.start,ui.end);
+  let overviewBodyCache={key:'',main:'',charts:''},overviewBodyJob=0,overviewBodyPending='';
+  function overviewBodyKey(){return [ui.start,ui.end,ui.mode,JSON.stringify(scope()),state.updatedAt||'',state.records.length,state.plans.length,state.progress.length,state.roles.length,state.accounts.length,ui.currency].join('|');}
+  function overviewScopeData(){
+    const s=summaryView(state,ui.start,ui.end,scope(),ui.mode),complete=completionView(state,ui.start,ui.end,scope());
+    return {s,complete,roles:activeRoles(),cash:M.cashSummary(state,ui.start,ui.end)};
+  }
+  function overviewMain(){
+    const {s,complete,roles,cash}=overviewScopeData();
     const spark=(label)=>{const days=M.dates(M.addDays(today,-6),today);let vals=days.map(d=>{const rows=state.records.filter(r=>r.date===d);if(label==='操作时间')return rows.reduce((n,r)=>n+(r.minutes||0),0);if(label==='完成进度')return state.progress.filter(p=>p.date===d&&Number(p.completed)>0).length;return rows.reduce((n,r)=>n+(r.gold||0),0);});const max=Math.max(1,...vals),min=Math.min(0,...vals),span=max-min||1;const path=vals.map((v,i)=>`${i?'L':'M'}${i/(vals.length-1||1)*88},${22-(v-min)/span*18}`).join(' ');return `<svg viewBox="0 0 88 24" aria-hidden="true"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;};
     const metric=(label,value,detail,negative=false,primary=false,delta='')=>{const parts=String(value).split(' / ');return `<div class="card insight-metric" ${primary?`data-metric-tone="${negative?'danger':'primary'}"`:''}><span class="metric-label">${cueIcon(label,negative?'danger':null)}<span>${label}</span></span><strong class="number ${negative?'negative':''}">${parts[0]}${parts.length>1?'<em>'+parts.slice(1).join(' / ')+'</em>':''}</strong><small>${detail}</small>${delta}${button(spark(label),label==='完成进度'?'open-task-progress':'open-roi-section','metric-drill ghost small',(label==='完成进度'?'data-status="all" aria-label="查看完成进度"':'data-value="'+(label==='操作时间'?'cost':'tasks')+'" aria-label="查看'+label+'"'))}</div>`;};
     const batchTotal=(s.tasks||[]).reduce((a,t)=>a+(t.batches||0),0)||state.records.filter(r=>r.date>=ui.start&&r.date<=ui.end).reduce((a,r)=>a+(r.batches||1),0);
     const span=M.dates(ui.start,ui.end).length,prevEnd=M.addDays(ui.start,-1),prevStart=M.addDays(prevEnd,-(Math.max(1,span)-1)),prev=summaryView(state,prevStart,prevEnd,scope(),ui.mode),delta=(cur,before,semantic=false)=>{if(!prev.hasData||cur==null)return '';if(before==null)return `<span class="metric-delta">上期无此项</span>`;if(before===0)return `<span class="metric-delta">上期为 0</span>`;const rate=(cur-before)/Math.abs(before)*100;if(Math.abs(rate)<0.05)return `<span class="metric-delta">与上期持平</span>`;const up=rate>0;return `<span class="metric-delta ${semantic?(up?'positive':'negative'):''}">${up?'↑':'↓'} ${pct(Math.abs(rate))} 较上期</span>`;};
     const metrics=`<div class="insight-metrics">${metric('净收益',s.hasData?amount(s.net,s.netGold):'—',s.hasData?'金币与人民币 / 当前期间':kind(),s.hasData&&s.net<0,false,delta(s.hasData?s.net:null,prev.net,true))}${metric('净时薪',s.hasData&&s.hourly!==null?amount(s.hourly,s.hourlyGold):'—','净收益 ÷ 操作小时',s.hasData&&s.hourly<0,false,delta(s.hourly,prev.hourly,true))}${metric('操作时间',s.hasData?num(s.minutes/60,1)+' 小时':'—','账号在线 '+num(s.onlineMinutes/60,1)+' 小时',false,false,delta(s.minutes,prev.minutes))}${metric('登记批次',num(batchTotal)+' 批','当前期间已登记批次')}</div>`;
+    return `${overviewHero(s,complete,roles)}${metrics}${overviewLeaderTables(s)}`;
+  }
+  function overviewCharts(){
+    const {s,cash}=overviewScopeData(),roles=activeRoles();
     const trend=`<section class="card insight-trend wb-trend" data-chart-card="净收益演化">${head('净收益演化','赛季累计 / 单位：金',chartExportButton('trend','净收益演化'))}${overviewTrendLine()}<div class="chart-foot"><span>实测与已确认排程分开累计</span><span>缺失日期不补零</span></div></section>`;
     const distribution=`<section class="card wb-distribution" data-chart-card="任务收益分布">${head('任务收益分布','仅正毛收益参与面积；亏损单独核算','<span class="pill">正收益面积</span>'+chartExportButton('distribution','任务收益分布'))}${composition(s)}<p class="chart-note">任务较多时按收益取前 5 项 + 其他；完整 8 项见收益分析。</p></section>`;
     const scatter=`<section class="card wb-scatter" data-chart-card="角色效率散点">${head('角色效率散点','操作时间 × 净时薪 / 点颜色来自门派','<span class="pill">操作时间 × 净时薪</span>'+chartExportButton('scatter','角色效率散点'))}${overviewScatterCharts(roles)}</section>`;
     const daily=`<section class="card wb-daily" data-chart-card="每日登记批次">${head('每日登记批次','按登记日期 / 最近 14 天','<span class="pill">最近 14 天</span>'+chartExportButton('daily','每日登记批次'))}${overviewDailyChart()}</section>`;
     const notes=`${attributionNotice(s)}${s.forecastWarnings?.length?`<details class="card pad wb-note"><summary>预测核对提醒 / ${s.forecastWarnings.length} 项</summary><p class="panel-sub mt">${s.forecastWarnings.map(esc).join('<br>')}</p></details>`:''}${s.billingWarnings?.length?notice(s.billingWarnings.map(esc).join('<br>')):''}`;
-    return `<div class="insight-workbench static-overview">${pageHead('WORKSPACE / OVERVIEW','工作台总览','')}${overviewHero(s,complete,roles)}${metrics}${overviewLeaderTables(s)}<div class="wb-chart-row">${trend}${distribution}</div><div class="wb-chart-row2">${scatter}${daily}</div>${notes}</div>`;
-}
+    return `<div class="wb-chart-row">${trend}${distribution}</div><div class="wb-chart-row2">${scatter}${daily}</div>${notes}`;
+  }
+  function overviewBody(){return overviewMain()+overviewCharts();}
+  function overviewSkeletonBody(){
+    const card=rows=>`<section class="card chart-skeleton" role="status" aria-live="polite"><span class="sr-only">正在计算总览数据</span>${rows}</section>`;
+    const line=w=>`<i style="width:${w}%"></i>`;
+    return `<div class="insight-metrics">${card(line(30)+line(64)+line(46))}</div><div class="wb-chart-row">${card(line(38)+line(72)+line(56)+line(84))}${card(line(44)+line(62)+line(52))}</div>`;
+  }
+  function overview(){
+    const shell=content=>`<div class="insight-workbench static-overview">${pageHead('WORKSPACE / OVERVIEW','工作台总览','')}${content}</div>`;
+    const key=overviewBodyKey(),cached=overviewBodyCache.key===key?overviewBodyCache:null;
+    if(cached&&cached.charts)return shell(cached.main+cached.charts);
+    // Large workspaces take seconds to build the leader boards; paint the shell and a skeleton
+    // first and fill main + charts in two phases so opening the overview never freezes a blank tab.
+    const heavy=state.roles.length>20||state.accounts.length>12;
+    const fillCharts=()=>{
+      if(ui.page!=='overview')return;
+      const host=document.getElementById('overview-charts-pending');
+      if(!host)return;
+      const active=viewCacheActive;viewCacheActive=true;let html;
+      try{html=overviewCharts();}finally{viewCacheActive=active;}
+      if(overviewBodyCache.key===key)overviewBodyCache={key,main:overviewBodyCache.main,charts:html};
+      const template=document.createElement('template');template.innerHTML=html;host.replaceWith(template.content);
+      applyPrivacy();fitRevenueMapLabels();enhanceTables();syncAnalysisHighlights();
+    };
+    if(!heavy){const main=overviewMain(),charts=overviewCharts();overviewBodyCache={key,main,charts};return shell(main+charts);}
+    if(cached){setTimeout(fillCharts,60);return shell(cached.main+`<div id="overview-charts-pending">${overviewSkeletonBody()}</div>`);}
+    const job=++overviewBodyJob;
+    setTimeout(()=>{
+      if(job!==overviewBodyJob||ui.page!=='overview'||overviewBodyKey()!==key)return;
+      const host=document.getElementById('overview-body-pending');
+      if(!host)return;
+      const active=viewCacheActive;viewCacheActive=true;let main;
+      try{main=overviewMain();}finally{viewCacheActive=active;}
+      overviewBodyCache={key,main,charts:''};
+      const template=document.createElement('template');template.innerHTML=main+'<div id="overview-charts-pending"></div>';host.replaceWith(template.content);
+      applyPrivacy();enhanceTables();syncAnalysisHighlights();
+      setTimeout(fillCharts,60);
+    },60);
+    return shell(`<div id="overview-body-pending">${overviewSkeletonBody()}</div>`);
+  }
   function reviewPage(){return '<div class="review-page">'+pageHead('WORKSPACE / OVERVIEW / REVIEW','周期回顾','',button('返回总览','nav','small','data-page="overview"')+button(icon('download')+'导出周期战报','review-export','primary'))+cycleReview()+'</div>';}
   function cycleReview(){
     const unit=ui.reviewUnit,range=M.reviewPeriod(ui.reviewDate||today,unit),cutoff=range.end>today?today:range.end;
@@ -820,10 +869,28 @@
   let compositionSnapshot=null;
   function cssColorVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||'#0f766e';}
   let roiChartSnapshot=null;
+  function barsSvgFromCard(card){
+    const rows=[...card.querySelectorAll('.value-bars [role="listitem"]')].map(item=>{
+      const label=item.querySelector('.value-bar-heading span')?.textContent?.trim()||'';
+      const value=item.querySelector('.value-bar-heading b')?.textContent?.trim()||'';
+      const bar=item.querySelector('.value-track i');
+      return {label,value,left:parseFloat(bar?.style.left||'0')||0,width:parseFloat(bar?.style.width||'0')||0,color:bar?getComputedStyle(bar).backgroundColor:cssColorVar('--wb-primary')};
+    }).filter(row=>row.label);
+    if(!rows.length)throw new Error('当前卡片没有可导出的图表');
+    const W=760,rowH=36,pad=20,H=Math.max(96,pad*2+rows.length*rowH),labelW=200,valueW=130,trackX=pad+labelW,trackW=Math.max(40,W-trackX-valueW-pad),parts=[];
+    rows.forEach((row,index)=>{
+      const y=pad+index*rowH+8,label=row.label.length>16?row.label.slice(0,16)+'…':row.label;
+      parts.push(`<text x="${pad}" y="${y+13}" font-size="14" fill="${cssColorVar('--wb-text')}">${esc(label)}</text>`);
+      parts.push(`<rect x="${trackX}" y="${y+4}" width="${trackW}" height="12" rx="3" fill="${cssColorVar('--wb-track')}"/>`);
+      parts.push(`<rect x="${(trackX+row.left/100*trackW).toFixed(1)}" y="${y+4}" width="${Math.max(row.width>0?2:0,row.width/100*trackW).toFixed(1)}" height="12" rx="3" fill="${row.color}"/>`);
+      parts.push(`<text x="${W-pad}" y="${y+13}" font-size="14" text-anchor="end" fill="${cssColorVar('--wb-text-secondary')}">${esc(row.value)}</text>`);
+    });
+    return {text:`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`,width:W,height:H};
+  }
   function roiTaskBarsSvg(){
     const snap=roiChartSnapshot;
     if(!snap||!snap.rows.length)throw new Error('当前没有可导出的图表');
-    const rows=snap.rows.map(r=>({label:r.task.name,value:analysisValue(r,snap.key),color:r.net<0?cssColorVar('--wb-danger'):colors[categoryIndex(r.task?.id||r.id||r.label)]})).filter(r=>chartNumber(r.value));
+    const rows=snap.rows.map(r=>({label:r.task.name,value:analysisValue(r,snap.key),color:r.net<0?cssColorVar('--wb-danger'):cssColorVar('--wb-chart-bg-'+(categoryIndex(r.task?.id||r.id||r.label)%6))})).filter(r=>chartNumber(r.value));
     const W=760,rowH=36,pad=20,H=Math.max(96,pad*2+rows.length*rowH),labelW=200,valueW=120,trackX=pad+labelW,trackW=Math.max(40,W-trackX-valueW-pad);
     const lo=Math.min(0,...rows.map(r=>r.value)),hi=Math.max(0,...rows.map(r=>r.value)),span=hi-lo||1,zero=-lo/span;
     const parts=[];
@@ -2007,7 +2074,7 @@
     return weekControls()+`<div class="kpi-grid">${kpi('本周实测执行',num(data.recordCount),'次','按原始执行记录去重','一条整队记录只计一次；账号和角色行列展示各自的参与轨迹。','cyan')}${kpi('角色副本 CD',num(data.cdCount),'个','每角色 × 副本 × 刷新周期','包含实测以及明确标记完成的 CD；未记录不等于确认可用。')}${kpi('实测操作耗时',data.actual.hasData?num(data.actual.minutes,1):'—','分钟',`${missing} 条角色参与耗时待补`,'现实操作时间按去重实测汇总，不能把并行角色参与分钟再次当作现实操作时间。')}${kpi('实测经济净收益',data.actual.hasData?money(data.actual.net):'—','',kind('actual'),'使用各次实测的历史价格；部分角色筛选只纳入明确分摊记录。','cyan')}</div>`+body+accountActivityTable(data);
   }
   function accountActivityTable(data){
-    return `<section class="card mb">${head('账号任务概况','参与时间是各角色在线分钟累计；分摊操作分钟和收益只统计明确归属记录')}${['overview','review','roi'].includes(ui.page)?simpleChart('account-contribution',data.accounts.map(a=>({label:a.account.name,...a.result})),moneyMetrics):''}${data.accounts.length?(ui.page==='history'?taskTable:table)(['账号 / 角色数','完成任务','角色 CD 数','参与分钟','分摊操作分钟','分摊金币 / 净收益','数据缺口'],data.accounts.map(a=>`<tr><td>${esc(a.account.name)}<small>${a.roles.length} 个角色</small></td><td>${esc(a.tasks.join('、')||'暂无完成任务')}</td><td>${a.cds}</td><td>${num(a.onlineMinutes,1)}</td><td>${a.result?num(a.result.minutes,1):'未分摊'}</td><td>${a.result?num(a.result.gold)+' G / '+money(a.result.net):'未分摊'}</td><td>${a.missingTime} 条耗时待补<small>${a.unallocated} 条归属待补</small></td></tr>`)):empty('尚无账号数据','添加个人账号后，这里会汇总其角色的任务与 CD。')}</section>`;
+    return `<section class="card mb" data-chart-card="账号任务概况">${head('账号任务概况','参与时间是各角色在线分钟累计；分摊操作分钟和收益只统计明确归属记录',chartExportButton('account-activity','账号任务概况'))}${['overview','review','roi'].includes(ui.page)?simpleChart('account-contribution',data.accounts.map(a=>({label:a.account.name,...a.result})),moneyMetrics):''}${data.accounts.length?(ui.page==='history'?taskTable:table)(['账号 / 角色数','完成任务','角色 CD 数','参与分钟','分摊操作分钟','分摊金币 / 净收益','数据缺口'],data.accounts.map(a=>`<tr><td>${esc(a.account.name)}<small>${a.roles.length} 个角色</small></td><td>${esc(a.tasks.join('、')||'暂无完成任务')}</td><td>${a.cds}</td><td>${num(a.onlineMinutes,1)}</td><td>${a.result?num(a.result.minutes,1):'未分摊'}</td><td>${a.result?num(a.result.gold)+' G / '+money(a.result.net):'未分摊'}</td><td>${a.missingTime} 条耗时待补<small>${a.unallocated} 条归属待补</small></td></tr>`)):empty('尚无账号数据','添加个人账号后，这里会汇总其角色的任务与 CD。')}</section>`;
   }
   function activityDetail(id){
     const events=Activity.events(state,ui.trajectoryWeek,M.addDays(ui.trajectoryWeek,6),trajectoryScope()),e=events.find(x=>x.id===id);if(!e)return;
@@ -3099,7 +3166,8 @@
     'edit-config':()=>configForm(),'new-scenario':()=>scenarioForm(),calibrate:b=>{const t=state.tasks.find(t=>t.id===b.dataset.id),minutes=Number(b.dataset.minutes);modal('应用耗时校准 / '+esc(t.name),`<p>当前每批 ${num(t.minutes,2)} 分钟 → 建议 ${num(minutes,2)} 分钟。</p><p class="muted mt">统计期间 ${ui.start} — ${ui.end}。样本包含准备耗时；应用后准备时间设为 0、效率设为 100%，避免重复计折损。历史实测保持不变。</p>`,()=>commit(()=>{t.minutes=minutes;t.prepare=0;t.efficiency=1;t.updatedAt=new Date().toISOString();},'耗时建议已应用到未来预测'),'应用建议');},
     guide,help:b=>modal('指标说明',`<p>${esc(b.dataset.text)}</p>`),'review-export':()=>reviewReportForm(),export:()=>exportData(),
     'chart-export':async b=>{const key=b.dataset.chartExport,card=b.closest('[data-chart-card]'),name=(card?.dataset.chartCard||'图表')+'_'+ui.start+'_'+ui.end+'.png',bg=getComputedStyle(card||document.body).backgroundColor;if(key==='distribution'){const svg=revenueMapSvg();await svgTextToPng(svg.text,svg.width,svg.height,bg,name);return;}
-  if(key==='roi-task'&&ui.analysisView!=='scatter'){const svg=roiTaskBarsSvg();await svgTextToPng(svg.text,svg.width,svg.height,bg,name);return;}await exportChartPng(card,name);},
+  if(key==='roi-task'&&ui.analysisView!=='scatter'){const svg=roiTaskBarsSvg();await svgTextToPng(svg.text,svg.width,svg.height,bg,name);return;}
+  if(key==='account-activity'){const svg=barsSvgFromCard(card);await svgTextToPng(svg.text,svg.width,svg.height,bg,name);return;}await exportChartPng(card,name);},
     'raw-backup':()=>download('JX3_raw_storage.txt',new Blob([JSON.stringify({current:localStorage.getItem(KEY),legacy:localStorage.getItem(Store.LEGACY_KEY)},null,2)],{type:'text/plain'})),
     'preset-sources':()=>presetSources(),'reset-blank':()=>confirmReset(),
     'csv-template':()=>download('JX3_roles_template.csv',new Blob(['\uFEFFaccount_id,account_name,group,role_id,role_name,server,school,stance,duty,level,score,opening_gold,balance,tags,companion,region,billing_type,monthly_expires_at,tongbao,points,camp,observed_gold,energy,energyCap,weeklyEnergy,contribution,chivalry,prestige,achievement,stage,huashang,homeSeason,resource_date,reference_dps,gongzhan_buff\na_example,账号示例,主力组,r_example,角色示例,梦江南,七秀,云裳心经,heal,50,85000,18000,1600,日常,,电信区,point,,,,unknown,,0,3000,,,,,,,,,2026-10-14,,false\n'],{type:'text/csv;charset=utf-8'})),
