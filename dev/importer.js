@@ -3,8 +3,8 @@
  'use strict';
  function stable(text){let h=2166136261;for(const c of text){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}
  const els=(n,tag)=>Array.from(n.getElementsByTagNameNS('*',tag)),val=(n,tag)=>els(n,tag)[0]?.textContent||'';
- async function readXLSX(buffer,name){if(typeof JSZip==='undefined')await globalThis.WorkbenchBoot?.loadModule('zip');if(buffer.byteLength>10*1024*1024)throw new Error('Excel 超过 10 MB');const zip=await JSZip.loadAsync(buffer);const files=Object.values(zip.files);if(files.length>2000||files.some(f=>f._data?.uncompressedSize>20*1024*1024)||files.reduce((n,f)=>n+(f._data?.uncompressedSize||0),0)>40*1024*1024)throw new Error('Excel 解压体积或文件数超限');
-  const xml=async path=>{const f=zip.file(path);if(!f)throw new Error('Excel 缺少 '+path);const text=await f.async('string');if(text.length>20*1024*1024||/<!DOCTYPE/i.test(text))throw new Error('Excel XML 格式不受支持');const doc=new DOMParser().parseFromString(text,'application/xml');if(els(doc,'parsererror').length)throw new Error('Excel XML 损坏');return doc;};
+ async function readXLSX(buffer,name){if(typeof JSZip==='undefined')await globalThis.WorkbenchBoot?.loadModule('zip');if(buffer.byteLength>64*1024*1024)throw new Error('Excel 超过 64 MB');const zip=await JSZip.loadAsync(buffer);const files=Object.values(zip.files);if(files.length>4000||files.some(f=>f._data?.uncompressedSize>80*1024*1024)||files.reduce((n,f)=>n+(f._data?.uncompressedSize||0),0)>240*1024*1024)throw new Error('Excel 解压体积或文件数超限');
+  const xml=async path=>{const f=zip.file(path);if(!f)throw new Error('Excel 缺少 '+path);const text=await f.async('string');if(text.length>80*1024*1024||/<!DOCTYPE/i.test(text))throw new Error('Excel XML 格式不受支持');const doc=new DOMParser().parseFromString(text,'application/xml');if(els(doc,'parsererror').length)throw new Error('Excel XML 损坏');return doc;};
   const wb=await xml('xl/workbook.xml'),rels=await xml('xl/_rels/workbook.xml.rels'),shared=zip.file('xl/sharedStrings.xml')?els(await xml('xl/sharedStrings.xml'),'si').map(n=>els(n,'t').map(t=>t.textContent).join('')):[],relations=Object.fromEntries(els(rels,'Relationship').map(r=>[r.getAttribute('Id'),r.getAttribute('Target')])),sheets=[];
   for(const sh of els(wb,'sheet')){const target=relations[sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')];if(!target||target.includes('..'))throw new Error('Excel 工作表路径无效');const path=target.startsWith('/')?target.slice(1):'xl/'+target,doc=await xml(path),cells={};for(const c of els(doc,'c')){const ref=c.getAttribute('r');if(!/^[A-Z]{1,3}[1-9][0-9]*$/.test(ref))throw new Error('Excel 单元格地址无效');const type=c.getAttribute('t'),raw=val(c,'v'),v=type==='s'?shared[Number(raw)]??'':type==='inlineStr'?els(c,'t').map(n=>n.textContent).join(''):raw;cells[ref]={value:v,formula:val(c,'f'),type:type||'n'};}if(Object.keys(cells).length>100000)throw new Error('单表单元格超限');sheets.push({name:sh.getAttribute('name'),cells,merges:els(doc,'mergeCell').map(n=>n.getAttribute('ref'))});}
   return {name,date1904:els(wb,'workbookPr')[0]?.getAttribute('date1904')==='1',sheets};
@@ -125,7 +125,7 @@
  const mingyiSchools={0:'',1:'少林',2:'万花',3:'天策',4:'纯阳',5:'七秀',6:'五毒',7:'唐门',8:'藏剑',9:'丐帮',10:'明教',21:'苍云',22:'长歌',23:'霸刀',24:'蓬莱',25:'凌雪阁',211:'衍天宗',212:'北天药宗',213:'刀宗',214:'万灵山庄',215:'段氏'};
  async function mingyiJSON(file,loadSQLite,crypto=globalThis.crypto){
    if(file.name.toLowerCase()!==mingyiFile)throw new Error('请选择茗伊的 '+mingyiFile);
-   if(file.size>32*1024*1024)throw new Error('茗伊数据库超过 32 MB');
+   if(file.size>64*1024*1024)throw new Error('茗伊数据库超过 64 MB');
    const bytes=new Uint8Array(await file.arrayBuffer());
    if(new TextDecoder().decode(bytes.subarray(0,16))!=='SQLite format 3\0')throw new Error('该文件不是有效的 SQLite 数据库');
    const SQLite=await loadSQLite();

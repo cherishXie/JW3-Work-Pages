@@ -1,14 +1,20 @@
 {
-  "id": "754b81a8333680c490f7fb1a059edefdc7558942e85a196c6ef2082933c5d0ab",
-  "version": "0.12.0-dev.71",
+  "id": "9522ef70d04ed440927e041423119f0bc138554d18a48c87db57a8e8887fb623",
+  "version": "0.12.0-dev.73",
   "channel": "dev",
-  "sourceCommit": "4dadc36b94433fcfe70a3752680edcfdef0b8349",
-  "sourceTimestamp": 1794883489,
+  "sourceCommit": "c3ca55331160f619677672055ad00e0188b9522b",
+  "sourceTimestamp": 1795141920,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "Release 0.12.0 with dual-team mode and synchronized README"
+      "按 `docs/design` 设计规范与模块交互规范落地统一界面基线：侧栏 256px、导航项 36px 高、页头 64px 粘顶模糊、页面内边距 24px；统一卡片语法（一卡一问、口径常驻、控件贴右上、最多两个操作）、32px 控件与 6px 圆角、表头 12px 无底色与 40px 密集行、数字等宽右对齐、首列固定。保留既有 Radix 色阶、0.5px 描边、不小于 12px 字号与全部业务功能。",
+      "总览首屏摘要卡改为随内容增高，不再以固定高度裁切口径与脚注；进度条填充在所有用法下可见；1024px 与 390px 分别保持三卡与单列排布，脚注不再截断。",
+      "账号与角色：取消左侧重复账号长列表，改为横排账号筛选；账号档案卡宽屏两列并排，新增期间摘要条；新增「角色」页签，以可点击角色卡展示门派心法、定位、净收益、净时薪、操作时间与装分，支持分页与查找。",
+      "收益分析移除与顶部筛选重复的日期工具条，期间与口径跟随顶部筛选；设置页「经营参数」与「工作空间与数据」宽屏并排，补充数据性质、保存时间与快捷入口。",
+      "侧栏新增「物价助手」快捷入口，在新标签页打开外部物价计算器。",
+      "修复大档案存储：浏览器存储接近上限时改用压缩写入，保留原数据并给出可操作提示；Excel 与茗伊导入上限放宽到 64 MB。",
+      "合成数据交互合同更新为当前顶栏筛选与任务查漏入口，继续覆盖无效日期保留已应用期间、跨页复选、主题与减少动态效果、截图重试、报价检索、移动端导航与导出等检查。"
     ]
   },
   "files": [
@@ -134,13 +140,13 @@
     },
     {
       "name": "styles.css",
-      "bytes": 350499,
-      "sha256": "6fffdad1b91afa4ecdc58a0867dc51bf4e19760442da571ec765b83f7b074013"
+      "bytes": 390830,
+      "sha256": "845675c591fe928dd522b34c30a567e5c264155b2935808929a13b07b0abc5c6"
     },
     {
       "name": "themes.js",
-      "bytes": 12989,
-      "sha256": "5bb9c4c0eebacb6ea6f16f83906e046bb65961bead04208b79a9cd3e65c78dc8"
+      "bytes": 12409,
+      "sha256": "5eae62ba5380fcde9ca23170c90c55264664defe61bd4dec7fc6147f2b2ca54c"
     },
     {
       "name": "catalog.js",
@@ -169,8 +175,8 @@
     },
     {
       "name": "storage.js",
-      "bytes": 6358,
-      "sha256": "8cc400cd317fec512cc9ceaee85396386151a49860be264cde89fc9cb34044a6"
+      "bytes": 9218,
+      "sha256": "dfcd867207af54742694e839c0b1f24df42ee451d0cdef99fd26947387daf9ab"
     },
     {
       "name": "storage-worker.js",
@@ -199,8 +205,8 @@
     },
     {
       "name": "importer.js",
-      "bytes": 22561,
-      "sha256": "9136160c7ca23c054757e308bba47b0e864194e054d3f846a53bc21ce087098f"
+      "bytes": 22562,
+      "sha256": "2750588b12b4d8789dd5504fd0121b2122ffaae0a5b7e9bf3d121a06c6f61cc2"
     },
     {
       "name": "roi.js",
@@ -214,13 +220,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 805010,
-      "sha256": "b9f70644427241056b8c185e412dfa30cde1fababf50674557cbcb86be8fa968"
+      "bytes": 843409,
+      "sha256": "fdf34974ae7f46e29c0f6dd2e3b4c6e5673a73904fda4f2d0f5d44e6832217a0"
     },
     {
       "name": "version.js",
-      "bytes": 371,
-      "sha256": "677157b91b0a461d6e89b420d82787f49eae4ca0bed631218844746a66557ccd"
+      "bytes": 1987,
+      "sha256": "a1b26e79245ca12bc379df595871d6cfb0b4433d8843dfee05903749b5ab51a9"
     }
   ]
 }
