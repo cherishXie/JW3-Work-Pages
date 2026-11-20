@@ -1,14 +1,14 @@
 {
-  "id": "b4ae604cd39d662d23ced0c7f88f8f3b81071e9901d9a713f151b88d73e57a12",
-  "version": "0.12.0-dev.76",
+  "id": "5c2dabb27c9d10e2e18948f37811518c604267c9ed40741e8400ecca0e13ad7b",
+  "version": "0.12.0-dev.77",
   "channel": "dev",
-  "sourceCommit": "c2372e2782763e8e8a909f805643cd81763fa1a2",
-  "sourceTimestamp": 1795144692,
+  "sourceCommit": "75a4c00df4eed6511f592d98bd96cc788498e97c",
+  "sourceTimestamp": 1795146242,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "外壳尺寸真正落到 256 / 64：清除静态样板遗留的 248 侧栏、页头 10px 内边距与 1251px 起的 20px 页边距覆盖，窄屏恢复零侧栏偏移。"
+      "重新触发网页发布：上一次 Pages 部署步骤失败"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 482,
-      "sha256": "f0e4ec1a073e870c1e6935faacb447ad0b28c936578ae6dcdc66f8010f8549f7"
+      "bytes": 374,
+      "sha256": "3e283ff7ef0dbbe13779fc416d9c18592c1db21061868cec9ea7bc08e6d3c93c"
     }
   ]
 }
