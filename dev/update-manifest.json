@@ -1,14 +1,15 @@
 {
-  "id": "3a071a0039791425b450074b163f3f76823625d18bcd436d006dc39181de49eb",
-  "version": "0.12.0-dev.90",
+  "id": "8cf3c9ae4da103963f62df3c2bd115a8bcf601a08755c9999a882113c8949c44",
+  "version": "0.12.0-dev.91",
   "channel": "dev",
-  "sourceCommit": "652593cdbc6930165d24c1cbb3dca20bd391abdc",
-  "sourceTimestamp": 1795157058,
+  "sourceCommit": "2cceace2961c16fe4cee1c2a656cdc5355685a59",
+  "sourceTimestamp": 1795159134,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "修复选择主题色后打开总览长时间无响应：总览改为先出外壳与骨架、再分两段填充（真实档案 34 角色：33ms 出现骨架、1.5 秒填充主体与图表），主题与主题色切换直接复用缓存，实测 89ms。"
+      "账号与角色的「角色」页签恢复正常切换与角色卡点击；顶部账号筛选取消分页，全部账号一次铺开，仅保留查找框。",
+      "区分删除与终止：批次「删除本批 / 删除批次」现在真正移除该批队伍与席位（只剩一批时连同排程删除），新增「终止本批 / 终止批次」用于标记本周期不再执行；两种操作各有独立确认文案，均可在回收站恢复。"
     ]
   },
   "files": [
@@ -134,8 +135,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 395446,
-      "sha256": "25aefe8da5b0656fe48d8cc261be3bf31c79865ac337f275b667f1bd37ff9b47"
+      "bytes": 395900,
+      "sha256": "675215277eac97d085858b0d2695c720c659010bb8b4d01a978a132e745260f2"
     },
     {
       "name": "themes.js",
@@ -189,8 +190,8 @@
     },
     {
       "name": "daily.js",
-      "bytes": 57531,
-      "sha256": "322632c06431cda735e9d04571193a112a0fe66426a2128790ea6b88512ab026"
+      "bytes": 59869,
+      "sha256": "1dd5d0976994ed0cde1fe0e36c20287c657a7197e10144bfda405e2874cbfcdc"
     },
     {
       "name": "execution.js",
@@ -214,13 +215,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 855459,
-      "sha256": "66bcfe4d1284b1660d5578e019bb9e6a6c0d1c58194168b15fbb92885b9a2980"
+      "bytes": 856406,
+      "sha256": "44b7ac8c728daf56e084aaefaa4747245e764f8471ab7eb674e0add395336add"
     },
     {
       "name": "version.js",
-      "bytes": 565,
-      "sha256": "531207f1a481f1fa5526df885f235116748da7d3d8782dfe615355170dabdcad"
+      "bytes": 757,
+      "sha256": "bc1b9785e9bef840e7455af9b2e1633eaeab89e19114c8be55ee1af8bc40e381"
     }
   ]
 }
