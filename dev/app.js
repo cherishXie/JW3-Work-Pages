@@ -1524,7 +1524,7 @@
       return `<button type="button" class="role-tile" data-action="role-detail" data-id="${esc(r.id)}" style="--role-school-bg:var(--wb-school-${index}-bg);--role-school-text:var(--wb-school-${index}-text);--role-school-edge:var(--wb-school-${index}-edge)" aria-label="${esc(r.name)}，${esc(sect?.name||'门派待补')}，查看角色档案">
         <span class="role-tile-head"><span class="role-tile-glyph" aria-hidden="true">${esc((sect?.name||r.school||'?').slice(0,1))}</span><span class="role-tile-name"><b>${esc(r.name)}</b><small>${esc(state.accounts.find(a=>a.id===r.accountId)?.name||'账号待补')} / ${esc(r.server||'区服待补')}</small></span><span class="pill">${status}</span></span>
         <span class="role-tile-tags">${roleIdentityTags(r)}</span>
-        <span class="role-tile-facts"><span><small>净收益</small><b>${v.hasData&&v.net!==null?num(v.net,0)+' 金':'暂无实测'}</b>${v.hasData&&v.netGold!=null?`<em>¥${num(v.netGold,2)}</em>`:''}</span><span><small>净时薪</small><b>${v.hourly!==null?money(v.hourly)+' /h':'—'}</b></span><span><small>操作</small><b>${v.hasData?num(v.minutes/60,1)+' 小时':'—'}</b></span></span>
+        <span class="role-tile-facts"><span><small>净收益</small><b>${v.hasData&&v.netGold!=null?num(v.netGold,0)+' 金':'暂无实测'}</b>${v.hasData&&v.netGold!=null?`<em>¥${num(v.net,2)}</em>`:''}</span><span><small>净时薪</small><b>${v.hourly!==null?money(v.hourly)+' /h':'—'}</b></span><span><small>操作</small><b>${v.hasData?num(v.minutes/60,1)+' 小时':'—'}</b></span></span>
         <span class="role-tile-foot"><span>装分 ${r.score==null?'待补':num(r.score)} / ${r.level==null?'等级待补':r.level+' 级'}</span><span class="role-tile-more">完成 ${c.total?c.done+' / '+c.total:'待安排'} ›</span></span>
       </button>`;
     };

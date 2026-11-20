@@ -1,14 +1,14 @@
 {
-  "id": "5c2dabb27c9d10e2e18948f37811518c604267c9ed40741e8400ecca0e13ad7b",
-  "version": "0.12.0-dev.77",
+  "id": "1f390b888830497466304a88ae89f2d99309626250a847cda2850a985be3e397",
+  "version": "0.12.0-dev.78",
   "channel": "dev",
-  "sourceCommit": "75a4c00df4eed6511f592d98bd96cc788498e97c",
-  "sourceTimestamp": 1795146242,
+  "sourceCommit": "22b5677b6e416d9ea6099697655296bb3a3af228",
+  "sourceTimestamp": 1795147322,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "重新触发网页发布：上一次 Pages 部署步骤失败"
+      "修正角色卡的净收益单位：主值为金币、副值为人民币等值，避免把人民币当金币显示。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 844650,
-      "sha256": "da458bbfa423f212c9cd4b7f593b89c07570192d2df433d7ff4880a950a42a6f"
+      "bytes": 844653,
+      "sha256": "cc9ad466c7b919175827ac2e7bfb2096dcf9639dd5f70142ffcd55454fe69ad4"
     },
     {
       "name": "version.js",
-      "bytes": 374,
-      "sha256": "3e283ff7ef0dbbe13779fc416d9c18592c1db21061868cec9ea7bc08e6d3c93c"
+      "bytes": 430,
+      "sha256": "bfeaaf6019426455af27e03b231723d8e5207297c1370d2fd4c443ac32d84878"
     }
   ]
 }
