@@ -1,14 +1,14 @@
 {
-  "id": "8e425b480cf3b28e7340a9081a8e723ee64721af01e51f1fecf331e4777e52ae",
-  "version": "0.12.0-dev.93",
+  "id": "15bd04dae09ea714a4e0e03d735a3214e52b578c1a19024b52fd5989432eb056",
+  "version": "0.12.0-dev.94",
   "channel": "dev",
-  "sourceCommit": "5305dd2a72a8da86f4fd40ebc411e0c8b8e05b9e",
-  "sourceTimestamp": 1795160025,
+  "sourceCommit": "7f1a7f83c4293250b58463ec16dc12ff23df018c",
+  "sourceTimestamp": 1795162055,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "重新触发网页验收：上一次浏览器验收步骤失败"
+      "账号与角色整页去分页：角色页签一次铺开全部角色卡，账号页签一次列出全部账号，账号内「所属角色」也全部展开；修复角色页签「下一页」无反应（同名动作键覆盖，指向了账号内的分页状态）。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 856406,
-      "sha256": "44b7ac8c728daf56e084aaefaa4747245e764f8471ab7eb674e0add395336add"
+      "bytes": 855128,
+      "sha256": "571987565c4925672c00c9e5cf64dfb7e17920ae6ecade51a53b17f8b5433385"
     },
     {
       "name": "version.js",
-      "bytes": 376,
-      "sha256": "db4c3fc4243e4be67221aae41aeb63d69cfe1b66ca4f1b25419fc722369766ba"
+      "bytes": 580,
+      "sha256": "fb23608bcc7f73215baaa54a270184919c8b068b0f0a9e4a16b90527ff1f7afd"
     }
   ]
 }
