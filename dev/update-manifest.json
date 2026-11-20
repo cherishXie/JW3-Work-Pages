@@ -1,14 +1,14 @@
 {
-  "id": "568196b1020e388cafd67531d111899058ecb159c73b5a0102b7bcdfb9144cc7",
-  "version": "0.12.0-dev.86",
+  "id": "a9ade10816b6369414d402cbeaca27853fca7b109f91abde9dd5257c0b08ad76",
+  "version": "0.12.0-dev.87",
   "channel": "dev",
-  "sourceCommit": "d034d662169c23df1a2f1f05eceaa4b0e7e0c6b3",
-  "sourceTimestamp": 1795154048,
+  "sourceCommit": "330d5a61738ffa839c14b21a94151940596976ad",
+  "sourceTimestamp": 1795154735,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "收益分析「任务效率与收益对比」支持独立导出：横向条形按当前指标与排序生成 PNG，散点视图沿用图表导出；散点纵轴标题增加留白。"
+      "性能：完成事实与执行记录按状态与修订号缓存，失效跟随视图缓存；16 账号 / 34 角色的真实档案下总览首屏从约 24 秒降到约 6 秒，账号角色 2.3 秒、收益分析 1.7 秒。"
     ]
   },
   "files": [
@@ -154,8 +154,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 212030,
-      "sha256": "5b1266e5540a5f2306c89e27728d6234380423c29d4e9fc705b79b8cacd443c4"
+      "bytes": 212873,
+      "sha256": "e1d403b847c89adffbd6fa7eb648a1faceb25d7605bb5c066849698ada3a7a6c"
     },
     {
       "name": "operations.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 852701,
-      "sha256": "7800fe691480207fac2ec86b1e42651a0016992cffe61799dc63d36dc7fd7ca1"
+      "bytes": 852717,
+      "sha256": "640debf949ebdd27ba906f70556920de49645f3acc3fba31963015a25032c9c7"
     },
     {
       "name": "version.js",
-      "bytes": 494,
-      "sha256": "f60009d73465fbf04e764bce22e1459391fa7991d6f0d629db5390edce7f2ae0"
+      "bytes": 534,
+      "sha256": "e4636c3063b72e4d42e2d1978b94efbf4ebf6a0e5bc68ed6da88c6a69738b0c7"
     }
   ]
 }
