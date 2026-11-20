@@ -417,7 +417,7 @@
   }
   function settingsWorkspaceCard(){
     const stored=Store.hasData(state),kind=!stored?'空白空间':state.dataKind==='simulated'?'示例 / 模拟':'个人数据',saved=state.updatedAt?beijingLocal(state.updatedAt).replace('T',' '):'尚未保存';
-    return `<section class="card pad"><h2>工作空间与数据</h2><div class="settings-facts">${metricFacts([['数据性质',kind],['最近保存',esc(saved)],['账号 / 角色',state.accounts.length+' / '+state.roles.length],['分析期间',esc(ui.start.slice(5))+' — '+esc(ui.end.slice(5))]])}</div><p class="panel-sub">外观与主题偏好独立保存，不进入业务备份。截图原图与完整备份不随隐私遮罩改变。</p><div class="flex wrap mt">${button('数据管理','settings-tab','small','data-value="data"')}${button('系统验证与帮助','settings-tab','small','data-value="validation"')}${button('配置引导','setup','small')}${button('使用与计算指南','guide','small')}</div></section>`;
+    return `<section class="card pad"><h2>工作空间与数据</h2><div class="settings-facts">${metricFacts([['数据性质',kind],['最近保存',esc(saved)],['账号 / 角色',state.accounts.length+' / '+state.roles.length],['分析期间',esc(ui.start.slice(5))+' — '+esc(ui.end.slice(5))]])}</div><p class="panel-sub">外观与主题偏好独立保存，不进入业务备份。截图原图与完整备份不随隐私遮罩改变。</p><div class="flex wrap mt">${button('配置引导','setup','small')}${button('使用与计算指南','guide','small')}${button('查看价格来源档案','open-prices','small')}</div></section>`;
   }
   function collapseRecordTables(){
     if(ui.setup)return;

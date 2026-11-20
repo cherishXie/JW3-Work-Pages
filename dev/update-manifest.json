@@ -1,15 +1,14 @@
 {
-  "id": "6de1743edcf1c0e991f201c5ada54241e1da4e87835b74f819c9e02df6d04db1",
-  "version": "0.12.0-dev.74",
+  "id": "4532a9bf03c756535a2a14da32afdd814cef401a83531381afbe4758e337a965",
+  "version": "0.12.0-dev.75",
   "channel": "dev",
-  "sourceCommit": "94e29d7dd7c6368db4353c40c0500701e2963c19",
-  "sourceTimestamp": 1795143239,
+  "sourceCommit": "678493b90347b4bb6148dec263f1f1f3419a58e1",
+  "sourceTimestamp": 1795144086,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "总览指标卡增加「较上期」环比：按等长上一周期计算净收益、净时薪与操作时间变化，上期无数据不补零也不显示伪基准；语义色只用于收益与时薪，时间保持中性。",
-      "任务历史的轨迹账号筛选保留卡片选择，收成单行可横向滚动条，首屏不再被筛选区占满；资产台账在无观测时给出空态出口，主指标不再用强调色表示待采集。"
+      "网页验收脚本改为按当前主题列表与顶部筛选取状态，修正存储容量失败的模拟写入点；设置页快捷入口不再与页签重复，避免同名操作出现两个触发点。"
     ]
   },
   "files": [
@@ -215,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 844742,
-      "sha256": "38f8040d738f6de8c9d0a42a9606c89536c4976e45f62ab8247f5e9c9fd9d841"
+      "bytes": 844650,
+      "sha256": "da458bbfa423f212c9cd4b7f593b89c07570192d2df433d7ff4880a950a42a6f"
     },
     {
       "name": "version.js",
-      "bytes": 751,
-      "sha256": "74a27dd8d8a5df8c9a7e3fd5dc0295cf0d1be4baac0bb96f61c47f5a15c78d43"
+      "bytes": 517,
+      "sha256": "d15e0c091a5bb0092756e8cb8998addd7b64513f5f7178dd03c34214cb594253"
     }
   ]
 }
