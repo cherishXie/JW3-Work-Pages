@@ -2324,3 +2324,8 @@ html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header
 #topbar.topbar .global-bar-summary{min-height:var(--ds-header-h)}
 @media(max-width:1024px){#topbar.topbar{padding:0 16px}}
 @media(max-width:1024px){html[data-theme] .workspace{margin-left:0}}
+
+/* 16 图表卡右上角独立导出 */
+.chart-export{min-height:28px;padding:4px 6px;color:var(--wb-text-muted)}
+.chart-export:hover{color:var(--wb-text)}
+.chart-export svg{width:15px;height:15px}
