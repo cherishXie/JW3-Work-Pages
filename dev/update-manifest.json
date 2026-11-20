@@ -1,14 +1,14 @@
 {
-  "id": "81bc155214662d1746d301e76f6786c807cddf4eaaa4a9560ea9bc3cfebff595",
-  "version": "0.12.0-dev.81",
+  "id": "9158cca16761e71840727d44aafbc1f37f23ef0895ba4126b9d9561a82dfde5f",
+  "version": "0.12.0-dev.82",
   "channel": "dev",
-  "sourceCommit": "7847f649590a837172cddde7cac8f9224d03512c",
-  "sourceTimestamp": 1795151123,
+  "sourceCommit": "c84307008f08ed27499051976de87b426ed785fe",
+  "sourceTimestamp": 1795151232,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "净收益演化首尾日期标签不再被裁切"
+      "徽标统一为 12px / 500 / 4px 圆角，紧凑标签与状态标签共用同一规格；净收益演化首尾日期标签不再被裁切。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 393411,
-      "sha256": "0769bac5aad9880e2d8a6c1136de0fa34a83518abcd25141f8aa1db1b8ae60d1"
+      "bytes": 393603,
+      "sha256": "27684d7138de683827b95739180e6555c7006c5664e8ef0c0c4beb242ac4cf5f"
     },
     {
       "name": "themes.js",
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 361,
-      "sha256": "ea6033d4cc3ffaf9d60d3bd39893af49e80fd9d08d29408447bf352949ed2350"
+      "bytes": 454,
+      "sha256": "4b738f291c848840e17454a8a65c22842f88114f9440a1c584213080c46722c6"
     }
   ]
 }

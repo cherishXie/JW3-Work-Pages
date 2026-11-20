@@ -2329,3 +2329,7 @@ html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header
 .chart-export{min-height:28px;padding:4px 6px;color:var(--wb-text-muted)}
 .chart-export:hover{color:var(--wb-text)}
 .chart-export svg{width:15px;height:15px}
+
+/* 17 徽标规格：12px / 500 / 4px 圆角，语义色沿用状态令牌 */
+.pill{border-radius:4px;font-weight:500;padding:2px 7px;line-height:16px}
+.pill.pill-round{border-radius:9999px}
