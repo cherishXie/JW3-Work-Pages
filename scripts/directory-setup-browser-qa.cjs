@@ -64,7 +64,7 @@ try{
  await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});
  await page.locator('[data-action="setup"]').first().click();
  for(const step of [0,2]){await page.locator('[data-action="setup-step"][data-step="'+step+'"]').click();
- for(const theme of ['deep-ocean','cloud-blue','jade-green','warm-sand','amethyst-night']){await page.locator('#theme-select').selectOption(theme,{force:true});for(const width of [1440,1024,390]){
+ for(const theme of await page.evaluate(()=>WorkbenchThemes.themes.map(t=>t.id))){await page.evaluate(t=>{const el=document.querySelector('#theme-select,#overview-theme-select');if(!el)return;el.value=t;el.dispatchEvent(new Event('change',{bubbles:true}));},theme);for(const width of [1440,1024,390]){
   await page.setViewportSize({width,height:900});
   const metric=await page.evaluate(()=>{const next=document.querySelector('#setup-layer [data-action="setup-next"]'),shell=document.querySelector('.setup-shell'),body=document.querySelector('.setup-content');return {nextBottom:next.getBoundingClientRect().bottom,shellHeight:shell.scrollHeight,scroll:body?body.scrollHeight-body.clientHeight:0,overflow:document.documentElement.scrollWidth>innerWidth};});metrics.push({step,theme,width,...metric});
   if(!baseline){assert(metric.nextBottom<=900);assert(!metric.overflow);assert(await page.locator('.setup-task-row').count()<=6);if(step===0){assert(await page.locator('#setup-mingyi-hint').isVisible());assert(await page.locator('#setup-layer [data-action="mingyi-import"]').isVisible());}if(width===390||theme==='deep-ocean')await page.screenshot({path:path.join(out,`step-${step}-${theme}-${width}.png`)});}

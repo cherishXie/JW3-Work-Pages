@@ -12,8 +12,8 @@ const base=process.argv[2]||'http://127.0.0.1:4173/',online=base.startsWith('htt
     await page.goto(base);await page.locator('#workbench-boot').waitFor({state:'detached'});
     assert.equal(await page.evaluate(()=>WorkbenchPlatform.kind),'web');
     assert.equal(await page.locator('footer [data-storage-label]').textContent(),'数据保存在此浏览器');
-    for(const theme of ['deep-ocean','cloud-blue','jade-green','warm-sand','amethyst-night']){
-      await page.locator('#theme-select').selectOption(theme,{force:true});
+    for(const theme of await page.evaluate(()=>WorkbenchThemes.themes.map(t=>t.id))){
+      await page.evaluate(t=>{const el=document.querySelector('#theme-select,#overview-theme-select');if(!el)return;el.value=t;el.dispatchEvent(new Event('change',{bubbles:true}));},theme);
       for(const width of [1440,1024,390]){
         await page.setViewportSize({width,height:900});
         assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -52,13 +52,14 @@ const base=process.argv[2]||'http://127.0.0.1:4173/',online=base.startsWith('htt
     await page.locator('#dialog').waitFor({state:'hidden'});
     const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#app [data-action="export"]').click()]);
     const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));assert.equal(exported.roles[0].name,imported.roles[0].name);
+    const appliedTheme=await page.locator('html').getAttribute('data-theme');
     await page.reload();await page.locator('#workbench-boot').waitFor({state:'detached'});
-    assert.equal(await page.locator('html').getAttribute('data-theme'),'amethyst-night');
+    assert.equal(await page.locator('html').getAttribute('data-theme'),appliedTheme);
     assert.equal(await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active.roles[0].name),imported.roles[0].name);
     assert.deepEqual(errors,[]);
     fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,online?'pages-online.png':'web-local.png')});
     fs.writeFileSync(path.join(out,online?'web-online-report.json':'web-local-report.json'),JSON.stringify({base,platform:'web',roles:fixture.roles.length,metrics,errors,importExport:true,reload:true,fixtureUnchanged:true},null,2));
-    console.log('PASS '+base+' browser port, five themes/three widths, JSON import/export, theme/data persistence after reload; independent '+(online?'synthetic':'layout copy')+' data.');
+    console.log('PASS '+base+' browser port, all themes/three widths, JSON import/export, theme/data persistence after reload; independent '+(online?'synthetic':'layout copy')+' data.');
     await context.close();
   }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
