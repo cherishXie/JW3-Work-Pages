@@ -1,14 +1,14 @@
 {
-  "id": "2ad046d0b54ee1d8166a92725d4a28ecd3d8ca9d8ddaaef2d26217235215e2a9",
-  "version": "0.12.0-dev.85",
+  "id": "568196b1020e388cafd67531d111899058ecb159c73b5a0102b7bcdfb9144cc7",
+  "version": "0.12.0-dev.86",
   "channel": "dev",
-  "sourceCommit": "682ba67378c5842adf8aef51eeb9d92ecf820da0",
-  "sourceTimestamp": 1795153563,
+  "sourceCommit": "d034d662169c23df1a2f1f05eceaa4b0e7e0c6b3",
+  "sourceTimestamp": 1795154048,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "收益分布导出按内容自适应高度"
+      "收益分析「任务效率与收益对比」支持独立导出：横向条形按当前指标与排序生成 PNG，散点视图沿用图表导出；散点纵轴标题增加留白。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 850780,
-      "sha256": "b6935e56d21fd2b4596e71b96a2a6319ce37300762282f6b47521c4e64151a0e"
+      "bytes": 852701,
+      "sha256": "7800fe691480207fac2ec86b1e42651a0016992cffe61799dc63d36dc7fd7ca1"
     },
     {
       "name": "version.js",
-      "bytes": 355,
-      "sha256": "f1e036cd7b4af939e065f07c94e95502038a317dbe2324ee3bf8542d8a17af2f"
+      "bytes": 494,
+      "sha256": "f60009d73465fbf04e764bce22e1459391fa7991d6f0d629db5390edce7f2ae0"
     }
   ]
 }
