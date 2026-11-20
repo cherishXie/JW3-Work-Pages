@@ -1,15 +1,14 @@
 {
-  "id": "8cf3c9ae4da103963f62df3c2bd115a8bcf601a08755c9999a882113c8949c44",
-  "version": "0.12.0-dev.91",
+  "id": "1484420b20563dce18a77b18d997c27216b319bf7a445e489de8c1e3729b87c3",
+  "version": "0.12.0-dev.92",
   "channel": "dev",
-  "sourceCommit": "2cceace2961c16fe4cee1c2a656cdc5355685a59",
-  "sourceTimestamp": 1795159134,
+  "sourceCommit": "64b100063fddee825e0b1dad1032f17888faac45",
+  "sourceTimestamp": 1795159607,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "账号与角色的「角色」页签恢复正常切换与角色卡点击；顶部账号筛选取消分页，全部账号一次铺开，仅保留查找框。",
-      "区分删除与终止：批次「删除本批 / 删除批次」现在真正移除该批队伍与席位（只剩一批时连同排程删除），新增「终止本批 / 终止批次」用于标记本周期不再执行；两种操作各有独立确认文案，均可在回收站恢复。"
+      "网页验收合同同步账号筛选不再分页：断言全部账号一次渲染且无页码控件。"
     ]
   },
   "files": [
@@ -220,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 757,
-      "sha256": "bc1b9785e9bef840e7455af9b2e1633eaeab89e19114c8be55ee1af8bc40e381"
+      "bytes": 415,
+      "sha256": "b5c6a48f880502dd4bfabaac163e5e189010eabcbd7b8f71c34df9ae5f8bbd1f"
     }
   ]
 }
