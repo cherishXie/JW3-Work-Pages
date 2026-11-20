@@ -23,7 +23,9 @@ async function launch(){
     assert.equal(await page.locator('footer [data-storage-label]').textContent(),'数据保存在此电脑');
     const security=await app.evaluate(({BrowserWindow})=>{const p=BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();return {sandbox:p.sandbox,contextIsolation:p.contextIsolation,nodeIntegration:p.nodeIntegration};});
     assert.deepEqual(security,{sandbox:true,contextIsolation:true,nodeIntegration:false});
+    let lastTheme=null;
     for(const theme of await page.locator('#theme-select option').evaluateAll(options=>options.map(option=>option.value))){
+      lastTheme=theme;
       await page.locator('#theme-select').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));},theme);
       for(const width of [1440,1024,390]){
         await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setContentSize(width,900),width);
@@ -60,14 +62,14 @@ async function launch(){
     await page.locator('#dialog').waitFor({state:'hidden'});
     assert.equal(await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active.roles[0].name),imported.roles[0].name);
     await app.close();app=null;
-    assert.equal(createStore(profile).getItem('jx3-workbench-theme-v1'),'amethyst-night');
-    page=await launch();assert.equal(await page.locator('html').getAttribute('data-theme'),'amethyst-night');
+    assert.equal(createStore(profile).getItem('jx3-workbench-theme-v1'),lastTheme);
+    page=await launch();assert.equal(await page.locator('html').getAttribute('data-theme'),lastTheme);
     assert.equal(await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active.roles.length),state.roles.length);
     assert.equal(await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active.roles[0].name),imported.roles[0].name);
     await page.reload();await page.locator('#workbench-boot').waitFor({state:'detached'});
     assert.equal(await page.evaluate(()=>WorkbenchStorage.read(WorkbenchPlatform.storage).store.active.roles.length),state.roles.length);
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({security,checks,metrics,ocr,screenshots,errors,restart:true,reload:true,syntheticFixture:true},null,2));
-    console.log('PASS Electron packaged host: five themes/three widths, hash navigation, restart/reload persistence, isolated bridge, denied network/private files, offline OCR with synthetic fixtures.');
+    console.log('PASS Electron packaged host: all themes/three widths, hash navigation, restart/reload persistence, isolated bridge, denied network/private files, offline OCR with synthetic fixtures.');
   }finally{if(app)await app.close();fs.rmSync(profile,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});
