@@ -2288,3 +2288,20 @@ th.num,td.num,.table-wrap th:last-child,td.num-cell{text-align:right;font-varian
   .wb-hero-foot>span{white-space:normal;overflow:visible;text-overflow:clip}
   .wb-hero-foot{flex-wrap:wrap;gap:6px}
 }
+
+/* 12 任务历史工具条：轨迹账号筛选保持卡片选择，但收成单行横向条，不再撑高首屏 */
+.trajectory-toolbar .task-card-picker{display:grid;grid-template-columns:minmax(140px,200px) minmax(0,1fr);grid-template-areas:"search grid" "pages pages";gap:6px 8px;align-items:center;margin-top:6px}
+.trajectory-toolbar .task-card-picker>[data-choice-search]{grid-area:search;min-height:32px}
+.trajectory-toolbar .task-choice-grid{grid-area:grid;display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:2px;scrollbar-width:thin}
+.trajectory-toolbar .task-choice-card{flex:0 0 auto;min-width:112px;text-align:left}
+.trajectory-toolbar .task-choice-pages{grid-area:pages;margin:0;justify-content:flex-end;gap:8px}
+.trajectory-toolbar .field>span{font-size:12px}
+@media(max-width:767px){
+  .trajectory-toolbar .task-card-picker{grid-template-columns:minmax(0,1fr);grid-template-areas:"search" "grid" "pages"}
+  .trajectory-toolbar .task-choice-pages{justify-content:space-between}
+}
+
+/* 13 KPI 环比：语义色只用于净收益与净时薪，时间与批次保持中性 */
+.insight-metric .metric-delta{font-size:12px;line-height:1.5;color:var(--wb-text-muted);margin-top:-2px}
+.insight-metric .metric-delta.positive{color:var(--wb-success)}
+.insight-metric .metric-delta.negative{color:var(--wb-danger)}
