@@ -91,7 +91,7 @@
     }
   }
   // Cache read-only results by business revision. Navigation never serializes archives.
-  const viewResults=new Map();let viewFingerprint=0,viewState=state,viewCacheActive=false,overviewJob=0,overviewDeferred=null;
+  const viewResults=new Map();let viewFingerprint=0,viewState=state,viewCacheActive=false,overviewJob=0;
   function invalidateViewCache(){viewResults.clear();viewFingerprint++;viewState=state;M.markDirty?.();}
   function prepareViewCache(){if(viewState!==state)invalidateViewCache();viewCacheActive=true;}
   const viewKey=(name,start,end,selection={},mode='estimated')=>JSON.stringify([name,start,end,selection.group||'',selection.account||'',selection.role||'',mode]);
@@ -102,27 +102,6 @@
   }
   const summaryView=(...args)=>viewCalculation('summary',...args),completionView=(...args)=>viewCalculation('completion',...args);
   function overviewScopedAccounts(){return state.accounts.filter(a=>(!ui.group||a.group===ui.group)&&M.scopeMatches(a.id,ui.account)&&(!ui.role||state.roles.some(r=>M.scopeMatches(r.id,ui.role)&&r.accountId===a.id)));}
-  function overviewAccountsReady(){return overviewScopedAccounts().every(a=>['summary','completion'].every(name=>viewResults.has(viewKey(name,ui.start,ui.end,{...scope(),account:a.id},name==='summary'?ui.mode:'estimated'))));}
-  function overviewTrendGroups(){const days=M.dates(ui.start,ui.end);return days.length>14?Array.from({length:Math.ceil(days.length/7)},(_,i)=>days.slice(i*7,i*7+7)):days.map(d=>[d]);}
-  function overviewTrendReady(){return !state.tasks.length||overviewTrendGroups().every(days=>['estimated','actual'].every(mode=>viewResults.has(viewKey('summary',days[0],days.at(-1),scope(),mode))));}
-  function scheduleOverviewDetails(){
-    const deferred=overviewDeferred;if(!deferred)return;const job=overviewJob,fingerprint=viewFingerprint,accounts=deferred.accounts?overviewScopedAccounts():[],groups=deferred.trend?overviewTrendGroups():[];let index=0,trendIndex=0,trendDone=false;
-    const enqueue=fn=>{if(typeof requestIdleCallback==='function')requestIdleCallback(fn,{timeout:80});else setTimeout(fn,0);};
-    const step=()=>{
-      if(job!==overviewJob||ui.page!=='overview'||viewFingerprint!==fingerprint)return;
-      const active=viewCacheActive;viewCacheActive=true;
-      try{
-        if(trendIndex<groups.length){const days=groups[trendIndex++];for(const mode of ['estimated','actual'])summaryView(state,days[0],days.at(-1),scope(),mode);const label=$('#overview-trend-progress-label'),bar=$('#overview-trend-progress');if(label)label.textContent='正在计算趋势 '+trendIndex+' / '+groups.length;if(bar)bar.value=trendIndex;enqueue(step);return;}
-        if(deferred.trend&&!trendDone){const trend=$('#overview-trend-pending');if(trend)trend.outerHTML=trendChart();trendDone=true;applyPrivacy();}
-        if(index<accounts.length){const selection={...scope(),account:accounts[index++].id};summaryView(state,ui.start,ui.end,selection,ui.mode);completionView(state,ui.start,ui.end,selection);const label=$('#overview-account-progress-label'),bar=$('#overview-account-progress');if(label)label.textContent='正在计算账号 '+index+' / '+accounts.length;if(bar)bar.value=index;enqueue(step);return;}
-        const attribution=$('#overview-attribution-pending'),cards=$('#overview-accounts-pending');
-        if(attribution)attribution.outerHTML=attributionNotice(deferred.summary);
-        if(cards)cards.outerHTML=overviewAccounts();applyPrivacy();
-      }finally{viewCacheActive=active;}
-    };
-    // Yield a paint before any account-level breakdown work begins.
-    requestAnimationFrame(()=>setTimeout(()=>enqueue(step),0));
-  }
   function scope(){return ui.drillContext?.scope||{group:ui.group,account:ui.account,role:ui.role};}
   function kind(mode=ui.mode){const label=mode==='actual'?'历史实测':'已确认排程预测';return state.dataKind==='simulated'?'示例 / '+label:label;}
   function badge(mode=ui.mode){return `<span class="pill ${state.dataKind==='simulated'?'simulated':mode}">${kind(mode)}</span>`;}
@@ -519,7 +498,7 @@
     closeCalendarPreview();
     const activeGold=goldContext()&&document.activeElement?.matches('.gold-toolbar button,.gold-workspace button')?document.activeElement:null;
     const goldFocus=activeGold?{action:activeGold.dataset.action,text:activeGold.textContent.trim(),id:activeGold.dataset.id,value:activeGold.dataset.value,side:activeGold.dataset.side}:null;
-    overviewJob++;overviewDeferred=null;prepareViewCache();try{
+    overviewJob++;prepareViewCache();try{
     const railPositions=new Map([...document.querySelectorAll('#calendar-task-panel [data-flow-rail]')].map(el=>[el.dataset.flowRail,el.scrollLeft]));
     const priorWizard=$('.planning-wizard'),planningScroll=priorWizard?{key:priorWizard.dataset.scrollScope,top:priorWizard.querySelector('.wizard-step-content').scrollTop,role:document.activeElement?.matches('[name="route-task"]')?document.activeElement.value:null}:null;
     const columnScroll=[...document.querySelectorAll('[data-execution-scroll]')].map(el=>({name:el.dataset.executionScroll,key:el.dataset.scrollKey,top:el.scrollTop}));
@@ -551,7 +530,6 @@
       const target=candidates.find(b=>b.textContent.trim()===goldFocus.text&&['id','value','side'].every(k=>goldFocus[k]===undefined||b.dataset[k]===goldFocus[k]))||candidates[0]||document.querySelector('[data-gold-picker]>summary');
       target?.focus({preventScroll:true});
     }
-    scheduleOverviewDetails();
   }
   const privateTexts=new WeakMap(),privateAttrs=new WeakMap();let privacyObserver=null,privacyScheduled=false;
   function privacyNames(){const map=new Map();state.accounts.forEach((a,i)=>{if(a.name)map.set(a.name,'账号 '+String(i+1).padStart(2,'0'));});state.roles.forEach((r,i)=>{if(r.name)map.set(r.name,'角色 '+String(i+1).padStart(2,'0'));});return map;}
@@ -683,7 +661,12 @@
   }
 
   function overviewTrendLine(){
-    const days=M.dates(ui.start,ui.end),roleData=activeRoles().map(r=>{let total=0;const values=[];for(const d of days){const v=summaryView(state,d,d,{...scope(),role:r.id},ui.mode);const value=v.hasData&&v.netGold!=null?v.netGold:0;total+=value;values.push(value);}let sum=0;return {r,total,values:values.map(v=>(sum+=v))};}).filter(x=>x.total!==0).sort((a,b)=>b.total-a.total).slice(0,6);
+    const days=M.dates(ui.start,ui.end);
+    // Rank roles by their period net first (already cached by the leader board), then only
+    // compute per-day series for the six that are drawn. Computing every role per day was
+    // the largest remaining cost of the overview render.
+    const ranked=activeRoles().map(r=>({r,v:summaryView(state,ui.start,ui.end,{...scope(),role:r.id},ui.mode)})).filter(x=>x.v.hasData&&x.v.netGold!=null&&x.v.netGold!==0).sort((a,b)=>b.v.netGold-a.v.netGold).slice(0,6);
+    const roleData=ranked.map(({r})=>{let total=0;const values=[];for(const d of days){const v=summaryView(state,d,d,{...scope(),role:r.id},ui.mode);const value=v.hasData&&v.netGold!=null?v.netGold:0;total+=value;values.push(value);}let sum=0;return {r,total,values:values.map(v=>(sum+=v))};}).filter(x=>x.total!==0);
     if(!roleData.length)return empty('暂无可展示的收益演化','记录实测或确认排程后再查看。');
     const W=570,H=270,L=46,R=12,T=22,B=34,all=roleData.flatMap(x=>x.values),max=Math.max(1,...all),min=Math.min(0,...all),span=max-min||1,cx=i=>L+(days.length<=1?0:i/(days.length-1))*(W-L-R),y=v=>T+(1-(v-min)/span)*(H-T-B),grid=Array.from({length:5},(_,i)=>{const val=min+span*i/4;return `<line class="grid-line" x1="${L}" y1="${y(val)}" x2="${W-R}" y2="${y(val)}"/><text x="${L-6}" y="${y(val)+4}" text-anchor="end">${val>=1000?Math.round(val/1000)+'k':Math.round(val)}</text>`;}).join(''),lines=roleData.map((x,i)=>{const d=x.values.map((v,j)=>`${j?'L':'M'}${cx(j)},${y(v)}`).join(' ');return `<path d="${d}" fill="none" stroke="var(--wb-chart-bg-${i%6})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>${x.values.map((v,j)=>`<circle cx="${cx(j)}" cy="${y(v)}" r="2.5" fill="var(--wb-chart-bg-${i%6})"/>`).join('')}`;}).join(''),labels=days.filter((_,i)=>i===0||i===days.length-1||i%Math.ceil(days.length/4)===0).map(d=>{const i=days.indexOf(d),first=i===0,last=i===days.length-1;return `<text x="${first?L:last?W-R:cx(i)}" y="${H-14}" text-anchor="${first?'start':last?'end':'middle'}">${d.slice(5)}</text>`;}).join('');
     return `<div class="legend">${roleData.map((x,i)=>`<span><i style="background:var(--wb-chart-bg-${i%6})"></i>${esc(x.r.name)}</span>`).join('')}</div><div class="chart-scroll"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="角色累计净收益演化"><text x="6" y="11" text-anchor="start">金</text>${grid}${lines}${labels}</svg></div><p class="chart-note">榜单前 ${roleData.length} 名角色的累计净收益；缺失日期不补零。</p>`;
@@ -691,7 +674,6 @@
 
   function overview(){
     const s=summaryView(state,ui.start,ui.end,scope(),ui.mode),complete=completionView(state,ui.start,ui.end,scope()),roles=activeRoles(),cash=M.cashSummary(state,ui.start,ui.end);
-    const deferred=ui.page==='overview'&&!ui.setup&&!overviewAccountsReady(),deferredTrend=ui.page==='overview'&&!ui.setup&&!overviewTrendReady();if(deferred||deferredTrend)overviewDeferred={summary:s,accounts:deferred,trend:deferredTrend};
     const spark=(label)=>{const days=M.dates(M.addDays(today,-6),today);let vals=days.map(d=>{const rows=state.records.filter(r=>r.date===d);if(label==='操作时间')return rows.reduce((n,r)=>n+(r.minutes||0),0);if(label==='完成进度')return state.progress.filter(p=>p.date===d&&Number(p.completed)>0).length;return rows.reduce((n,r)=>n+(r.gold||0),0);});const max=Math.max(1,...vals),min=Math.min(0,...vals),span=max-min||1;const path=vals.map((v,i)=>`${i?'L':'M'}${i/(vals.length-1||1)*88},${22-(v-min)/span*18}`).join(' ');return `<svg viewBox="0 0 88 24" aria-hidden="true"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;};
     const metric=(label,value,detail,negative=false,primary=false,delta='')=>{const parts=String(value).split(' / ');return `<div class="card insight-metric" ${primary?`data-metric-tone="${negative?'danger':'primary'}"`:''}><span class="metric-label">${cueIcon(label,negative?'danger':null)}<span>${label}</span></span><strong class="number ${negative?'negative':''}">${parts[0]}${parts.length>1?'<em>'+parts.slice(1).join(' / ')+'</em>':''}</strong><small>${detail}</small>${delta}${button(spark(label),label==='完成进度'?'open-task-progress':'open-roi-section','metric-drill ghost small',(label==='完成进度'?'data-status="all" aria-label="查看完成进度"':'data-value="'+(label==='操作时间'?'cost':'tasks')+'" aria-label="查看'+label+'"'))}</div>`;};
     const batchTotal=(s.tasks||[]).reduce((a,t)=>a+(t.batches||0),0)||state.records.filter(r=>r.date>=ui.start&&r.date<=ui.end).reduce((a,r)=>a+(r.batches||1),0);

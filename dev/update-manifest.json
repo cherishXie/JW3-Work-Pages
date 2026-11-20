@@ -1,14 +1,14 @@
 {
-  "id": "68259f25aab9f4c4457c0ea36b5b4b3dd66ab658c728908f259730f145a54d04",
-  "version": "0.12.0-dev.88",
+  "id": "6661c7bee3e6cdcf288643828ef6c0394f62604dcfec4dbaabc33f899f2d9933",
+  "version": "0.12.0-dev.89",
   "channel": "dev",
-  "sourceCommit": "60281d40ab8e8531120a1fde49eeba2f70cee1f7",
-  "sourceTimestamp": 1795155196,
+  "sourceCommit": "b7eb59079282a4f744e43ee19dedfce121211ad4",
+  "sourceTimestamp": 1795156164,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "收益分析分区导航收回单行紧凑按钮，宽屏不再被拉成三列大卡；浅色与深色主题在 1440 / 1024 / 390 全量路由复核无横向溢出与过小字号。"
+      "总览趋势改为先按期间净收益排序再计算前 6 名的逐日曲线，并移除指向已不存在区块的延迟填充逻辑；真实档案下首屏约 6.4 秒降到 3.1 秒，隐私遮罩等重绘从约 5 秒降到 0.15 秒。"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 852717,
-      "sha256": "640debf949ebdd27ba906f70556920de49645f3acc3fba31963015a25032c9c7"
+      "bytes": 850263,
+      "sha256": "aa463069d5b1f22278ca8748c3b420531adef43730713338c3c614efc710e124"
     },
     {
       "name": "version.js",
-      "bytes": 494,
-      "sha256": "3424fdf12810e34159235060ad8786bc2ed4c86277c08ec58112fc3f1e45bc77"
+      "bytes": 551,
+      "sha256": "653453f2f05bd066d56ac571a0d1a0a49afb71b9f0ca119d0bac0cf011a14823"
     }
   ]
 }
