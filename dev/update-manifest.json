@@ -1,14 +1,14 @@
 {
-  "id": "9158cca16761e71840727d44aafbc1f37f23ef0895ba4126b9d9561a82dfde5f",
-  "version": "0.12.0-dev.82",
+  "id": "fc484f68eba285051fb8b4f6aa235ae38602832536928ca0f73d5e49b2b21562",
+  "version": "0.12.0-dev.83",
   "channel": "dev",
-  "sourceCommit": "c84307008f08ed27499051976de87b426ed785fe",
-  "sourceTimestamp": 1795151232,
+  "sourceCommit": "26f6d29625e2b2f1253496cb714b1163f2ce34d4",
+  "sourceTimestamp": 1795152959,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "徽标统一为 12px / 500 / 4px 圆角，紧凑标签与状态标签共用同一规格；净收益演化首尾日期标签不再被裁切。"
+      "响应式修整：1024px 起账号档案卡两列并排；窄屏顶栏上下文与操作分两行不再互相压字；窄屏日历保留七列并改为区内横向滚动，日期格与任务名恢复可读。"
     ]
   },
   "files": [
@@ -134,8 +134,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 393603,
-      "sha256": "27684d7138de683827b95739180e6555c7006c5664e8ef0c0c4beb242ac4cf5f"
+      "bytes": 394478,
+      "sha256": "bffecb502fb3e82e6d7e0e1e48ce86a0774c4b2cd577d8b7bb183198838bc9f3"
     },
     {
       "name": "themes.js",
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 454,
-      "sha256": "4b738f291c848840e17454a8a65c22842f88114f9440a1c584213080c46722c6"
+      "bytes": 521,
+      "sha256": "c7aeea6beab56e6cd42dc578e32096522bd11a16e69e50f245b7b84eef23e395"
     }
   ]
 }

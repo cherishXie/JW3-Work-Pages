@@ -2333,3 +2333,20 @@ html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header
 /* 17 徽标规格：12px / 500 / 4px 圆角，语义色沿用状态令牌 */
 .pill{border-radius:4px;font-weight:500;padding:2px 7px;line-height:16px}
 .pill.pill-round{border-radius:9999px}
+@media(min-width:1000px){.account-archive-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1000px) and (max-width:1279px){.account-resource-grid{gap:8px}.account-archive{padding:12px}}
+
+/* 18 窄屏页头：上下文与操作分两行，高度随内容增长，避免文字溢出顶栏 */
+@media(max-width:767px){
+  #topbar.topbar{min-height:0;padding:8px 16px}
+  #topbar.topbar .global-bar-summary{flex-wrap:wrap;min-height:0;gap:6px}
+  #topbar.topbar .global-bar-context{width:100%;min-width:0}
+  #topbar.topbar .global-bar-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}
+}
+
+/* 19 窄屏日历：保留七列但改为区内横向滚动，避免把日期格压到无法阅读 */
+@media(max-width:767px){
+  .tc-cal-body{overflow-x:auto;overscroll-behavior-x:contain}
+  .tc-cal-grid{min-width:620px}
+  .tc-cal-grid.is-month{min-width:620px}
+}
