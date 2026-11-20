@@ -67,6 +67,48 @@
     return decode(root,decoded.length);
   }
   function quotaError(e){return e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22||e?.code===1014;}
+  const GZIP_PREFIX='gzip1:';
+  function bytesToBase64(bytes){let out='';const chunk=0x8000;for(let i=0;i<bytes.length;i+=chunk)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));return btoa(out);}
+  function base64ToBytes(text){const bin=atob(text);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out;}
+  async function gzipText(text){
+    if(typeof CompressionStream!=='function')throw new Error('当前浏览器不支持大档案压缩保存，请升级浏览器或拆分导入');
+    const stream=new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+    const buffer=await new Response(stream).arrayBuffer();
+    return GZIP_PREFIX+bytesToBase64(new Uint8Array(buffer));
+  }
+  async function gunzipText(raw){
+    if(typeof DecompressionStream!=='function')throw new Error('当前浏览器不支持读取大档案压缩数据，请升级浏览器');
+    const stream=new Blob([base64ToBytes(raw.slice(GZIP_PREFIX.length))]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  }
+  async function readAsync(storage,key=KEY){
+    const raw=storage.getItem(key);
+    if(raw===null)return read(storage,key);
+    if(raw.startsWith(GZIP_PREFIX)){
+      const json=await gunzipText(raw);
+      return {store:validate(unpack(JSON.parse(json))),migrated:false};
+    }
+    return {store:validate(unpack(JSON.parse(raw))),migrated:false};
+  }
+  async function writeAsync(storage,store,key=KEY){
+    const raw=JSON.stringify(validate(store));
+    try{storage.setItem(key,raw);return;}catch(e){if(!quotaError(e))throw e;}
+    const compact=JSON.stringify(pack(JSON.parse(raw)));
+    if(compact.length<raw.length){try{storage.setItem(key,compact);return;}catch(e){if(!quotaError(e))throw e;}}
+    const text=compact.length<raw.length?compact:raw;
+    const compressed=await gzipText(text);
+    try{storage.setItem(key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
+    throw new Error('浏览器本地存储空间不足，压缩后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
+  }
+  async function writePreparedAsync(storage,prepared,key=KEY){
+    try{writePrepared(storage,prepared,key);return;}catch(e){
+      if(!quotaError(e)&&!/存储空间不足/.test(e.message))throw e;
+    }
+    const text=prepared.compact&&prepared.compact.length<prepared.raw.length?prepared.compact:prepared.raw;
+    const compressed=await gzipText(text);
+    try{storage.setItem(key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
+    throw new Error('浏览器本地存储空间不足，压缩后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
+  }
   // Prepared by the same storage implementation in a worker. setItem remains atomic.
   function writePrepared(storage,prepared,key=KEY){
     try{storage.setItem(key,prepared.raw);return;}catch(e){if(!quotaError(e))throw e;}
@@ -89,5 +131,5 @@
     for(const row of incoming.snapshots){const old=next.snapshots.find(x=>x.id===row.id);if(!old)next.snapshots.push(copy(row));else if(row.savedAt>old.savedAt)Object.assign(old,copy(row));}
     return validate(next);
   }
-  return {writePrepared,pack,KEY,LEGACY_KEY,empty,hasData,validate,withState,read,write,restore,mergeArchives};
+  return {writePrepared,writePreparedAsync,writeAsync,readAsync,pack,KEY,LEGACY_KEY,empty,hasData,validate,withState,read,write,restore,mergeArchives};
 });
