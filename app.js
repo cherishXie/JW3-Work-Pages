@@ -92,7 +92,7 @@
   }
   // Cache read-only results by business revision. Navigation never serializes archives.
   const viewResults=new Map();let viewFingerprint=0,viewState=state,viewCacheActive=false,overviewJob=0,overviewDeferred=null;
-  function invalidateViewCache(){viewResults.clear();viewFingerprint++;viewState=state;}
+  function invalidateViewCache(){viewResults.clear();viewFingerprint++;viewState=state;M.markDirty?.();}
   function prepareViewCache(){if(viewState!==state)invalidateViewCache();viewCacheActive=true;}
   const viewKey=(name,start,end,selection={},mode='estimated')=>JSON.stringify([name,start,end,selection.group||'',selection.account||'',selection.role||'',mode]);
   function viewCalculation(name,s,start,end,selection={},mode='estimated'){
