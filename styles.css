@@ -2356,3 +2356,10 @@ html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header
 .analysis-section-nav button{flex:0 1 auto;min-width:0;white-space:nowrap;padding:6px 12px;min-height:32px;border-radius:var(--ds-control-radius)}
 @media(max-width:1100px){.analysis-section-nav button{flex-basis:auto}}
 @media(max-width:767px){.analysis-section-nav button{flex:1 1 auto;white-space:normal;font-size:12px;padding:6px 10px}}
+
+/* 21 总览加载骨架：大档案先出外壳与灰块，再分两批填充，避免白屏假死 */
+.chart-skeleton{display:grid;gap:8px;padding:16px;align-content:start;min-height:120px}
+.chart-skeleton i{display:block;height:12px;border-radius:4px;background:var(--wb-surface-2)}
+.chart-skeleton i:nth-child(3n+2){height:34px;border-radius:6px}
+.insight-metrics>.chart-skeleton{min-height:96px}
+@media(prefers-reduced-motion:reduce){.chart-skeleton i{transition:none}}
