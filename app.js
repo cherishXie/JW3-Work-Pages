@@ -840,7 +840,7 @@
   function revenueMapSvg(){
     const data=compositionSnapshot;
     if(!data||!data.blocks.length)throw new Error('当前没有可导出的收益分布');
-    const W=800,H=360,pad=16,mapW=Math.round(W*0.6),mapH=H-pad*2,detailX=mapW+24;
+    const rowsShown=Math.min(8,data.rows.length),W=800,pad=16,H=Math.max(232,pad*2+rowsShown*30+56),mapW=Math.round(W*0.6),mapH=H-pad*2,detailX=mapW+24;
     const parts=[];
     for(const block of data.blocks){
       const {row:r,x,y,w,h}=block,color=cssColorVar('--wb-chart-bg-'+categoryIndex(r.task.id)),share=data.value(r)/data.total*100;
@@ -848,7 +848,7 @@
       parts.push(`<rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}" fill="${color}"/>`);
       if(rw>96&&rh>48)parts.push(`<text x="${(rx+12).toFixed(1)}" y="${(ry+26).toFixed(1)}" font-size="14" font-weight="600" fill="#ffffff">${esc(r.task.name)}</text><text x="${(rx+12).toFixed(1)}" y="${(ry+48).toFixed(1)}" font-size="14" fill="#ffffff">${pct(share)}</text>`+(rh>76?`<text x="${(rx+12).toFixed(1)}" y="${(ry+70).toFixed(1)}" font-size="12" fill="#ffffff">${esc(amount(r.gross,r.gold))}</text>`:''));
     }
-    const maxRows=Math.min(8,data.rows.length);
+    const maxRows=rowsShown;
     for(let i=0;i<maxRows;i++){
       const r=data.rows[i],share=data.value(r)/data.total*100,ly=pad+26+i*30;
       parts.push(`<rect x="${detailX}" y="${ly-11}" width="10" height="10" rx="2" fill="${cssColorVar('--wb-chart-bg-'+categoryIndex(r.task.id))}"/>`);
@@ -856,7 +856,7 @@
       parts.push(`<text x="${W-pad}" y="${ly}" font-size="14" text-anchor="end" fill="${cssColorVar('--wb-text')}">${pct(share)}</text>`);
     }
     parts.push(`<text x="${detailX}" y="${pad+maxRows*30+26}" font-size="14" fill="${cssColorVar('--wb-text-muted')}">${data.rows.length} 项任务 / 前三项 ${pct(data.largest)}</text>`);
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`;
+    return {text:`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`,width:W,height:H};
   }
   function revenueMapBlocks(rows,value){
     // Alternating binary proportional partitions, avoiding tiny unreadable labels.
@@ -3098,7 +3098,7 @@
     'new-record':b=>recordForm(null,b.dataset.task||null),'new-ledger':()=>ledgerForm(),'new-cash':()=>cashForm(),'new-snapshot':()=>snapshotForm(),'new-equipment':()=>equipmentForm(),
     'edit-config':()=>configForm(),'new-scenario':()=>scenarioForm(),calibrate:b=>{const t=state.tasks.find(t=>t.id===b.dataset.id),minutes=Number(b.dataset.minutes);modal('应用耗时校准 / '+esc(t.name),`<p>当前每批 ${num(t.minutes,2)} 分钟 → 建议 ${num(minutes,2)} 分钟。</p><p class="muted mt">统计期间 ${ui.start} — ${ui.end}。样本包含准备耗时；应用后准备时间设为 0、效率设为 100%，避免重复计折损。历史实测保持不变。</p>`,()=>commit(()=>{t.minutes=minutes;t.prepare=0;t.efficiency=1;t.updatedAt=new Date().toISOString();},'耗时建议已应用到未来预测'),'应用建议');},
     guide,help:b=>modal('指标说明',`<p>${esc(b.dataset.text)}</p>`),'review-export':()=>reviewReportForm(),export:()=>exportData(),
-    'chart-export':async b=>{const key=b.dataset.chartExport,card=b.closest('[data-chart-card]'),name=(card?.dataset.chartCard||'图表')+'_'+ui.start+'_'+ui.end+'.png',bg=getComputedStyle(card||document.body).backgroundColor;if(key==='distribution'){const text=revenueMapSvg();await svgTextToPng(text,800,360,bg,name);return;}await exportChartPng(card,name);},
+    'chart-export':async b=>{const key=b.dataset.chartExport,card=b.closest('[data-chart-card]'),name=(card?.dataset.chartCard||'图表')+'_'+ui.start+'_'+ui.end+'.png',bg=getComputedStyle(card||document.body).backgroundColor;if(key==='distribution'){const svg=revenueMapSvg();await svgTextToPng(svg.text,svg.width,svg.height,bg,name);return;}await exportChartPng(card,name);},
     'raw-backup':()=>download('JX3_raw_storage.txt',new Blob([JSON.stringify({current:localStorage.getItem(KEY),legacy:localStorage.getItem(Store.LEGACY_KEY)},null,2)],{type:'text/plain'})),
     'preset-sources':()=>presetSources(),'reset-blank':()=>confirmReset(),
     'csv-template':()=>download('JX3_roles_template.csv',new Blob(['\uFEFFaccount_id,account_name,group,role_id,role_name,server,school,stance,duty,level,score,opening_gold,balance,tags,companion,region,billing_type,monthly_expires_at,tongbao,points,camp,observed_gold,energy,energyCap,weeklyEnergy,contribution,chivalry,prestige,achievement,stage,huashang,homeSeason,resource_date,reference_dps,gongzhan_buff\na_example,账号示例,主力组,r_example,角色示例,梦江南,七秀,云裳心经,heal,50,85000,18000,1600,日常,,电信区,point,,,,unknown,,0,3000,,,,,,,,,2026-10-14,,false\n'],{type:'text/csv;charset=utf-8'})),
