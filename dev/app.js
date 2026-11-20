@@ -657,11 +657,14 @@
     rect.setAttribute('width','100%');rect.setAttribute('height','100%');rect.setAttribute('fill',bg);
     clone.insertBefore(rect,clone.firstChild);clone.setAttribute('xmlns','http://www.w3.org/2000/svg');clone.setAttribute('width',width);clone.setAttribute('height',height);
     if(!clone.getAttribute('viewBox'))clone.setAttribute('viewBox','0 0 '+width+' '+height);
-    const text=new XMLSerializer().serializeToString(clone),url=URL.createObjectURL(new Blob([text],{type:'image/svg+xml;charset=utf-8'})),scale=2;
+    await svgTextToPng(new XMLSerializer().serializeToString(clone),width,height,bg,filename);
+  }
+  async function svgTextToPng(text,width,height,bg,filename,scale=2){
+    const url=URL.createObjectURL(new Blob([text],{type:'image/svg+xml;charset=utf-8'}));
     try{
       const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('图表导出失败，请重试'));img.src=url;});
       const canvas=document.createElement('canvas');canvas.width=width*scale;canvas.height=height*scale;
-      const context=canvas.getContext('2d');context.fillStyle=bg;context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+      const context=canvas.getContext('2d');context.fillStyle=bg||'#0b1220';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
       canvas.width=canvas.height=0;
       if(!blob)throw new Error('图表导出失败，请重试');
@@ -695,7 +698,7 @@
     const span=M.dates(ui.start,ui.end).length,prevEnd=M.addDays(ui.start,-1),prevStart=M.addDays(prevEnd,-(Math.max(1,span)-1)),prev=summaryView(state,prevStart,prevEnd,scope(),ui.mode),delta=(cur,before,semantic=false)=>{if(!prev.hasData||cur==null)return '';if(before==null)return `<span class="metric-delta">上期无此项</span>`;if(before===0)return `<span class="metric-delta">上期为 0</span>`;const rate=(cur-before)/Math.abs(before)*100;if(Math.abs(rate)<0.05)return `<span class="metric-delta">与上期持平</span>`;const up=rate>0;return `<span class="metric-delta ${semantic?(up?'positive':'negative'):''}">${up?'↑':'↓'} ${pct(Math.abs(rate))} 较上期</span>`;};
     const metrics=`<div class="insight-metrics">${metric('净收益',s.hasData?amount(s.net,s.netGold):'—',s.hasData?'金币与人民币 / 当前期间':kind(),s.hasData&&s.net<0,false,delta(s.hasData?s.net:null,prev.net,true))}${metric('净时薪',s.hasData&&s.hourly!==null?amount(s.hourly,s.hourlyGold):'—','净收益 ÷ 操作小时',s.hasData&&s.hourly<0,false,delta(s.hourly,prev.hourly,true))}${metric('操作时间',s.hasData?num(s.minutes/60,1)+' 小时':'—','账号在线 '+num(s.onlineMinutes/60,1)+' 小时',false,false,delta(s.minutes,prev.minutes))}${metric('登记批次',num(batchTotal)+' 批','当前期间已登记批次')}</div>`;
     const trend=`<section class="card insight-trend wb-trend" data-chart-card="净收益演化">${head('净收益演化','赛季累计 / 单位：金',chartExportButton('trend','净收益演化'))}${overviewTrendLine()}<div class="chart-foot"><span>实测与已确认排程分开累计</span><span>缺失日期不补零</span></div></section>`;
-    const distribution=`<section class="card wb-distribution">${head('任务收益分布','仅正毛收益参与面积；亏损单独核算','<span class="pill">正收益面积</span>')}${composition(s)}<p class="chart-note">任务较多时按收益取前 5 项 + 其他；完整 8 项见收益分析。</p></section>`;
+    const distribution=`<section class="card wb-distribution" data-chart-card="任务收益分布">${head('任务收益分布','仅正毛收益参与面积；亏损单独核算','<span class="pill">正收益面积</span>'+chartExportButton('distribution','任务收益分布'))}${composition(s)}<p class="chart-note">任务较多时按收益取前 5 项 + 其他；完整 8 项见收益分析。</p></section>`;
     const scatter=`<section class="card wb-scatter" data-chart-card="角色效率散点">${head('角色效率散点','操作时间 × 净时薪 / 点颜色来自门派','<span class="pill">操作时间 × 净时薪</span>'+chartExportButton('scatter','角色效率散点'))}${overviewScatterCharts(roles)}</section>`;
     const daily=`<section class="card wb-daily" data-chart-card="每日登记批次">${head('每日登记批次','按登记日期 / 最近 14 天','<span class="pill">最近 14 天</span>'+chartExportButton('daily','每日登记批次'))}${overviewDailyChart()}</section>`;
     const notes=`${attributionNotice(s)}${s.forecastWarnings?.length?`<details class="card pad wb-note"><summary>预测核对提醒 / ${s.forecastWarnings.length} 项</summary><p class="panel-sub mt">${s.forecastWarnings.map(esc).join('<br>')}</p></details>`:''}${s.billingWarnings?.length?notice(s.billingWarnings.map(esc).join('<br>')):''}`;
@@ -832,6 +835,29 @@
   function motionSettings(){return `<section class="card pad"><h2>动态效果</h2><div class="settings-start mt" role="group" aria-label="动态效果偏好">${[['system','跟随系统'],['reduce','减少动态效果']].map(([value,label])=>button(label,'set-motion',motionChoice===value?'selected':'',`data-value="${value}" aria-pressed="${motionChoice===value}"`)).join('')}</div><small>系统开启减少动态效果时始终生效；输入与保存即时处理。</small></section>`;}
   function themePanel(){const activeAccent=currentAccent();return `<section class="card pad mb"><div class="flex between wrap"><div><h2>外观主题</h2><p class="panel-sub">只保留夜间与白天两套主题，页面、图表与战报共用同一套令牌。</p></div><span class="pill">2 套主题</span></div><div class="theme-options mt">${Theme.themes.map(t=>{const v=t.mode==='dark'?VISUAL_TOKENS.dark:VISUAL_TOKENS.light,a=t.mode==='light'?currentAccent():null,p={...v,primary:a?a.accent:v.primary,cyan:v.chart[1],purple:v.chart[3],'primary-text':v['primary-text'],'success-bg':v['success-bg'],success:v.success},active=document.documentElement.dataset.theme===t.id;return `<button type="button" class="theme-option ${active?'selected':''}" data-action="set-theme" data-id="${t.id}" aria-pressed="${active}"><span class="theme-swatch" style="background:${p.bg};border-color:${p.border}"><i style="background:${p.sidebar};border-color:${p.border}"></i><span style="background:${p.surface};border-color:${p.border}"><b style="background:${p.primary}"></b><b style="background:${p.cyan}"></b><b style="background:${p.purple}"></b></span></span><span class="theme-preview-text" style="color:${p.text}">正文 <span style="background:${p.primary};color:${p['primary-text']}">保存</span><small style="background:${p['success-bg']};color:${p.success}">已完成</small></span><strong>${t.name} ${active?'✓':''}</strong><small>${t.id==='cloud-blue'?'云白底 / '+currentAccent().name+'强调':t.description}</small></button>`;}).join('')}</div></section><section class="card pad mb"><div class="flex between wrap"><div><h2>白天主题色</h2><p class="panel-sub">选择后自动切换到白天模式；导航、主按钮、选中态、主卡与图表色板同步。</p></div><span class="pill">任意 HEX</span></div><div class="accent-choices mt">${DAY_ACCENTS.map(a=>`<button type="button" class="accent-choice ${document.documentElement.dataset.colorMode==='light'&&dayAccent===a.id?'selected':''}" data-action="set-accent" data-id="${a.id}" aria-pressed="${document.documentElement.dataset.colorMode==='light'&&dayAccent===a.id}"><i style="background:${a.accent}"></i><span>${a.name}</span><small>${a.accent}</small></button>`).join('')}</div><div class="custom-accent"><span>任意 HEX</span><label class="accent-color"><input id="custom-accent-color" type="color" value="${esc(activeAccent.accent)}" aria-label="选择自定义主题色"></label><input id="custom-accent-hex" class="accent-hex" type="text" maxlength="7" value="${esc(activeAccent.accent)}" aria-label="输入十六进制颜色"><button type="button" class="primary" data-action="apply-custom-accent">应用</button><small>过亮颜色会按白字对比度自动压暗</small></div><p class="panel-sub mt">当前：${esc(activeAccent.name)}。夜间固定青玉，避免两套主题互相污染。</p></section>`;}
 
+  let compositionSnapshot=null;
+  function cssColorVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||'#0f766e';}
+  function revenueMapSvg(){
+    const data=compositionSnapshot;
+    if(!data||!data.blocks.length)throw new Error('当前没有可导出的收益分布');
+    const W=800,H=360,pad=16,mapW=Math.round(W*0.6),mapH=H-pad*2,detailX=mapW+24;
+    const parts=[];
+    for(const block of data.blocks){
+      const {row:r,x,y,w,h}=block,color=cssColorVar('--wb-chart-bg-'+categoryIndex(r.task.id)),share=data.value(r)/data.total*100;
+      const rx=pad+x/100*mapW,ry=pad+y/100*mapH,rw=Math.max(1,w/100*mapW),rh=Math.max(1,h/100*mapH);
+      parts.push(`<rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}" fill="${color}"/>`);
+      if(rw>96&&rh>48)parts.push(`<text x="${(rx+12).toFixed(1)}" y="${(ry+26).toFixed(1)}" font-size="14" font-weight="600" fill="#ffffff">${esc(r.task.name)}</text><text x="${(rx+12).toFixed(1)}" y="${(ry+48).toFixed(1)}" font-size="14" fill="#ffffff">${pct(share)}</text>`+(rh>76?`<text x="${(rx+12).toFixed(1)}" y="${(ry+70).toFixed(1)}" font-size="12" fill="#ffffff">${esc(amount(r.gross,r.gold))}</text>`:''));
+    }
+    const maxRows=Math.min(8,data.rows.length);
+    for(let i=0;i<maxRows;i++){
+      const r=data.rows[i],share=data.value(r)/data.total*100,ly=pad+26+i*30;
+      parts.push(`<rect x="${detailX}" y="${ly-11}" width="10" height="10" rx="2" fill="${cssColorVar('--wb-chart-bg-'+categoryIndex(r.task.id))}"/>`);
+      parts.push(`<text x="${detailX+18}" y="${ly}" font-size="14" fill="${cssColorVar('--wb-text-secondary')}">${esc(r.task.name)}</text>`);
+      parts.push(`<text x="${W-pad}" y="${ly}" font-size="14" text-anchor="end" fill="${cssColorVar('--wb-text')}">${pct(share)}</text>`);
+    }
+    parts.push(`<text x="${detailX}" y="${pad+maxRows*30+26}" font-size="14" fill="${cssColorVar('--wb-text-muted')}">${data.rows.length} 项任务 / 前三项 ${pct(data.largest)}</text>`);
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`;
+  }
   function revenueMapBlocks(rows,value){
     // Alternating binary proportional partitions, avoiding tiny unreadable labels.
     function split(items,x,y,w,h,depth){
@@ -874,6 +900,7 @@
     if(!total)return empty(s.hasData?'当前没有收益贡献':'暂无实测数据','收益占比仅使用当前筛选中的正毛收益，缺失值不记为零。');
     const largest=rows.slice(0,3).reduce((n,r)=>n+value(r),0)/total*100;
     const blocks=revenueMapBlocks(rows,value);
+    compositionSnapshot={rows,total,value,blocks,largest};
     return `<div class="revenue-map-layout"><div class="revenue-map" role="list" aria-label="按任务正毛收益的面积占比图">${blocks.map(({row:r,x,y,w,h},i)=>{
       const share=value(r)/total*100;
       return `<button type="button" role="listitem" class="revenue-map-tile ${w*h<220||w<9||h<11?'is-tiny':w*h<650||w<18||h<23?'is-small':''}" data-action="task-analysis" data-id="${esc(r.task.id)}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;--tile-accent:var(--wb-chart-bg-${categoryIndex(r.task.id)});--tile-bg:var(--wb-chart-bg-${categoryIndex(r.task.id)});--tile-text:var(--wb-chart-text-${categoryIndex(r.task.id)})" title="${esc(r.task.name)}：${pct(share)} / ${esc(amount(r.gross,r.gold))}" aria-label="查看${esc(r.task.name)}，收益占比${pct(share)}"><span class="revenue-map-name">${esc(r.task.name)}</span><strong class="revenue-map-share">${pct(share)}</strong><small>${amount(r.gross,r.gold)}</small></button>`;
@@ -3071,7 +3098,7 @@
     'new-record':b=>recordForm(null,b.dataset.task||null),'new-ledger':()=>ledgerForm(),'new-cash':()=>cashForm(),'new-snapshot':()=>snapshotForm(),'new-equipment':()=>equipmentForm(),
     'edit-config':()=>configForm(),'new-scenario':()=>scenarioForm(),calibrate:b=>{const t=state.tasks.find(t=>t.id===b.dataset.id),minutes=Number(b.dataset.minutes);modal('应用耗时校准 / '+esc(t.name),`<p>当前每批 ${num(t.minutes,2)} 分钟 → 建议 ${num(minutes,2)} 分钟。</p><p class="muted mt">统计期间 ${ui.start} — ${ui.end}。样本包含准备耗时；应用后准备时间设为 0、效率设为 100%，避免重复计折损。历史实测保持不变。</p>`,()=>commit(()=>{t.minutes=minutes;t.prepare=0;t.efficiency=1;t.updatedAt=new Date().toISOString();},'耗时建议已应用到未来预测'),'应用建议');},
     guide,help:b=>modal('指标说明',`<p>${esc(b.dataset.text)}</p>`),'review-export':()=>reviewReportForm(),export:()=>exportData(),
-    'chart-export':async b=>{const card=b.closest('[data-chart-card]');await exportChartPng(card,(card?.dataset.chartCard||'图表')+'_'+ui.start+'_'+ui.end+'.png');},
+    'chart-export':async b=>{const key=b.dataset.chartExport,card=b.closest('[data-chart-card]'),name=(card?.dataset.chartCard||'图表')+'_'+ui.start+'_'+ui.end+'.png',bg=getComputedStyle(card||document.body).backgroundColor;if(key==='distribution'){const text=revenueMapSvg();await svgTextToPng(text,800,360,bg,name);return;}await exportChartPng(card,name);},
     'raw-backup':()=>download('JX3_raw_storage.txt',new Blob([JSON.stringify({current:localStorage.getItem(KEY),legacy:localStorage.getItem(Store.LEGACY_KEY)},null,2)],{type:'text/plain'})),
     'preset-sources':()=>presetSources(),'reset-blank':()=>confirmReset(),
     'csv-template':()=>download('JX3_roles_template.csv',new Blob(['\uFEFFaccount_id,account_name,group,role_id,role_name,server,school,stance,duty,level,score,opening_gold,balance,tags,companion,region,billing_type,monthly_expires_at,tongbao,points,camp,observed_gold,energy,energyCap,weeklyEnergy,contribution,chivalry,prestige,achievement,stage,huashang,homeSeason,resource_date,reference_dps,gongzhan_buff\na_example,账号示例,主力组,r_example,角色示例,梦江南,七秀,云裳心经,heal,50,85000,18000,1600,日常,,电信区,point,,,,unknown,,0,3000,,,,,,,,,2026-10-14,,false\n'],{type:'text/csv;charset=utf-8'})),
