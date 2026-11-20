@@ -22,15 +22,11 @@ const base=process.argv[2]||'http://127.0.0.1:4173/',online=base.startsWith('htt
     }
     await page.setViewportSize({width:1440,height:1000});
     await page.locator('nav [data-page="roles"]').click();
-    assert(await page.locator('.directory-account-list button').count()<=6);
+    assert.equal(await page.locator('.directory-account-list button').count(),fixture.accounts.length);
+    assert.equal(await page.locator('.directory-account-pages').count(),0);
     const selectedId=await page.locator('.directory-account-list button').first().getAttribute('data-id');
     await page.locator('.directory-account-list button').first().click();
-    if(await page.locator('[aria-label="下一页账号"]').isEnabled()){
-      await page.locator('[aria-label="下一页账号"]').press('Enter');
-      assert.equal(await page.locator('.account-archive').getAttribute('data-account-id'),selectedId);
-      await page.locator('[data-action="directory-account-current"]').click();
-      assert.equal(await page.locator('.directory-account-list button.active').getAttribute('data-id'),selectedId);
-    }
+    assert.equal(await page.locator('.account-archive').getAttribute('data-account-id'),selectedId);
     const last=fixture.accounts.at(-1);await page.locator('#directory-account-search').fill(last.name);
     await page.locator('.directory-account-list [data-id="'+last.id+'"]').press('Enter');
     assert.equal(await page.locator('.account-archive').getAttribute('data-account-id'),last.id);
