@@ -2350,3 +2350,9 @@ html[data-theme] .topbar{padding:0 var(--ds-page-pad);min-height:var(--ds-header
   .tc-cal-grid{min-width:620px}
   .tc-cal-grid.is-month{min-width:620px}
 }
+
+/* 20 收益分析分区导航：按内容宽度排布，避免宽屏被拉成三列大卡 */
+.analysis-section-nav{display:flex;flex-wrap:wrap;gap:6px}
+.analysis-section-nav button{flex:0 1 auto;min-width:0;white-space:nowrap;padding:6px 12px;min-height:32px;border-radius:var(--ds-control-radius)}
+@media(max-width:1100px){.analysis-section-nav button{flex-basis:auto}}
+@media(max-width:767px){.analysis-section-nav button{flex:1 1 auto;white-space:normal;font-size:12px;padding:6px 10px}}
