@@ -1,14 +1,14 @@
 {
-  "id": "3c201dc7a00f89e30c81d468cdb284003ea7ea48a6b730196d5f2e7c8c733733",
-  "version": "0.12.0-dev.84",
+  "id": "2ad046d0b54ee1d8166a92725d4a28ecd3d8ca9d8ddaaef2d26217235215e2a9",
+  "version": "0.12.0-dev.85",
   "channel": "dev",
-  "sourceCommit": "3e73af9575ae11995ff6952e9b3fa45b0205a768",
-  "sourceTimestamp": 1795153431,
+  "sourceCommit": "682ba67378c5842adf8aef51eeb9d92ecf820da0",
+  "sourceTimestamp": 1795153563,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "任务收益分布支持独立导出 PNG：按同一面积占比生成矩形面积图与图例，含任务名、占比与金额；总览四张图表均可右上角单独导出。"
+      "收益分布导出按内容自适应高度"
     ]
   },
   "files": [
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 850688,
-      "sha256": "3d7e72b398cfe40a2bd9d8a3bad9ef950486ad126a0973a26773fdcc3a7f6661"
+      "bytes": 850780,
+      "sha256": "b6935e56d21fd2b4596e71b96a2a6319ce37300762282f6b47521c4e64151a0e"
     },
     {
       "name": "version.js",
-      "bytes": 491,
-      "sha256": "1c4f7242143137f40ba6cae24a91568e30b42feb364334b42329932bb85161a4"
+      "bytes": 355,
+      "sha256": "f1e036cd7b4af939e065f07c94e95502038a317dbe2324ee3bf8542d8a17af2f"
     }
   ]
 }
