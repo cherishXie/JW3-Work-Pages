@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="deep-ocean">
+<html lang="zh-CN" data-theme="cloud-blue" data-color-mode="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111111'/%3E%3Cpath d='M18 4L8 18h8l-2 10 10-15h-8z' fill='%23009e96'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2319c8b9'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%23f5c31c'/%3E%3Cpath d='M4 23c2.5-6 6.5-9 12-9s9.5 3 12 9z' fill='%23fffcf2'/%3E%3Cpath d='M4 24h24' stroke='%230b6f65' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="app-icon.png">
-  <meta name="theme-color" content="#111111">
+  <meta name="theme-color" content="#F3EEDF">
   <meta name="description" content="剑网三多账号效率工作台 / 可验证 HTML 原型">
   <!-- Public release: published via allowlisted JW3-Work-Pages workflow; user data stays browser-local. -->
   <title>剑网三 / 效率工作台</title>
@@ -16,11 +16,40 @@
   <script defer src="themes.js?v=startup-20261024"></script>
   <link rel="stylesheet" href="styles.css?v=dashboard-20261104">
   <style>
-  #workbench-boot{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:var(--wb-bg,#111111);color:var(--wb-text,#eeeeee);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif} .boot-content{width:min(340px,calc(100vw - 48px));text-align:center}.boot-mark{width:96px;height:96px;margin:0 auto 24px;color:var(--wb-primary,#3e63dd)}.boot-mark svg{display:block;width:100%;height:100%}.boot-mark path{stroke-dasharray:90;stroke-dashoffset:0;animation:boot-draw 900ms ease-out both}.boot-content h1{margin:0;font-size:24px;font-weight:600}.boot-features{font-size:12px;color:var(--wb-text-muted,#b4b4b4);margin:12px 0 32px;display:flex;justify-content:center;gap:20px}.boot-track{height:3px;background:var(--wb-surface-2,#222222);overflow:hidden;margin-bottom:14px}.boot-track span{display:block;height:100%;width:100%;background:var(--wb-primary,#3e63dd);transform-origin:left;animation:boot-charge 1200ms ease-out both}#boot-status{font-size:14px;margin:0}#boot-elapsed{display:block;margin-top:6px;font-size:12px;color:var(--wb-text-muted,#b4b4b4)}#boot-retry{margin-top:12px}#boot-hint{font-size:12px;color:var(--wb-text-muted,#b4b4b4);margin:10px 0}#boot-error{text-align:left;margin-top:10px;font-size:12px}#boot-error pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:120px;overflow:auto}#boot-recovery:not([hidden]){display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}.boot-caption{font-size:12px;color:var(--wb-text-muted,#b4b4b4);margin-top:24px}@keyframes boot-draw{from{stroke-dashoffset:90;opacity:.2}to{stroke-dashoffset:0;opacity:1}}@keyframes boot-charge{from{transform:scaleX(.04)}to{transform:scaleX(1)}}@media(prefers-reduced-motion:reduce){.boot-mark path,.boot-track span{animation:none}}
+  #workbench-boot{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background-color:var(--wb-bg,#f3eedf);background-image:radial-gradient(circle,rgba(121,79,39,.07) 1px,transparent 1.4px);background-size:22px 22px;color:var(--wb-text,#3d2e1b);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+  .boot-content{width:min(372px,calc(100vw - 40px));text-align:center;padding:30px 26px 24px;background:var(--wb-surface,#fffcf2);border:2px solid var(--wb-border,#e4d9c2);border-radius:26px;box-shadow:0 4px 0 #e2d5bb,0 18px 40px -30px rgba(61,52,40,.5)}
+  .boot-mark{width:92px;height:92px;margin:0 auto 18px;color:var(--wb-primary,#0e8c7f);background:var(--wb-primary-soft,#d9f5ef);border:2px solid #b9e4d8;border-radius:28px;display:grid;place-items:center}
+  .boot-mark svg{display:block;width:60px;height:60px}
+  .boot-mark path{stroke-dasharray:90;stroke-dashoffset:0;animation:boot-draw 900ms ease-out both}
+  .boot-content h1{margin:0;font-size:24px;line-height:1.3;font-weight:800;letter-spacing:-.4px}
+  .boot-features{font-size:12px;color:var(--wb-text-secondary,#6b5942);margin:14px 0 22px;display:flex;justify-content:center;flex-wrap:wrap;gap:6px}
+  .boot-features span{padding:5px 11px;border:1.5px solid var(--wb-border,#e4d9c2);border-radius:999px;background:var(--wb-bg,#f3eedf)}
+  .boot-track{height:10px;background:var(--wb-track,#ebe1cc);border-radius:999px;overflow:hidden;margin-bottom:14px;border:1.5px solid var(--wb-border,#e4d9c2)}
+  #boot-progress-bar{display:block;height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,var(--wb-primary,#0e8c7f),#19c8b9);transition:width .35s ease}
+  .boot-track.is-waiting #boot-progress-bar{background-image:linear-gradient(90deg,var(--wb-primary,#0e8c7f),#3dd4c6,var(--wb-primary,#0e8c7f));background-size:200% 100%;animation:boot-shimmer 1.8s linear infinite}
+  .boot-track.is-failed{border-color:#e0a49a}
+  .boot-track.is-failed #boot-progress-bar{background:#c0473f}
+  .boot-status-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  #boot-percent{font-size:12px;font-weight:700;color:var(--wb-primary-label,#0b5f56);font-variant-numeric:tabular-nums}
+  .boot-network{display:block;margin:8px 0 0;padding:6px 10px;border-radius:10px;background:#fff3ce;border:1.5px solid #efd699;color:#6e4c0c;font-size:12px;line-height:1.5}
+  .boot-network[data-state="offline"]{background:#fce9e5;border-color:#f3c9c1;color:#8f2b24}
+  #boot-status{font-size:14px;font-weight:600;margin:0}
+  #boot-elapsed{display:block;margin-top:6px;font-size:12px;color:var(--wb-text-muted,#8b7a61)}
+  #boot-retry{margin-top:12px}
+  #boot-hint{font-size:12px;color:var(--wb-text-muted,#8b7a61);margin:10px 0}
+  #boot-error{text-align:left;margin-top:10px;font-size:12px}
+  #boot-error pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:120px;overflow:auto}
+  #boot-recovery:not([hidden]){display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+  .boot-caption{font-size:12px;color:var(--wb-text-muted,#8b7a61);margin-top:20px}
+  #boot-retry,#boot-backup,#boot-repair{min-height:34px;padding:6px 16px;border:1.5px solid var(--wb-border,#e4d9c2);border-radius:999px;background:var(--wb-surface,#fffcf2);color:var(--wb-text,#3d2e1b);font-weight:600;cursor:pointer;box-shadow:0 2px 0 #ddd0b6}
+  #boot-retry:hover,#boot-backup:hover,#boot-repair:hover{transform:translateY(-1px)}
+  @keyframes boot-draw{from{stroke-dashoffset:90;opacity:.2}to{stroke-dashoffset:0;opacity:1}}
+  @keyframes boot-shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
+  @media(prefers-reduced-motion:reduce){.boot-mark path,.boot-track span{animation:none}}
   </style>
 </head>
 <body>
-  <section id="workbench-boot" aria-label="工作台启动" aria-busy="true"><div class="boot-content"><div class="boot-mark" aria-hidden="true"><svg viewBox="0 0 96 96" fill="none"><rect x="9" y="9" width="78" height="78" rx="8" stroke="currentColor" stroke-width=".5"/><rect x="19" y="19" width="58" height="58" rx="2" stroke="currentColor" stroke-width=".5"/><path d="M53 24L34 51h17l-5 21 20-29H49z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div><h1>剑网三工作台</h1><div class="boot-features"><span>账号与角色</span><span>任务排程</span><span>收益分析</span></div><div class="boot-track" aria-hidden="true"><span></span></div><p id="boot-status" role="status" aria-live="polite">正在加载工作台</p><small id="boot-elapsed">已等待 0 秒</small><button id="boot-retry" type="button" hidden>重新加载</button><p id="boot-hint" hidden></p><details id="boot-error" hidden><summary>错误详情</summary><pre id="boot-error-detail"></pre></details><div id="boot-recovery" hidden><button id="boot-backup" type="button">导出原始备份</button><button id="boot-repair" type="button">重新下载应用</button></div><p class="boot-caption" data-storage-label>数据保存在此浏览器</p></div></section>
+  <section id="workbench-boot" aria-label="工作台启动" aria-busy="true"><div class="boot-content"><div class="boot-mark" aria-hidden="true"><svg viewBox="0 0 96 96" fill="none"><circle cx="66" cy="28" r="10" fill="#f5c31c"/><path d="M10 66c6-15 19-23 38-23s32 8 38 23z" fill="#8fd8cb" stroke="#0b6f65" stroke-width="3" stroke-linejoin="round"/><path d="M8 74h80" stroke="#0b6f65" stroke-width="4" stroke-linecap="round"/><path d="M30 50c4-9 10-14 18-14s14 5 18 14" stroke="#fffcf2" stroke-width="3" stroke-linecap="round"/></svg></div><h1>剑网三工作台</h1><div class="boot-features"><span>账号与角色</span><span>任务排程</span><span>收益分析</span></div><div class="boot-track" id="boot-track" role="progressbar" aria-label="工作台启动进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="4"><span id="boot-progress-bar" style="width:4%"></span></div><div class="boot-status-row"><p id="boot-status" role="status" aria-live="polite">正在加载工作台</p><b id="boot-percent">4%</b></div><small id="boot-elapsed">已等待 0 秒</small><small id="boot-network" class="boot-network" hidden></small><button id="boot-retry" type="button" hidden>重新加载</button><p id="boot-hint" hidden></p><details id="boot-error" hidden><summary>错误详情</summary><pre id="boot-error-detail"></pre></details><div id="boot-recovery" hidden><button id="boot-backup" type="button">导出原始备份</button><button id="boot-repair" type="button">重新下载应用</button></div><p class="boot-caption" data-storage-label>数据保存在此浏览器</p></div></section>
 
 <section id="app-update" class="app-update" aria-label="版本更新" hidden><div><div class="update-heading"><span id="update-tag" class="update-tag">有新版本</span><strong id="update-message" role="status" aria-live="polite"></strong></div><p id="update-detail"></p></div><div class="update-actions"><button id="update-apply" class="primary" type="button">立即更新</button><button id="update-dismiss" type="button">稍后</button></div></section>
   <aside id="sidebar" class="sidebar"></aside>
