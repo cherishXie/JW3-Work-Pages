@@ -26,10 +26,12 @@
   const dayLabels=['周日','周一','周二','周三','周四','周五','周六'];
   globalThis.WorkbenchBoot?.stage('正在读取本地档案');
   let storageError='',storageReadError=false,state,dataStore=Store.empty(),migrated=false,startupSource;
+  const readStarted=performance.now();
   try{startupSource={current:localStorage.getItem(KEY),legacy:KEY===Store.KEY?localStorage.getItem(Store.LEGACY_KEY):null};const loaded=await Store.readAsync(localStorage,KEY);dataStore=loaded.store;migrated=loaded.migrated;state=dataStore.active?M.clone(dataStore.active):M.blank();}catch(e){storageReadError=true;state=M.blank();storageError='本地数据读取失败：'+e.message+'。原存储未覆盖，可导出原始数据或重置。';}
+  globalThis.WorkbenchBoot?.timing?.('读取本地档案',performance.now()-readStarted);
   globalThis.WorkbenchBoot?.stage('正在整理任务与收益记录');
   const rulesUpgraded=!storageError&&(state.levelSeason!==M.LEVEL_SEASON||state.roles.some(r=>r.gongzhanBuff==null)||state.partyRulesVersion!==3||state.workflowVersion!==2||state.plans.some(p=>p.requiresReview!==undefined));
-  async function prepare(label,work){globalThis.WorkbenchBoot?.stage(label);await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));return work();}
+  async function prepare(label,work){globalThis.WorkbenchBoot?.stage(label);await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));const started=performance.now();try{return work();}finally{globalThis.WorkbenchBoot?.timing?.(label,performance.now()-started);}}
   if(!storageError){await prepare('正在迁移赛季与任务规则',()=>M.upgradeState(state));await prepare('正在整理历史收益归属',()=>M.freezeHistory(state));}
   const defaultsAdded=!storageError&&await prepare('正在准备默认任务',()=>Ops.ensureDefaults(state));
   const forecastUpgraded=!storageError&&await prepare('正在整理已确认排程',()=>M.capturePlanForecasts(state,dataStore.snapshots));
@@ -609,7 +611,7 @@
     let left=24*3600-(hour*3600+minute*60+second)+7*3600;if(left>=24*3600)left-=24*3600;
     const countdown=[Math.floor(left/86400),Math.floor(left%86400/3600),Math.floor(left%3600/60),left%60].map(v=>String(v).padStart(2,'0'));
     const days=M.dates(M.addDays(today,-6),today),max=Math.max(1,...days.map(d=>state.records.filter(r=>r.date===d).length)),weekRecords=state.records.filter(r=>days.includes(r.date)),weekGold=weekRecords.reduce((n,r)=>n+(r.gold||0),0),weekBatches=weekRecords.reduce((n,r)=>n+(r.batches||1),0);
-    const top=[...roles].map(r=>({r,v:summaryView(state,ui.start,ui.end,{...scope(),role:r.id},'actual')})).filter(x=>x.v.hasData&&x.v.hourly!=null).sort((a,b)=>b.v.hourly-a.v.hourly)[0];
+    const top=(()=>{try{const best=M.reviewAnalysis(state,ui.start,ui.end,scope()).roles.filter(r=>r.role&&r.hasTime&&r.minutes>0&&r.net!=null).sort((a,b)=>b.net/(b.minutes/60)-a.net/(a.minutes/60))[0];return best?{r:best.role,v:{hourly:best.net/(best.minutes/60)}}:null;}catch{return [...roles].map(r=>({r,v:summaryView(state,ui.start,ui.end,{...scope(),role:r.id},'actual')})).filter(x=>x.v.hasData&&x.v.hourly!=null).sort((a,b)=>b.v.hourly-a.v.hourly)[0];}})();
     const batchCount=(s.tasks||[]).reduce((n,t)=>n+(t.batches||0),0)||state.records.filter(r=>r.date>=ui.start&&r.date<=ui.end).reduce((n,r)=>n+(r.batches||1),0);
     const avg=batchCount?s.minutes/batchCount:null;
     const fastest=(()=>{const grouped=new Map();for(const r of state.records.filter(r=>r.date>=ui.start&&r.date<=ui.end&&M.inScope(state,r,scope()))){const row=grouped.get(r.taskId)||{minutes:0,batches:0,name:state.tasks.find(t=>t.id===r.taskId)?.name||r.taskName||'任务待补'};row.minutes+=r.minutes||0;row.batches+=r.batches||1;grouped.set(r.taskId,row);}const rows=[...grouped.values()].filter(x=>x.batches).map(x=>({...x,avg:x.minutes/x.batches}));return rows.length?rows.sort((a,b)=>a.avg-b.avg)[0]:null;})();
@@ -617,8 +619,12 @@
   }
 
   function overviewLeaderTables(s){
+    const started=performance.now();
     const roleRows=activeRoles().map(r=>({r,v:summaryView(state,ui.start,ui.end,{...scope(),role:r.id},ui.mode)})).sort((a,b)=>(b.v.hasData?b.v.net:-Infinity)-(a.v.hasData?a.v.net:-Infinity)).slice(0,7);
+    globalThis.WorkbenchBoot?.timing?.('总览角色榜',performance.now()-started);
+    const accountStarted=performance.now();
     const accountRows=state.accounts.filter(a=>M.scopeMatches(a.id,ui.account)&&(!ui.group||a.group===ui.group)).map(a=>({a,v:summaryView(state,ui.start,ui.end,{...scope(),account:a.id},ui.mode),roles:activeRoles().filter(r=>r.accountId===a.id)})).sort((a,b)=>(b.v.hasData?b.v.net:-Infinity)-(a.v.hasData?a.v.net:-Infinity)).slice(0,7);
+    globalThis.WorkbenchBoot?.timing?.('总览账号榜',performance.now()-accountStarted);
     const totalNet=accountRows.reduce((n,x)=>n+(x.v.hasData?x.v.net:0),0);
     return `<div class="wb-tables-row"><article class="card wb-rank-card">${head('角色榜','按净收益排序 / 当前期间',button('完整榜单','nav','small','data-page="roi"'))}<div class="table-wrap"><table class="table wb-rank-table"><thead><tr><th class="pos">#</th><th>角色</th><th>账号</th><th class="num">净收益</th><th class="num">净时薪</th><th class="num">趋势</th></tr></thead><tbody>${roleRows.map(({r,v},i)=>`<tr data-action="role-detail" data-id="${esc(r.id)}" tabindex="0"><td class="num">${i+1}</td><td><div class="wb-role-cell"><span class="wb-glyph">${esc((r.school||'?').slice(0,1))}</span><div><b>${esc(r.name)}</b><small>${esc(r.school||'门派待补')} / ${esc(r.stance||'心法待补')}</small></div></div></td><td>${esc(state.accounts.find(a=>a.id===r.accountId)?.name||'待补')}</td><td class="num">${v.hasData?amount(v.net,v.netGold):'—'}</td><td class="num">${v.hourly!==null?money(v.hourly)+' /h':'—'}</td><td class="num">${v.hasData?(v.net>=0?'↑':'↓'):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty-cell">当前范围没有角色</td></tr>'}</tbody></table></div><div class="table-foot"><span>${activeRoles().length} 名角色 / ${ui.start} — ${ui.end}</span><span>当前口径</span></div></article><article class="card wb-rank-card">${head('账号榜','按账号聚合 / 含全部角色',button('全部账号','nav','small','data-page="roles"'))}<div class="table-wrap"><table class="table wb-rank-table"><thead><tr><th class="pos">#</th><th>账号</th><th class="num">角色</th><th class="num">净收益</th><th class="num">份额</th></tr></thead><tbody>${accountRows.map(({a,v,roles},i)=>`<tr data-action="overview-account" data-id="${esc(a.id)}" tabindex="0"><td class="num">${i+1}</td><td><div class="wb-account-cell"><i style="background:var(--wb-chart-bg-${i%6})"></i><span><b>${esc(a.name)}</b><small>${esc(a.region||'区服待补')}</small></span></div></td><td class="num">${roles.length}</td><td class="num">${v.hasData?amount(v.net,v.netGold):'—'}</td><td class="num">${totalNet&&v.hasData?pct(v.net/totalNet*100):'—'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty-cell">当前范围没有账号</td></tr>'}</tbody></table></div><div class="table-foot"><span>${accountRows.length} 个账号</span><span>按净收益排序</span></div></article><div class="wb-attention">${overviewActions(s)}</div></div>`;
   }
@@ -675,7 +681,9 @@
   let overviewBodyCache={key:'',main:'',charts:''},overviewBodyJob=0,overviewBodyPending='';
   function overviewBodyKey(){return [ui.start,ui.end,ui.mode,JSON.stringify(scope()),state.updatedAt||'',state.records.length,state.plans.length,state.progress.length,state.roles.length,state.accounts.length,ui.currency].join('|');}
   function overviewScopeData(){
-    const s=summaryView(state,ui.start,ui.end,scope(),ui.mode),complete=completionView(state,ui.start,ui.end,scope());
+    const started=performance.now(),s=summaryView(state,ui.start,ui.end,scope(),ui.mode);
+    globalThis.WorkbenchBoot?.timing?.('总览汇总',performance.now()-started);
+    const complete=completionView(state,ui.start,ui.end,scope());
     return {s,complete,roles:activeRoles(),cash:M.cashSummary(state,ui.start,ui.end)};
   }
   function overviewMain(){
@@ -713,8 +721,8 @@
       if(ui.page!=='overview')return;
       const host=document.getElementById('overview-charts-pending');
       if(!host)return;
-      const active=viewCacheActive;viewCacheActive=true;let html;
-      try{html=overviewCharts();}finally{viewCacheActive=active;}
+      const active=viewCacheActive;viewCacheActive=true;let html;const started=performance.now();
+      try{html=overviewCharts();}finally{viewCacheActive=active;}globalThis.WorkbenchBoot?.timing?.('总览图表',performance.now()-started);
       if(overviewBodyCache.key===key)overviewBodyCache={key,main:overviewBodyCache.main,charts:html};
       const template=document.createElement('template');template.innerHTML=html;host.replaceWith(template.content);
       applyPrivacy();fitRevenueMapLabels();enhanceTables();syncAnalysisHighlights();
@@ -726,8 +734,8 @@
       if(job!==overviewBodyJob||ui.page!=='overview'||overviewBodyKey()!==key)return;
       const host=document.getElementById('overview-body-pending');
       if(!host)return;
-      const active=viewCacheActive;viewCacheActive=true;let main;
-      try{main=overviewMain();}finally{viewCacheActive=active;}
+      const active=viewCacheActive;viewCacheActive=true;let main;const started=performance.now();
+      try{main=overviewMain();}finally{viewCacheActive=active;}globalThis.WorkbenchBoot?.timing?.('总览主区',performance.now()-started);
       overviewBodyCache={key,main,charts:''};
       const template=document.createElement('template');template.innerHTML=main+'<div id="overview-charts-pending"></div>';host.replaceWith(template.content);
       applyPrivacy();enhanceTables();syncAnalysisHighlights();
@@ -1158,12 +1166,15 @@
     const rules=entry?.cycleSnapshot||entry?.cdSnapshot||x.t,deadline=M.planExecutionDeadline(state,x.p,x.t,rules);
     const actual=started?stamp(started)+' → '+(ended?stamp(ended):entry?'结束待补':paused?'已暂停':'结束待录'):entry?esc(entry.date)+' / 起止待补':'尚未记录';
     const attrs='data-plan="'+esc(x.p.id)+'" data-task="'+esc(x.id)+'" data-index="'+x.i+'"';
-    const timerAction=paused?'resume':started?'pause':'start',canTime=(!started||Date.parse(started)<=Date.now())&&(timerAction==='pause'||M.planExecutionValid(state,x.p,x.t,new Date().toISOString()));
     const recordedMinutes=entry?.minutes??entry?.measurements?.minutes;
+    const canStart=!started||Date.parse(started)>Date.now(),cycleOpen=!started||M.planExecutionValid(state,x.p,x.t,new Date().toISOString()),canResume=paused&&cycleOpen;
     const clock=started&&(!entry||recordedMinutes==null&&ended)?'<span>'+ (entry?'已记录耗时':Date.parse(started)>Date.now()?'开始时间未到':paused?'计时已暂停':ended?'草稿耗时':'计时中')+' <b data-execution-clock data-started-at="'+esc(started)+'" data-ended-at="'+esc(ended||'')+'" data-pauses="'+esc(JSON.stringify(timing.timerPauses||[]))+'">'+executionClockText(started,ended,timing.timerPauses||[])+'</b></span>':entry?'<span>'+(recordedMinutes!=null?'已记录耗时 <b>'+num(recordedMinutes,1)+' 分钟</b>':'耗时待补')+'</span>':'';
+    const timerButtons=!entry&&x.pending&&!x.closed&&!x.p.cancelled?(started?(ended?'<span class="muted">计时已结束 / 待登记完成</span>':
+      ('<span class="execution-timer-actions">'+button(paused?'继续计时':'暂停计时','queue-batch-timer','small',attrs+' data-timer="'+(paused?'resume':'pause')+'" '+(paused&&!canResume?'disabled title="已跨任务刷新周期，请先调整排程"':''))
+      +button('结束计时','queue-batch-timer','small',attrs+' data-timer="end"')+'</span>')):
+      button('开始计时','queue-batch-timer','small',attrs+' data-timer="start" '+(canStart&&cycleOpen?'':'disabled title="已跨任务刷新周期，请先调整排程日期"'))):'';
     return '<dl class="execution-dates"><div><dt>安排日期</dt><dd>'+esc(x.p.date)+'</dd></div><div><dt>实际执行'+(draft&&!entry?'（草稿）':'')+'</dt><dd>'+actual+'</dd></div><div><dt>CD 截止（北京时间）</dt><dd>'+stamp(deadline)+'<small>此时刷新</small></dd></div></dl>'+
-      '<div class="execution-timer">'+clock+
-      (x.t.partyRule==='raid10'&&x.pending&&!x.closed&&!x.p.cancelled?button(paused?'继续计时':started?'暂停计时':'开始计时','queue-batch-timer','small',attrs+' data-timer="'+timerAction+'" '+(canTime?'':'disabled title="已跨刷新周期，可补录有效周期内的历史时间"')):'')+'</div>';
+      '<div class="execution-timer">'+clock+timerButtons+'</div>';
   }
   function taskV2FocusCard(x,navigation=[],batchNav=''){
     if(!x)return '<section class="card tc-v2-empty-focus">'+empty('当前范围没有可执行批次','可以切换日期或状态，或安排新的任务。',button('安排新任务','work-view','primary small','data-value="planning"'))+'</section>';
@@ -1180,7 +1191,7 @@
       '<p class="panel-sub">'+(x.p.teamConfigs?.[x.i]?.name?esc(x.p.teamConfigs[x.i].name)+' / ':'')+x.members.length+' 个角色 / '+new Set(x.members.map(id=>state.roles.find(r=>r.id===id)?.accountId)).size+' 个账号 / '+batchDurationLabel(x)+'</p></div></div>'+
       '<div class="execution-dock">'+executionTimingSummary(x,measured||x.fact)+'<div class="tc-v2-focus-actions">'+taskV2Action(x)+
       (x.pending?button('检查 MuMu 配置 / 未连接','mumu-prepare','small',attrs):'')+
-      button('复制本批名单','copy-batch','small','data-plan="'+esc(x.p.id)+'" data-index="'+x.i+'"')+
+      button('复制本批名单','copy-batch','small','data-plan="'+esc(x.p.id)+'" data-task="'+esc(x.id)+'" data-index="'+x.i+'"')+
       (x.pending?button('改期 / 调整','adjust-batch','small',attrs+(locked?' disabled title="请先解锁队伍"':'')):'')+
       '<details class="tc-v2-more"><summary>更多操作</summary><div class="tc-v2-more-body">'+
       (x.pending?button('删除本批','delete-batch','ghost small',attrs+(locked?' disabled title="请先解锁队伍"':''))+button('终止本批','stop-batch','ghost small',attrs+(locked?' disabled title="请先解锁队伍"':'')):(!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',attrs)+button('撤销完成','reopen-execution','ghost small',attrs):''))+
@@ -1267,8 +1278,25 @@
     return parts?{controls,content}:controls+content;
   }
   function progressTaskGroups(tasks,renderItem){
-    const regular=tasks.filter(x=>x.t.partyRule!=='raid10'),raids=tasks.filter(x=>x.t.partyRule==='raid10');
-    return regular.map(renderItem).join('')+(raids.length?`<details class="tc-raid-progress" data-progress-raids ${ui.progressRaids||ui.taskFilter?'open':''}><summary>10 人副本 CD <small>${raids.length} 项 / ${raids.filter(x=>x.p.completed>=x.p.target).length} 已完成</small></summary><div class="tc-raid-progress-items">${raids.map(renderItem).join('')}</div></details>`:'');
+    const regular=tasks.filter(x=>x.t.partyRule!=='raid10'),raids25=tasks.filter(x=>x.t.partyRule==='raid10'&&M.raidCapacity(x.t)===25),raids10=tasks.filter(x=>x.t.partyRule==='raid10'&&M.raidCapacity(x.t)!==25);
+    const group=(label,rows,key)=>rows.length?`<details class="tc-raid-progress" data-progress-raids ${ui.progressRaids||ui.taskFilter?'open':''}><summary>${label} <small>${rows.length} 项 / ${rows.filter(x=>x.p.completed>=x.p.target).length} 已完成</small></summary><div class="tc-raid-progress-items">${rows.map(renderItem).join('')}</div></details>`:'';
+    return regular.map(renderItem).join('')+group('25 人副本 CD',raids25,'25')+group('10 人副本 CD',raids10,'10');
+  }
+  function raid25GapPanel(){
+    const date=ui.taskDate;
+    const rank=t=>{const seasonId=t.seasonId||Raids.find(t.dungeonId)?.seasonId;const index=Raids.seasons.findIndex(x=>x.id===seasonId);return index<0?Raids.seasons.length:index;};
+    const difficultyRank={'25人普通':0,'25人英雄':1,'25人挑战':2};
+    const tasks=state.tasks.filter(t=>t.enabled!==false&&M.raidCapacity(t)===25).sort((a,b)=>rank(a)-rank(b)||(Date.parse(b.opensAt||0)-Date.parse(a.opensAt||0))||(difficultyRank[a.difficulty]??9)-(difficultyRank[b.difficulty]??9));
+    if(!tasks.length)return '';
+    const current=tasks.filter(t=>rank(t)===0),older=tasks.filter(t=>rank(t)!==0);
+    const card=t=>{
+      const roles=t.roleIds.map(id=>state.roles.find(r=>r.id===id)).filter(r=>r&&M.isMaxLevel(state,r));
+      const rows=roles.map(r=>({r,p:M.effectiveProgress(state,t,r,date)})),used=rows.filter(x=>x.p.status==='completed').length,free=roles.filter(r=>M.availableCount(state,t,r,date)>0).length;
+      const status=!roles.length?'未分配角色':used>=roles.length?'本周已用':used?'部分完成':free?'可安排':'暂无可用 CD';
+      const reset=(t.resetDays||[1]).map(d=>dayLabels[d]).join(' / ')+' '+(t.resetHour??7)+':00 刷新';
+      return `<article class="raid25-card"><header><div><strong>${esc(t.dungeonName||t.name)}</strong><small>${esc(t.difficulty||'25人')} / ${esc(Raids.seasons.find(x=>x.id===(t.seasonId||Raids.find(t.dungeonId)?.seasonId))?.name||t.gameVersion||'赛季待补')}</small></div><span class="pill">${status}</span></header><p>${roles.length?`已用 ${used} / 可安排 ${free} / 已分配 ${roles.length}`:'尚未分配参与角色，先补齐角色再记录 CD'}</p><div class="progress" aria-hidden="true"><div style="width:${roles.length?Math.min(100,used/roles.length*100):0}%"></div></div><footer><span>${reset}</span><div>${roles.length?button('安排','replan','small',`data-id="${esc(t.id)}"`):''}${button(roles.length?'调整角色':'分配角色','edit-task','small',`data-id="${esc(t.id)}"`)}</div></footer></article>`;
+    };
+    return `<section class="card pad raid25-gap mb"><div class="panel-head"><div><h2>25 人副本 CD</h2><p class="panel-sub">优先当前赛季最新副本；按角色登记本周 CD，已用与可安排分开显示。</p></div><span class="pill">${current.length} 个当前赛季</span></div><div class="raid25-gap-grid">${current.slice(0,4).map(card).join('')||'<p class="muted">当前赛季暂无启用的 25 人副本任务。</p>'}</div>${older.length?`<div class="raid25-older"><button type="button" class="ghost small" data-action="raid25-older" aria-expanded="${ui.raid25Older}">${ui.raid25Older?'收起':'展开'}更早赛季 / 其他 25 人本（${older.length}）</button>${ui.raid25Older?`<div class="raid25-gap-grid">${older.map(card).join('')}</div>`:''}</div>`:''}</section>`;
   }
   document.addEventListener('toggle',e=>{if(e.target.matches?.('[data-progress-raids]'))ui.progressRaids=e.target.open;},true);
   function progressStatusControl(){return `<label class="field progress-status-control"><span>查漏状态</span><select id="progress-status" aria-label="查漏状态">${[['all','全部目标'],['pending','未完成'],['unassigned','未安排']].map(([value,label])=>`<option value="${value}" ${ui.progressStatus===value?'selected':''}>${label}</option>`).join('')}</select></label>`;}
@@ -1295,7 +1323,7 @@
         '<button type="button" data-action="progress" data-role="'+esc(r.id)+'" data-task="'+esc(t.id)+'" class="tc-v2-role-task"><span>'+esc(t.name)+'</span><span class="'+(p.status==='skipped'?'is-skipped':p.completed>=p.target?'is-complete':'')+'">'+(p.status==='skipped'?'已跳过':p.completed+'/'+p.target)+(p.completionOnly?' / 待补实测':'')+'</span></button>')+'</div>'+
         '<div class="tc-v2-role-tools">'+button('角色详情','role-detail','small','data-id="'+esc(r.id)+'"')+'<label><input type="checkbox" name="progress-role" value="'+esc(r.id)+'" '+(ui.progressSelection.includes(r.id)?'checked':'')+'> 批量选择</label></div></article>';
     }).join('');
-    const content='<div class="tc-v2-role-bulk"><label><input id="all-progress-roles" type="checkbox" '+(items.length&&items.every(x=>ui.progressSelection.includes(x.r.id))?'checked':'')+'> 选择当前角色</label>'+button('批量跳过 / 恢复','bulk-progress','small',ui.progressSelection.length?'':'disabled')+'<small>已选 '+ui.progressSelection.filter(id=>items.some(x=>x.r.id===id)).length+' 个角色 / 仅修改周期进度，不产生收益或实测。</small></div>'+
+    const content=raid25GapPanel()+'<div class="tc-v2-role-bulk"><label><input id="all-progress-roles" type="checkbox" '+(items.length&&items.every(x=>ui.progressSelection.includes(x.r.id))?'checked':'')+'> 选择当前角色</label>'+button('批量跳过 / 恢复','bulk-progress','small',ui.progressSelection.length?'':'disabled')+'<small>已选 '+ui.progressSelection.filter(id=>items.some(x=>x.r.id===id)).length+' 个角色 / 仅修改周期进度，不产生收益或实测。</small></div>'+
       (items.length?'<div class="tc-v2-role-grid">'+cards+'</div>':empty('当前筛选没有角色','可切换全部进度或调整任务筛选。',button('显示全部进度','all-progress','small')));
     return parts?{controls,content}:controls+content;
   }
@@ -1320,19 +1348,30 @@
     return '实际 '+num([...actual.values()].reduce((n,v)=>n+v,0),1)+' 分钟'+(missing?' / '+missing+' 批耗时待补':'')+(pending.length?' / 预计剩余 '+num(pending.reduce((n,x)=>n+x.minutes,0),1)+' 分钟':'');
   }
   const raidModeLabels={output:'输出模式',balanced:'均衡模式',mentor:'带新模式',external:'外部团队模式'};
+  let raidModeTouched=false;
+  function effectiveRaidMode(t){
+    if(!raidModeTouched&&t?.partyRule==='raid10'&&M.raidCapacity(t)===10&&!M.externalParty(t))return 'balanced';
+    return ui.raidMode;
+  }
+  function raidBalanceNote(t){
+    const teams=ui.generated?.taskId===t.id?ui.generated.result.batches.length:t.runs||1;
+    const lead=teams<=1?'单队按门派增益与远近搭配生成，不涉及跨队平衡。':teams>=3?'3 队及以上优先分散门派增益与远近战，再均衡输出与装分。':'2 队优先平衡输出，再分散门派增益与远近战。';
+    return `<section class="raid-balance-strategy" aria-label="副本自动平衡分队"><div class="flex between wrap"><b>自动平衡分队</b><span class="pill">${teams} 队</span></div><p class="panel-sub">${lead}账号连续使用、共战覆盖与首队锁定优先，职责与侠客校验不变。</p><ul>${M.raidBatchRules.map(r=>`<li><strong>${r.name}</strong><span>${r.description}</span></li>`).join('')}</ul></section>`;
+  }
   function gongzhanTag(r,showState=false){const present=r?.gongzhanBuff===true;if(showState)return `<span class="combat-tag gongzhan-state is-${present?'present':'absent'}" title="共战江湖：${present?'有':'无'}">${present?'共战江湖':'无共战江湖'}</span>`;return present?'<span class="combat-tag gongzhan" title="共战江湖">共战江湖</span>':'';}
 
   function participationTag(mode){return M.externalParty({raidMode:mode})?`<span class="participation-tag ${mode}">${esc(raidModeLabels[mode])}</span>`:'';}
-  function raidModeFields(t){const external=M.externalParty({raidMode:ui.raidMode}),daily=t?.partyRule==='daily5',labels=daily?{output:'自有角色组队',external:'外部团队模式'}:raidModeLabels;
-    return `<div class="raid-mode-picker mt ${external?'is-external':''}"><label for="raid-mode">分批组队模式</label><select id="raid-mode">${Object.entries(labels).map(([v,label])=>`<option value="${v}" ${(daily&&!external?'output':ui.raidMode)===v?'selected':''}>${label}</option>`).join('')}</select>${external?`${participationTag(ui.raidMode)}<label class="field">每批自有角色上限<input id="external-player-seats" type="number" min="1" max="${daily?5:M.raidCapacity(t)}" step="1" value="${Math.min(ui.externalPlayerSeats||1,daily?5:M.raidCapacity(t))}"></label>${!daily?`<label class="field">目标团队数<input id="raid-team-count" data-task="${t.id}" type="number" min="1" max="30" step="1" value="${t.runs}"></label>`:''}<p class="panel-sub">默认每个角色单独参团；增加上限可让不同账号角色同行。空位与职责由外部团队补齐，不召请自有侠客。</p><small>仅计算自有角色点卡与 CD；整队收益按自有席位占比分配，个人奖励保留。外部共战待确认，实际收入以登记为准。</small>`:`<details data-task-fold="raid-mode-help" ${taskFold('raid-mode-help')}><summary>模式说明</summary><p class="panel-sub">${daily?'玩家职责优先，3–4 人用已有侠客补位，1–2 人世界组队。':{output:'优先高装分、高参考 DPS 的输出角色，按输出参考指数排序。',balanced:'优先保留输出能力，再均衡各队输出参考指数。',mentor:'优先将强力 DPS 与已知低装分角色安排同队，分散带新。'}[ui.raidMode]} 优先覆盖共战；账号、职责、区服、CD 和侠客限制继续生效。</p><small>参考 DPS 使用相同战斗口径；缺失时仅参考装分，指数不等于真实伤害，不计侠客或共战增益。</small></details>`}</div>`;
+  function raidModeFields(t){const activeMode=effectiveRaidMode(t),external=M.externalParty({raidMode:activeMode}),daily=t?.partyRule==='daily5',labels=daily?{output:'自有角色组队',external:'外部团队模式'}:raidModeLabels;
+    return `<div class="raid-mode-picker mt ${external?'is-external':''}"><label for="raid-mode">分批组队模式</label><select id="raid-mode">${Object.entries(labels).map(([v,label])=>`<option value="${v}" ${(daily&&!external?'output':activeMode)===v?'selected':''}>${label}</option>`).join('')}</select>${external?`${participationTag(ui.raidMode)}<label class="field">每批自有角色上限<input id="external-player-seats" type="number" min="1" max="${daily?5:M.raidCapacity(t)}" step="1" value="${Math.min(ui.externalPlayerSeats||1,daily?5:M.raidCapacity(t))}"></label>${!daily?`<label class="field">目标团队数<input id="raid-team-count" data-task="${t.id}" type="number" min="1" max="30" step="1" value="${t.runs}"></label>`:''}<p class="panel-sub">默认每个角色单独参团；增加上限可让不同账号角色同行。空位与职责由外部团队补齐，不召请自有侠客。</p><small>仅计算自有角色点卡与 CD；整队收益按自有席位占比分配，个人奖励保留。外部共战待确认，实际收入以登记为准。</small>`:`<details data-task-fold="raid-mode-help" ${taskFold('raid-mode-help')}><summary>模式说明</summary><p class="panel-sub">${daily?'玩家职责优先，3–4 人用已有侠客补位，1–2 人世界组队。':{output:'优先高装分、高参考 DPS 的输出角色，按输出参考指数排序。',balanced:'均衡模式：优先分散门派增益与远近战，再平衡各队输出参考指数。',mentor:'优先将强力 DPS 与已知低装分角色安排同队，分散带新。'}[activeMode]} 优先覆盖共战；账号、职责、区服、CD 和侠客限制继续生效。</p><small>参考 DPS 使用相同战斗口径；缺失时仅参考装分，指数不等于真实伤害，不计侠客或共战增益。</small></details>`}${!daily&&!external&&t?.partyRule==='raid10'&&M.raidCapacity(t)===10?raidBalanceNote(t):''}</div>`;
   }
+
   function raidGongzhanNote(t,players){
     if(t?.partyRule!=='raid10')return '';if(M.externalParty(t))return '<p class="panel-sub">外部成员、职责与共战待游戏内确认；仅统计自有角色。</p>';const status=M.raidGongzhanStatus(players);
     return `<div class="raid-gongzhan-status ${status.covered?'covered':'missing'}" ${status.covered?'':'role="status"'}><b>${status.covered?'共战江湖已覆盖 / '+status.count+' 人':'缺少共战江湖'}</b><span>${M.raidCapacity(t)===25?'按当前难度的工资 / 实收结算。':status.covered?'每个首领额外掉落 1 件装备。':'本队未配置有效共战角色，缺少每首领额外 1 件装备掉落；请检查角色状态、CD 或队伍约束。'}</span></div>`;
   }
   function raidPowerNote(players,mode,basis){
-    if(!mode||mode==='legacy'||!basis)return '';const a=M.raidPartyStats(players,basis);
-    return `<p class="tc-party-balance raid-power-note"><b>${raidModeLabels[mode]||'副本组队'}</b> / 输出参考指数 ${num(a.outputIndex,1)}<span>已登记参考 DPS 合计 ${a.knownDps?num(a.referenceDps):'待补'}${a.missingDps?' / '+a.missingDps+' 名 DPS 未登记':''} / 已标记共战江湖 ${a.gongzhan} 人</span></p>`;
+    if(!mode||mode==='legacy'||!basis)return '';const a=M.raidPartyStats(players,basis),s=M.partyStats(players),syn=M.dailyPartySynergy(players);
+    return `<p class="tc-party-balance raid-power-note"><b>${raidModeLabels[mode]||'副本组队'}</b> / 输出参考指数 ${num(a.outputIndex,1)}<span>已登记参考 DPS 合计 ${a.knownDps?num(a.referenceDps):'待补'}${a.missingDps?' / '+a.missingDps+' 名 DPS 未登记':''} / 共战 ${a.gongzhan} 人 / 近战 ${s.melee} 远程 ${s.ranged} / 门派协同 ${syn.unknown===0?num(syn.score,1):'部分待补'}</span></p>`;
   }
   function batchMemberNames(ids){return ids.map(id=>{const r=state.roles.find(r=>r.id===id),a=state.accounts.find(a=>a.id===r?.accountId);return `<span class="tc-member" title="${esc(r?.stance||duty(Catalog.profile(r||{}).duty))}">${esc(r?.name||id)}${roleIdentityTags(r)}${gongzhanTag(r)}<small>${esc(a?.name||'未知账号')}</small></span>`;}).join('');}
   function batchSwitchNote(previous,players,label=''){
@@ -1348,7 +1387,7 @@
   }
   function savedBatchSwitchNote(x){const task=M.savedPartyTask(x.t,x.p);if(task.partyRule==='daily5'&&task.dailyDualTeams===true&&!M.externalParty(task))return dailyWaveSwitchNote(task,x.p.batches.map(b=>b.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean)),x.i);if(x.p.routeTaskIds?.indexOf(x.id)>0)return '<small class="tc-switch-note">本批串本沿用角色，无需换号。</small>';const ids=x.p.batches[x.i-1]||[],roles=ids=>ids.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean);return batchSwitchNote(roles(ids),roles(x.members),`接第 ${x.i} 批：`);}
   function batchTable(rows,nextKey){
-    return `<div class="table-wrap tc-batch-wrap"><table class="tc-batches"><thead><tr><th>批次 / 任务</th><th>角色 / 账号</th><th>耗时</th><th>状态</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr class="${x.key===nextKey?'tc-next':''}" data-batch-index="${x.i}" data-task-id="${x.id}"><td>${x.key===nextKey?'<span class="tc-next-tag">下一批</span>':''}<b>第 ${x.i+1} 批${x.p.teamConfigs?.[x.i]?.name?' / '+esc(x.p.teamConfigs[x.i].name):''}</b>${x.p.routeTaskIds?.length>1?`<small>${esc(x.t?.name||x.id)}</small>`:''}</td><td><div class="tc-members tc-account-grid">${batchAccountRoster(x.p,x.i,x.id)}</div>${raidGongzhanNote(x.t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))}${raidPowerNote(x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean),x.p.rulesSnapshot?.raidMode,x.p.rulesSnapshot?.powerBasis)}${savedDailyWaveNote(x)}${savedBatchSwitchNote(x)}${worldPartyNote(x.t,x.members.length)}${partyBalanceNote(x.t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))}${x.p.companionAssignments?.[x.i]?.length?`<small class="tc-companions">侠客：${x.p.companionAssignments[x.i].map(c=>esc(c.name)+' '+duty(c.duty)).join('、')}</small>`:''}</td><td>${batchDurationLabel(x)}</td><td><span class="status ${x.pending?'planned':'completed'}">${x.p.cancelled?'已取消':x.closed?'已移出 / 终止':x.pending?'待执行':x.fact?'已完成 / 待补实测':'已完成'}</span></td><td><div class="tc-row-actions">${x.pending?button('登记完成','quick-batch','primary small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`):''}${x.fact?button('补录实测','quick-batch','small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`):''}${x.pending?batchEditControls(x.p,x.i)+button('调整','adjust-batch','small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}" ${x.p.lockedBatches?.includes(x.i)?'disabled title="请先解锁队伍"':''}`)+button('删除批次','delete-batch','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}" ${x.p.lockedBatches?.includes(x.i)?'disabled title="请先解锁队伍"':''}`)+button('终止批次','stop-batch','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}" ${x.p.lockedBatches?.includes(x.i)?'disabled title="请先解锁队伍"':''}`):!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`)+button('撤销完成','reopen-execution','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`):''}${!x.pending&&x.p.lockedBatches?.includes(x.i)?button('解锁队伍','lock-batch','small',`data-plan="${x.p.id}" data-index="${x.i}" aria-pressed="true"`):''}${button('复制名单','copy-batch','ghost small',`data-plan="${x.p.id}" data-index="${x.i}"`)}</div></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-wrap tc-batch-wrap"><table class="tc-batches"><thead><tr><th>批次 / 任务</th><th>角色 / 账号</th><th>耗时</th><th>状态</th><th>操作</th></tr></thead><tbody>${rows.map(x=>`<tr class="${x.key===nextKey?'tc-next':''}" data-batch-index="${x.i}" data-task-id="${x.id}"><td>${x.key===nextKey?'<span class="tc-next-tag">下一批</span>':''}<b>第 ${x.i+1} 批${x.p.teamConfigs?.[x.i]?.name?' / '+esc(x.p.teamConfigs[x.i].name):''}</b>${x.p.routeTaskIds?.length>1?`<small>${esc(x.t?.name||x.id)}</small>`:''}</td><td><div class="tc-members tc-account-grid">${batchAccountRoster(x.p,x.i,x.id)}</div>${raidGongzhanNote(x.t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))}${raidPowerNote(x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean),x.p.rulesSnapshot?.raidMode,x.p.rulesSnapshot?.powerBasis)}${savedDailyWaveNote(x)}${savedBatchSwitchNote(x)}${worldPartyNote(x.t,x.members.length)}${partyBalanceNote(x.t,x.members.map(id=>state.roles.find(r=>r.id===id)).filter(Boolean))}${x.p.companionAssignments?.[x.i]?.length?`<small class="tc-companions">侠客：${x.p.companionAssignments[x.i].map(c=>esc(c.name)+' '+duty(c.duty)).join('、')}</small>`:''}</td><td>${batchDurationLabel(x)}</td><td><span class="status ${x.pending?'planned':'completed'}">${x.p.cancelled?'已取消':x.closed?'已移出 / 终止':x.pending?'待执行':x.fact?'已完成 / 待补实测':'已完成'}</span></td><td><div class="tc-row-actions">${x.pending?button('登记完成','quick-batch','primary small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`):''}${x.fact?button('补录实测','quick-batch','small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`):''}${x.pending?batchEditControls(x.p,x.i)+button('调整','adjust-batch','small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}" ${x.p.lockedBatches?.includes(x.i)?'disabled title="请先解锁队伍"':''}`)+button('删除批次','delete-batch','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}" ${x.p.lockedBatches?.includes(x.i)?'disabled title="请先解锁队伍"':''}`)+button('终止批次','stop-batch','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}" ${x.p.lockedBatches?.includes(x.i)?'disabled title="请先解锁队伍"':''}`):!x.closed&&!x.p.cancelled?button('调整完成记录','edit-execution','small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`)+button('撤销完成','reopen-execution','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`):''}${!x.pending&&x.p.lockedBatches?.includes(x.i)?button('解锁队伍','lock-batch','small',`data-plan="${x.p.id}" data-index="${x.i}" aria-pressed="true"`):''}${button('复制名单','copy-batch','ghost small',`data-plan="${x.p.id}" data-task="${x.id}" data-index="${x.i}"`)}</div></td></tr>`).join('')}</tbody></table></div>`;
   }
   function savedPlanTableCard(p,nextKey){
     const rows=planBatchRows(p),pending=rows.filter(x=>x.pending),done=rows.filter(x=>!x.pending).sort(recentCompletedBatch),facts=planFacts(p),finished=planFinished(p),executed=rows.filter(x=>!x.pending&&!x.closed).length,hasRecords=Daily.hasExecution(state,p),closed=rows.filter(x=>x.closed).length;
@@ -1482,7 +1521,7 @@
   function customTeamPlan(taskId){
     const s=planningState(),t=s.tasks.find(t=>t.id===taskId);if(!t)throw new Error('请先选择任务');
     const ids=t.partyRule==='raid10'?[...new Set([t.id,...ui.routeTaskIds])]:[t.id];
-    const p={id:ui.replacingPlanId||'draft-plan',taskId:t.id,date:ui.taskDate,routeTaskIds:ids.length>1?ids:undefined,batches:[],companionAssignments:[],rulesSnapshot:{fillCompanionSlots:t.partyRule==='raid10',raidMode:ui.raidMode},taskSnapshots:Object.fromEntries(ids.map(id=>[id,M.clone(s.tasks.find(t=>t.id===id))]))};
+    const p={id:ui.replacingPlanId||'draft-plan',taskId:t.id,date:ui.taskDate,routeTaskIds:ids.length>1?ids:undefined,batches:[],companionAssignments:[],rulesSnapshot:{fillCompanionSlots:t.partyRule==='raid10',raidMode:effectiveRaidMode(t)},taskSnapshots:Object.fromEntries(ids.map(id=>[id,M.clone(s.tasks.find(t=>t.id===id))]))};
     teamRosterEditor(p,0,true,true);
   }
   function teamRosterEditor(p,index=0,draft=false,creating=false,library=null){
@@ -1515,7 +1554,7 @@
       const next=candidate();
       if(library)return saveLibraryTeam({id:library.id,name:library.name,teamKind:library.teamKind,raidSize:library.size||M.raidCapacity(t),batches:next.batches,teamConfigs:next.teamConfigs});
       if(draft){
-        if(creating){ui.planTask=t.id;ui.generated={taskId:t.id,date:p.date,startedAt:p.startedAt||null,raidMode:ui.raidMode,fillCompanionSlots:t.partyRule==='raid10',routeTaskIds:p.routeTaskIds,taskSnapshots:p.taskSnapshots,result:{batches:[],parties:[],reasons:[]}};}
+        if(creating){ui.planTask=t.id;ui.generated={taskId:t.id,date:p.date,startedAt:p.startedAt||null,raidMode:effectiveRaidMode(t),fillCompanionSlots:t.partyRule==='raid10',routeTaskIds:p.routeTaskIds,taskSnapshots:p.taskSnapshots,result:{batches:[],parties:[],reasons:[]}};}
         if(creating)ui.planStage='review';refreshGeneratedPlan(next);render();toast('自定义队伍已更新，请确认保存排程');
       }else commit(()=>{const current=state.plans.find(x=>x.id===p.id);if(!current||JSON.stringify(current)!==JSON.stringify(p))throw new Error('排程已变化，请重新打开成员面板');Object.assign(current,Daily.setBatchRosters(state,current,teams));ui.generated=null;},'队伍人数与成员已更新；可撤销');
     };
@@ -1559,7 +1598,7 @@
     const t=teamMode?tasks.find(t=>t.id===(ui.teamSelectedIds?.[0]||ui.planTask)):tasks.find(t=>t.id===ui.planTask)||tasks[0];return {tasks,t,teamMode};
   }
   function resetPlanning(){
-    Object.assign(ui,{templatePlanningOverrides:null,planStage:'kind',planTab:'batches',planTask:'',planStartTime:'',teamSelectedIds:null,routeTaskIds:[],locks:[],generated:null,replacingPlanId:null,planningOverrides:{},raidTeamView:'auto',raidReusePlanId:'',raidReuseIndices:null,planTaskQuery:'',routeSearch:'',routeCategory:'all',reuseHistoryDate:'',reuseHistoryQuery:'',reuseHistoryPage:0});
+    Object.assign(ui,{templatePlanningOverrides:null,planStage:'kind',planTab:'batches',planTask:'',planStartTime:'',teamSelectedIds:null,routeTaskIds:[],locks:[],generated:null,replacingPlanId:null,raidModeTouched:false,planningOverrides:{},raidTeamView:'auto',raidReusePlanId:'',raidReuseIndices:null,planTaskQuery:'',routeSearch:'',routeCategory:'all',reuseHistoryDate:'',reuseHistoryQuery:'',reuseHistoryPage:0});
   }
   function historyReusePanel(){
     const query=(ui.reuseHistoryQuery||'').toLowerCase(),all=state.plans.filter(p=>!p.cancelled&&p.batches?.length).slice().sort((a,b)=>b.date.localeCompare(a.date));
@@ -2427,8 +2466,9 @@
       button('导出启动准备 JSON','mumu-export','small','type="button" data-plan="'+esc(ref.planId)+'" data-task="'+esc(ref.taskId)+'" data-index="'+ref.batchIndex+'"'+(request.issues.length?' disabled':''))+'</div>'+
       '<p class="panel-sub">启动准备不会登记任务完成、扣除 CD 或生成收益。修改批次或绑定后，请重新检查。</p>');
   }
-  async function copyBatch(p,index){
-    const text=privacyText(p.batches[index].map(id=>{const r=state.roles.find(r=>r.id===id);return (r?.name||'角色待补')+'（'+(state.accounts.find(a=>a.id===r?.accountId)?.name||'账号待补')+'）';}).join('、'));
+  async function copyBatch(p,index,taskId=p.taskId){
+    const ordered=Daily.batchAccountSlots(state,p,index,taskId).map(slot=>slot.role?state.roles.find(r=>r.id===slot.role.id):null).filter(Boolean);
+    const text=privacyText(ordered.map(r=>r.name+'（'+(state.accounts.find(a=>a.id===r.accountId)?.name||'账号待补')+'）').join('、'));
     try{if(!navigator.clipboard?.writeText)throw new Error();await navigator.clipboard.writeText(text);toast(ui.privacy?'已复制遮罩后的本批名单':'已复制本批原始名称');}catch{modal('复制本批名单',`<textarea class="tc-copy" rows="4" readonly aria-label="本批名单">${esc(text)}</textarea>`);$('#dialog textarea').select();}
   }
   function remainingForm(p,taskId=null,selectedIndices=null){
@@ -2817,7 +2857,7 @@
       const incoming=archives?(archives.active||M.blank()):M.validateState(parsed),isEmpty=!Store.hasData(state);
       let preview,mergeError='';try{preview=M.merge(state,incoming);}catch(e){mergeError=e.message;}
       previewImport={incoming,name:file.name,archives};
-      modal('导入预览 / '+esc(file.name),`${migration?`<p class="panel-sub mb">识别 ${migration.counts.roles} 个角色、${migration.incoming.progress.length} 条周期状态、${migration.counts.balances} 条总级余额；${migration.counts.archivedSheets} 张原表完整归档。已有 Excel 角色档案保持当前值；任务收益、工资、耗时没有从完成标记推断。</p><details class="mb"><summary>待确认 / 未映射 ${migration.issues.length} 项（保留原文）</summary><div class="pad">${migration.issues.map(x=>`<p>${esc(x)}</p>`).join('')||'无'}</div></details>`:''}<p class="muted mb">已验证版本、ID、账号归属与计算参数。源文件保持原样。</p><div class="list-detail">${preview?`<div><span>将新增记录（合并）</span><b class="success">${preview.stats.added}</b></div><div><span>将更新记录（合并）</span><b>${preview.stats.updated}</b></div><div><span>重复 / 不可覆盖旧记录</span><b>${preview.stats.skipped+preview.stats.old}</b></div>`:''}<div><span>来源数据性质</span><b>${incoming.dataKind==='simulated'?'示例 / 模拟':'手工 / 导入'}</b></div><div><span>账号 / 角色 / 任务</span><b>${incoming.accounts.length} / ${incoming.roles.length} / ${incoming.tasks.length}</b></div>${archives?`<div><span>包含日期档案</span><b>${archives.snapshots.length} 份</b></div>`:''}</div><div class="mt">${mergeError?`<div class="form-preview import-conflict" role="status"><b>文件已校验，合并需要处理冲突</b><p>${esc(mergeError)}</p><p>可以选择完整替换来恢复这份备份，或取消后保留当前工作空间。</p></div>`:''}${select('importMode','导入方式',mergeError?[['','请选择导入方式'],['replace','替换当前工作空间（完整恢复文件）']]:[['merge','合并到当前工作空间'],['replace','替换当前工作空间（完整恢复文件）']],mergeError?'':'merge')}</div><label class="mt"><input type="checkbox" name="applyConfig" ${isEmpty?'checked':''}> 合并时同时应用文件中的全局参数</label><div class="form-preview mt">替换会完整恢复文件参数和数据，保留其他日期档案。合并时，同 ID 金融事件不改写；没有更新时点的配置保留当前值。<br>日期档案会一并导入；相同档案 ID 只接纳较新的快照。确认后可立即撤销。</div>`,fd=>{
+      modal('导入预览 / '+esc(file.name),`${migration?`<p class="panel-sub mb">识别 ${migration.counts.roles} 个角色、${migration.incoming.progress.length} 条周期状态、${migration.counts.balances} 条总级余额；${migration.counts.archivedSheets} 张原表完整归档。已有 Excel 角色档案保持当前值；任务收益、工资、耗时没有从完成标记推断。</p><details class="mb"><summary>待确认 / 未映射 ${migration.issues.length} 项（保留原文）</summary><div class="pad">${migration.issues.map(x=>`<p>${esc(x)}</p>`).join('')||'无'}</div></details>`:''}<p class="muted mb">已验证版本、ID、账号归属与计算参数。源文件保持原样。</p><div class="list-detail">${preview?`<div><span>将新增记录（合并）</span><b class="success">${preview.stats.added}</b></div><div><span>将更新记录（合并）</span><b>${preview.stats.updated}</b></div><div><span>重复 / 不可覆盖旧记录</span><b>${preview.stats.skipped+preview.stats.old}</b></div>${preview.stats.repaired?`<div><span>按北京时间修正完成日期</span><b class="warning">${preview.stats.repaired}</b></div>`:''}`:''}<div><span>来源数据性质</span><b>${incoming.dataKind==='simulated'?'示例 / 模拟':'手工 / 导入'}</b></div><div><span>账号 / 角色 / 任务</span><b>${incoming.accounts.length} / ${incoming.roles.length} / ${incoming.tasks.length}</b></div>${archives?`<div><span>包含日期档案</span><b>${archives.snapshots.length} 份</b></div>`:''}</div><div class="mt">${mergeError?`<div class="form-preview import-conflict" role="status"><b>文件已校验，合并需要处理冲突</b><p>${esc(mergeError)}</p><p>可以选择完整替换来恢复这份备份，或取消后保留当前工作空间。</p></div>`:''}${select('importMode','导入方式',mergeError?[['','请选择导入方式'],['replace','替换当前工作空间（完整恢复文件）']]:[['merge','合并到当前工作空间'],['replace','替换当前工作空间（完整恢复文件）']],mergeError?'':'merge')}</div><label class="mt"><input type="checkbox" name="applyConfig" ${isEmpty?'checked':''}> 合并时同时应用文件中的全局参数</label><div class="form-preview mt">替换会完整恢复文件参数和数据，保留其他日期档案。合并时，同 ID 金融事件不改写；没有更新时点的配置保留当前值。<br>日期档案会一并导入；相同档案 ID 只接纳较新的快照。确认后可立即撤销。</div>`,fd=>{
         const item=previewImport,wasSetup=ui.setup;
         commit(()=>{
           const mode=fd.get('importMode');if(!['merge','replace'].includes(mode))throw new Error('请选择导入方式；完整替换会恢复文件中的全部数据');
@@ -2837,14 +2877,14 @@
   }
   function generatePlan(taskId){const state=planningState(),previous=ui.generated?.taskId===taskId?ui.generated:null,previousShape=previous?JSON.stringify({batches:previous.result.batches.map(b=>b.map(r=>r.id)),route:previous.routeTaskIds||[previous.taskId],parties:(previous.result.parties||[]).map(p=>({teamConfig:p.teamConfig,companions:p.companions}))}):null;
     if(ui.generated?.taskId===taskId&&ui.generated.lockedBatches?.length)throw new Error('当前方案包含锁定队伍，请先解锁后重新生成');
-    const t={...M.planningTask(M.taskForVersion(state,state.tasks.find(x=>x.id===taskId))),raidMode:['raid10','daily5'].includes(state.tasks.find(x=>x.id===taskId)?.partyRule)?ui.raidMode:undefined,externalPlayerSeats:Math.min(ui.externalPlayerSeats||1,state.tasks.find(x=>x.id===taskId)?.partyRule==='daily5'?5:M.raidCapacity(state.tasks.find(x=>x.id===taskId)))},when=ui.planStartTime?ui.taskDate+'T'+ui.planStartTime+':00+08:00':ui.taskDate,roles=M.availableRoles(state,t,when,scope(),ui.replacingPlanId);let result;
+    const sourceTask=state.tasks.find(x=>x.id===taskId),t={...M.planningTask(M.taskForVersion(state,sourceTask)),raidMode:['raid10','daily5'].includes(sourceTask?.partyRule)?effectiveRaidMode(sourceTask):undefined,externalPlayerSeats:Math.min(ui.externalPlayerSeats||1,sourceTask?.partyRule==='daily5'?5:M.raidCapacity(sourceTask))},when=ui.planStartTime?ui.taskDate+'T'+ui.planStartTime+':00+08:00':ui.taskDate,roles=M.availableRoles(state,t,when,scope(),ui.replacingPlanId);let result;
     if(t.partyRule!=='raid10'&&!Ops.planningTasks(state,ui.taskDate,'batches').some(x=>x.id===t.id))throw new Error('该任务不在所选日期的执行日内，请重新选择任务');
-    if(t.partyRule==='raid10'&&ui.routeTaskIds.filter(id=>id!==t.id).length){result=M.routePlan(state,[t.id,...ui.routeTaskIds.filter(id=>id!==t.id)],when,ui.locks,scope(),ui.replacingPlanId,{fullRaid:true,raidMode:ui.raidMode,externalPlayerSeats:t.externalPlayerSeats});}
+    if(t.partyRule==='raid10'&&ui.routeTaskIds.filter(id=>id!==t.id).length){result=M.routePlan(state,[t.id,...ui.routeTaskIds.filter(id=>id!==t.id)],when,ui.locks,scope(),ui.replacingPlanId,{fullRaid:true,raidMode:effectiveRaidMode(t),externalPlayerSeats:t.externalPlayerSeats});}
     else if(t.type==='team'){const g=M.teamCandidates(t,roles,ui.locks,state.config.concurrency);result={...M.calculateTeam(t,g.teams,M.pricingConfig(state)),reasons:g.reasons,parties:g.parties||[],unassigned:g.unassigned||[],powerBasis:g.powerBasis};}
     else{const all=[],counts=roles.map(r=>({r,n:M.availableCount(state,t,r,when,ui.replacingPlanId)}));for(let i=0;i<Math.max(0,...counts.map(x=>x.n));i++)all.push(M.calculateRole({...t,prepare:i?0:t.prepare,otherCost:i?0:t.otherCost},counts.filter(x=>x.n>i).map(x=>x.r),M.pricingConfig(state),1));result={...M.sum(all,state.config),batches:all.flatMap(x=>x.batches),parties:all.flatMap(x=>x.parties||[]),reasons:[...new Set(all.flatMap(x=>x.reasons||[]))],unassigned:all.flatMap(x=>x.unassigned||[])};}
     if(t.type==='role')result={...result,...M.optimizeTaskBatches(t,result.batches,state.config.concurrency,result.parties)};
     if(!result.taskResults)result=M.pricePrediction(state,t,result,when);
-    ui.planTask=t.id;ui.generated={taskId:t.id,dailyDualTeams:t.partyRule==='daily5'&&t.dailyDualTeams===true,dailyBatchPriorities:t.partyRule==='daily5'?M.dailyBatchPriorities(t.dailyBatchPriorities):undefined,raidMode:['raid10','daily5'].includes(t.partyRule)?ui.raidMode:undefined,fillCompanionSlots:t.partyRule==='raid10',date:ui.taskDate,startedAt:ui.planStartTime?when:null,result,routeTaskIds:result.taskResults?.map(x=>x.task.id)};ui.planStage='review';ui.generated.taskSnapshots=Object.fromEntries((ui.generated.routeTaskIds||[ui.generated.taskId]).map(id=>[id,{...M.clone(state.tasks.find(t=>t.id===id)),...(t.partyRule==='daily5'?{dailyDualTeams:ui.generated.dailyDualTeams,dailyBatchPriorities:ui.generated.dailyBatchPriorities}:{}),...(['raid10','daily5'].includes(t.partyRule)?{raidMode:ui.raidMode}:{})}]));render();if(previous){const same=previousShape===JSON.stringify({batches:result.batches.map(b=>b.map(r=>r.id)),route:ui.generated.routeTaskIds||[taskId],parties:(result.parties||[]).map(p=>({teamConfig:p.teamConfig,companions:p.companions}))});toast(same?'已重新计算，队伍与分批未变化':'已重新计算，候选队伍已更新');}
+    ui.planTask=t.id;ui.generated={taskId:t.id,dailyDualTeams:t.partyRule==='daily5'&&t.dailyDualTeams===true,dailyBatchPriorities:t.partyRule==='daily5'?M.dailyBatchPriorities(t.dailyBatchPriorities):undefined,raidMode:['raid10','daily5'].includes(t.partyRule)?effectiveRaidMode(t):undefined,fillCompanionSlots:t.partyRule==='raid10',date:ui.taskDate,startedAt:ui.planStartTime?when:null,result,routeTaskIds:result.taskResults?.map(x=>x.task.id)};ui.planStage='review';ui.generated.taskSnapshots=Object.fromEntries((ui.generated.routeTaskIds||[ui.generated.taskId]).map(id=>[id,{...M.clone(state.tasks.find(t=>t.id===id)),...(t.partyRule==='daily5'?{dailyDualTeams:ui.generated.dailyDualTeams,dailyBatchPriorities:ui.generated.dailyBatchPriorities}:{}),...(['raid10','daily5'].includes(t.partyRule)?{raidMode:effectiveRaidMode(t)}:{})}]));render();if(previous){const same=previousShape===JSON.stringify({batches:result.batches.map(b=>b.map(r=>r.id)),route:ui.generated.routeTaskIds||[taskId],parties:(result.parties||[]).map(p=>({teamConfig:p.teamConfig,companions:p.companions}))});toast(same?'已重新计算，队伍与分批未变化':'已重新计算，候选队伍已更新');}
   }
   function scheduleEdit(t,date){modal('调整该周期目标 / '+esc(t.name),`<p class="muted mb">${date} / 周期 ${M.cycle(t,date)}。按角色覆盖目标；目标减少会同步改变预测与账号用量。完成历史保留。</p><div class="form-grid">${fnum('target','所选角色本周期目标',t.target,'设为 0 时不再贡献预测。','min="0" step="1" required')}${roleChecks(t.roleIds,'roles',true)}</div>`,fd=>commit(()=>{const target=M.number(fd.get('target'),'目标',{integer:true});for(const id of fd.getAll('roles')){if(!t.roleIds.includes(id))throw new Error('只能调整已分配角色的目标');const r=state.roles.find(r=>r.id===id),p=M.getProgress(state,t,r,date);updateProgress(t,r,date,p?.status||'planned',p?.completed||0,target);}ui.generated=null;},'周期目标已更新'));}
   function clearScope(){ui.directoryAccount='';ui.scopePickerOpen='';ui.planningOverrides={};ui.workView='queue';ui.progressSelection=[];ui.taskColumnIds=null;ui.roiTaskIds=null;ui.roiResult=null;ui.replacingPlanId=null;ui.planStartTime='';ui.account='';ui.role='';ui.group='';ui.selected.clear();ui.generated=null;ui.planTask='';ui.locks=[];ui.taskFilter='';ui.search='';ui.archiveDate='';ui.routeTaskIds=[];ui.teamSelectedIds=null;ui.raidSelection=[];ui.managedSelection=[];ui.trajectoryAccount='';}
@@ -3061,7 +3101,7 @@
     'execution-page':b=>{ui.queuePage+=Number(b.dataset.offset);render();document.querySelector('[data-execution-scroll="queue"]')?.scrollTo(0,0);document.querySelector('[data-action="execution-page"][data-offset="'+b.dataset.offset+'"]')?.focus({preventScroll:true});},
     'execution-batch-page':b=>{ui.queueBatchPage+=Number(b.dataset.offset);render();document.querySelector('[data-action="execution-batch-page"][data-offset="'+b.dataset.offset+'"]')?.focus({preventScroll:true});},
     'execution-status':b=>{ui.queueStatus=b.dataset.value;ui.queuePage=0;render();document.querySelector('[data-action="execution-status"][data-value="'+b.dataset.value+'"]')?.focus({preventScroll:true});},
-    'queue-batch-timer':b=>commit(()=>Daily.transitionRaidTimer(state,b.dataset.plan,b.dataset.task,Number(b.dataset.index),b.dataset.timer),b.dataset.timer==='pause'?'计时已暂停':b.dataset.timer==='resume'?'已继续计时':'已开始计时'),
+    'queue-batch-timer':b=>commit(()=>Daily.transitionRaidTimer(state,b.dataset.plan,b.dataset.task,Number(b.dataset.index),b.dataset.timer),b.dataset.timer==='pause'?'计时已暂停':b.dataset.timer==='resume'?'已继续计时':b.dataset.timer==='end'?'计时已结束，可登记本批完成':'已开始计时'),
     'flow-plan':b=>{if(window.innerWidth<960)ui.queueMobileOpen=false;ui.focusPlanId=b.dataset.id;ui.focusBatchKey='';ui.queueBatchPage=0;ui.queueBatchQuery='';render();const heading=$('#tc-v2-focus h2');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}},
     'flow-scroll':b=>{const rail=document.querySelector('[data-flow-rail="'+b.dataset.target+'"]');if(rail)rail.scrollBy({left:Number(b.dataset.offset)*rail.clientWidth*.75,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},
     'task-layout':b=>{ui.taskLayout=b.dataset.value;render();},
@@ -3122,7 +3162,8 @@
       if(request.issues.length)throw new Error('批次或绑定已变化，请重新检查启动准备');
       download('JX3_MuMu_启动准备.json',new Blob([JSON.stringify(request,null,2)],{type:'application/json'}));toast('启动准备已导出，尚未执行模拟器操作');
     },
-    'copy-batch':b=>copyBatch(state.plans.find(p=>p.id===b.dataset.plan),Number(b.dataset.index)).catch(e=>toast(e.message)),
+    'raid25-older':()=>{ui.raid25Older=!ui.raid25Older;render();},
+    'copy-batch':b=>copyBatch(state.plans.find(p=>p.id===b.dataset.plan),Number(b.dataset.index),b.dataset.task).catch(e=>toast(e.message)),
     'reuse-plan':b=>reusePlanForm(state.plans.find(p=>p.id===b.dataset.id)),
     'reuse-selected':()=>reusePlanForm(state.plans.find(p=>p.id===$('#reuse-source').value)),
     'favorite-plan':b=>commit(()=>{const p=state.plans.find(p=>p.id===b.dataset.id);p.favorite=!p.favorite;p.updatedAt=new Date().toISOString();},'常用组已更新'),
@@ -3139,7 +3180,7 @@
     'confirm-plan':()=>{if(!ui.generated?.result.batches.length)return;commit(()=>{const g=ui.generated,t=planningState().tasks.find(t=>t.id===g.taskId);const old=state.plans.find(p=>p.id===ui.replacingPlanId&&p.taskId===t.id);if(old)Daily.assertPlanUnlocked(old);if(old&&(old.executed||old.executedTaskIds?.length||Daily.hasExecution(state,old)||Object.values(old.closedBatches||{}).some(a=>a.length)))throw new Error('已执行或部分执行方案不能整体替换');const duplicate=state.plans.find(p=>p.id!==old?.id&&!p.cancelled&&p.date===g.date&&JSON.stringify(p.routeTaskIds||[p.taskId])===JSON.stringify(g.routeTaskIds||[t.id])&&JSON.stringify(p.batches.map(b=>[...b].sort()).sort())===JSON.stringify(g.result.batches.map(b=>b.map(r=>r.id).sort()).sort()));if(duplicate)throw new Error('相同任务与批次已有已确认排程，请在排程与执行中调整原方案');const saved={id:old?.id||M.id('plan'),taskId:t.id,taskName:t.name,routeTaskIds:g.routeTaskIds||undefined,executedTaskIds:[],date:g.date,startedAt:g.startedAt,batches:g.result.batches.map(b=>b.map(r=>r.id)),lockedBatches:[...(g.lockedBatches||[])],companionAssignments:(g.result.parties||[]).map(p=>p.companions),teamConfigs:g.result.parties?.some(p=>p.teamConfig)?g.result.parties.map(p=>p.teamConfig||null):undefined,rulesSnapshot:{dailyDualTeams:g.dailyDualTeams,dailyBatchPriorities:g.dailyBatchPriorities,partyRule:t.partyRule,raidPlayerSeats:t.raidPlayerSeats,tank:t.tank,heal:t.heal,companionLimit:t.companionLimit,allowCompanions:t.allowCompanions,fillCompanionSlots:g.fillCompanionSlots||t.fillCompanionSlots,raidMode:g.raidMode,powerBasis:g.result.powerBasis},taskSnapshots:Object.fromEntries((g.routeTaskIds||[g.taskId]).map(id=>{const task=planningState().tasks.find(t=>t.id===id);return [id,{...M.clone(task),...(task.partyRule==='daily5'?{dailyDualTeams:g.dailyDualTeams,dailyBatchPriorities:g.dailyBatchPriorities}:{}),...(['raid10','daily5'].includes(task.partyRule)?{raidMode:g.raidMode}:{}),roleIds:[...new Set(g.result.batches.flat().map(r=>r.id))]}];})),configVersion:state.updatedAt,executed:false,createdAt:old?.createdAt||new Date().toISOString()};Daily.validatePendingGongzhan(state,saved);M.validatePlanCapacity(planningState(),saved,old?.id);if(old)Object.assign(old,saved,{cancelled:false});else state.plans.push(saved);ui.replacingPlanId=null;ui.taskFilter='';ui.search='';ui.queueStatus='pending';ui.calendarDate=g.date;ui.taskRangeStart=g.date;ui.taskRangeEnd=g.date;ui.queueRange='custom';ui.calendarAnchor='';ui.calendarExecution=true;ui.focusPlanId=saved.id;ui.focusBatchKey='';ui.queuePage=0;ui.queueBatchPage=0;ui.queueBatchQuery='';ui.workView='queue';ui.page='task';resetPlanning();},'建议已确认保存；尚未执行，不计入实测');},
     'use-five':()=>commit(()=>{state.config.concurrency=5;ui.generated=null;},'全局并行上限已改为 5，大战优先使用 5 个自有角色'),
     'use-eight':()=>commit(()=>{state.config.concurrency=8;ui.generated=null;},'全局并行上限已改为 8，未来方案已重算'),
-    replan:b=>{const p=state.plans.find(p=>p.id===b.dataset.plan);if(p)Daily.assertPlanUnlocked(p);resetPlanning();ui.planStage='scope';ui.page='task';ui.workView='planning';ui.taskFilter='';ui.search='';if(p&&(Daily.hasExecution(state,p)||Object.values(p.closedBatches||{}).some(x=>x.length)))throw new Error('已有执行，须保留原批次；请复核剩余批次');ui.planTab=state.tasks.find(t=>t.id===b.dataset.id)?.partyRule==='raid10'?'teams':'batches';ui.planTask=b.dataset.id;ui.teamSelectedIds=ui.planTab==='teams'?(p?.routeTaskIds||[b.dataset.id]):null;ui.routeTaskIds=ui.teamSelectedIds?.slice(1)||[];if(p){ui.taskDate=p.date;ui.planStartTime=p.startedAt?new Date(p.startedAt).toLocaleTimeString('sv-SE',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'}):'';ui.replacingPlanId=!p.executed&&!p.executedTaskIds?.length?p.id:null;}ui.generated=null;ui.locks=[];render();},
+    replan:b=>{const p=state.plans.find(p=>p.id===b.dataset.plan);if(p)Daily.assertPlanUnlocked(p);resetPlanning();ui.planStage='scope';ui.page='task';ui.workView='planning';ui.taskFilter='';ui.search='';if(p&&(Daily.hasExecution(state,p)||Object.values(p.closedBatches||{}).some(x=>x.length)))throw new Error('已有执行，须保留原批次；请复核剩余批次');ui.planTab=state.tasks.find(t=>t.id===b.dataset.id)?.partyRule==='raid10'?'teams':'batches';ui.planTask=b.dataset.id;ui.teamSelectedIds=ui.planTab==='teams'?(p?.routeTaskIds||[b.dataset.id]):null;ui.routeTaskIds=ui.teamSelectedIds?.slice(1)||[];if(p){ui.taskDate=p.date;ui.planStartTime=p.startedAt?new Date(p.startedAt).toLocaleTimeString('sv-SE',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'}):'';ui.replacingPlanId=!p.executed&&!p.executedTaskIds?.length?p.id:null;if(p.rulesSnapshot?.raidMode){ui.raidMode=p.rulesSnapshot.raidMode;ui.raidModeTouched=true;}}ui.generated=null;ui.locks=[];render();},
     'cancel-plan':b=>commit(()=>{const p=state.plans.find(p=>p.id===b.dataset.id);Daily.assertPlanUnlocked(p);if(p.executed||p.executedTaskIds?.length||Daily.hasExecution(state,p))throw new Error('已执行方案保留历史');p.cancelled=true;},'排程已取消，预测和账号预算同步更新'),
     'manage-remaining':b=>remainingForm(state.plans.find(p=>p.id===b.dataset.id)),
     'execute-plan':b=>chooseExecution(state.plans.find(p=>p.id===b.dataset.id),b.dataset.task||state.plans.find(p=>p.id===b.dataset.id).taskId),
@@ -3304,7 +3345,7 @@
       if(el.id==='rank-metric'){ui.rankMetric=el.value;render();}
       if(el.id==='raid-team-count'||el.dataset.teamField){try{updateRaidTeams(el);}catch(err){render();throw err;}}
       if(el.id==='external-player-seats'){const {t}=planningTaskForDate();ui.externalPlayerSeats=M.number(el.value,'自有角色上限',{min:1,max:t?.partyRule==='daily5'?5:M.raidCapacity(t),integer:true});ui.generated=null;}
-      if(el.id==='raid-mode'){if(ui.generated?.lockedBatches?.length){el.value=ui.raidMode;throw new Error('当前方案包含锁定队伍，请先解锁后切换模式');}if(!M.raidModes.includes(el.value))throw new Error('副本组队模式无效');ui.raidMode=el.value;ui.generated=null;render();}
+      if(el.id==='raid-mode'){if(ui.generated?.lockedBatches?.length){el.value=ui.raidMode;throw new Error('当前方案包含锁定队伍，请先解锁后切换模式');}if(!M.raidModes.includes(el.value))throw new Error('副本组队模式无效');ui.raidMode=el.value;ui.raidModeTouched=true;ui.generated=null;render();}
       if(el.id==='raid-seats'){const t=planningState().tasks.find(x=>x.id===el.dataset.task);setPlanningOptions(selectedTeamIds(t),[],{assignmentMode:'keep',raidPlayerSeats:el.value==='auto'?'auto':Number(el.value),raidTeams:[]});}
       if(el.id==='queue-range'){ui.queueRange=el.value;if(el.value==='day')syncTaskDate();if(el.value==='week')ui.trajectoryWeek=M.weekStart(ui.taskDate);ui.focusBatchKey='';render();}if(el.id==='queue-status'){ui.focusPlanId='';ui.focusBatchKey='';ui.queueStatus=el.value;ui.focusBatchKey='';if(el.value==='overdue')ui.queueRange='all';render();}if(el.id==='progress-status'){ui.progressStatus=el.value;ui.progressSelection=[];render();}if(el.id==='progress-task'){ui.taskFilter=el.value;ui.progressSelection=[];render();}if(el.name==='task-column'){const all=Ops.assignedTasks(state,scope()).map(t=>t.id);ui.taskColumnIds=[...document.querySelectorAll('[name="task-column"]:checked')].map(x=>x.value);ui.progressSelection=[];render();}if(el.name==='progress-role'){ui.progressSelection=el.checked?[...new Set([...ui.progressSelection,el.value])]:ui.progressSelection.filter(id=>id!==el.value);for(const other of document.querySelectorAll('[name="progress-role"]'))if(other.value===el.value)other.checked=el.checked;render();}if(el.id==='all-progress-roles'){ui.progressSelection=el.checked?[...new Set([...document.querySelectorAll('[name="progress-role"]')].map(x=>x.value))]:[];render();}
       if(el.id==='plan-season-select'){ui.planSeason=el.value;render();}
@@ -3352,7 +3393,9 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void resumeWorkspace();});
   // A fresh opening stays blank. Never overwrite a concurrent tab's newer archive.
   assertStartupSource();
+  const saveStarted=performance.now();
   try{if(!storageError&&(migrated||rulesUpgraded||defaultsAdded||forecastUpgraded)&&dataStore.active){dataStore.active=M.clone(state);await Store.writeAsync(localStorage,dataStore,KEY);}}catch(e){storageError='本机存储不可用：'+e.message;}
+  globalThis.WorkbenchBoot?.timing?.('保存启动迁移',performance.now()-saveStarted);
   document.addEventListener('workbench:before-update',event=>{
     if(pendingMutation||$('#dialog').open||ui.setup||ui.generated||($('#app .planning-wizard')&&planningStage()!=='kind')||storageError){event.preventDefault();return;}
     try{if(dataStore.active)save(false);}catch{event.preventDefault();}
@@ -3361,8 +3404,10 @@
   setInterval(updateOverviewCountdown,1000);
   setInterval(()=>{updateExecutionClocks();for(const el of document.querySelectorAll('[data-account-time]')){const a=state.accounts.find(a=>a.id===el.dataset.accountTime);if(a)el.textContent=Ops.duration(Ops.remaining(a),a.billingType==='monthly');}},1000);
   globalThis.WorkbenchBoot?.stage('正在生成工作台视图');
+  const renderStarted=performance.now();
   applyVisualTheme();
   render();
+  globalThis.WorkbenchBoot?.timing?.('生成工作台视图',performance.now()-renderStarted);
   requestAnimationFrame(()=>globalThis.WorkbenchBoot?.finish());
   }
   // Paint the startup screen before synchronous archive migration and first calculations.

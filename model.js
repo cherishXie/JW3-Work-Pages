@@ -470,6 +470,64 @@
     parties=optimizeBatchSwitching(parties,{rebuild,reorder:!task.raidTeams?.length,locked});
     return parties.map(p=>({...p,powerStats:raidPartyStats(p.players,basis),strongDps:p.players.filter(r=>Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold).map(r=>r.id),noviceIds:p.players.filter(r=>Number.isFinite(r.score)&&r.score>0&&r.score<=lowThreshold&&!(Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold)).map(r=>r.id)}));
   }
+  // Ten-player raids balance like daily five-player runs: school effects, ranged/melee
+  // spread and output parity. Team count changes the emphasis; switching stays first.
+  const raidBatchRules=[
+    {id:'synergy',name:'门派增益与阵法',description:'把可核实增益、阵法与受益输出分散到各队'},
+    {id:'outputBalance',name:'输出均衡',description:'按参考 DPS 与装分均衡各队输出参考指数'},
+    {id:'rangeBalance',name:'远近战均衡',description:'按候选 DPS 的远近比例分配'},
+    {id:'gearBalance',name:'装分均衡',description:'均衡各队平均装分与待补装分'}
+  ];
+  function balanceRaidParties(input,rebuild,locked=[]){
+    if(input.length<2)return input;
+    const base=input.map(p=>({...p,players:[...p.players]}));
+    const all=base.flatMap(p=>p.players),basis=raidPowerBasis(all),peak=Math.max(1,...all.map(r=>roleOutputPower(r,basis)));
+    const weights=new Map(all.map(r=>[r.id,1+roleOutputPower(r,basis)/peak])),synergyCache=new Map();
+    const synergy=players=>{const key=JSON.stringify(players.map(r=>r.id).sort());if(!synergyCache.has(key))synergyCache.set(key,dailyPartySynergy(players,weights).score);return synergyCache.get(key);};
+    const target=partyStats(all),targetScore=target.averageScore,teams=base.length;
+    // Team count changes the emphasis: two teams favour output parity, three or more
+    // favour spreading buffs and ranged/melee. Switching still dominates both.
+    const weight=teams>=3?{synergy:2,output:35,range:80,gear:8}:{synergy:1.2,output:60,range:40,gear:8};
+    const score=ps=>{
+      const switching=batchSwitchCost(ps.map(p=>p.players));
+      const powers=ps.map(p=>raidPartyStats(p.players,basis).outputIndex),mean=powers.reduce((n,x)=>n+x,0)/ps.length;
+      const outputVar=powers.reduce((n,x)=>n+(x-mean)**2,0)/(ps.length*(mean*mean+1));
+      const rows=ps.map(p=>partyStats(p.players)),totalDps=target.melee+target.ranged;
+      const rangeDev=totalDps?rows.reduce((n,a)=>{const dps=a.melee+a.ranged,expected=dps*target.melee/totalDps;return n+(a.melee-expected)**2;},0)/(totalDps*totalDps+1):0;
+      const synergyTotal=ps.reduce((n,p)=>n+synergy(p.players),0);
+      const unknown=rows.reduce((n,a)=>n+a.unknownScores,0);
+      const gearDev=targetScore?rows.reduce((n,a)=>n+(a.averageScore===null?0:((a.averageScore-targetScore)/targetScore)**2),0)/ps.length:0;
+      const synergyNorm=synergyTotal/(ps.length*20+1);
+      const balance=-synergyNorm*weight.synergy+outputVar*weight.output+rangeDev*weight.range+gearDev*weight.gear+unknown;
+      return [switching.logins+switching.switches,switching.logins,balance];
+    };
+    const better=(a,b)=>{for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-10)return a[i]<b[i];}return false;};
+    let parties=base,current=score(parties),attempts=0;
+    for(let pass=0;pass<10&&attempts<8000;pass++){
+      let best=null,bestScore=current;
+      for(let i=0;i<parties.length&&attempts<8000;i++)for(let j=i+1;j<parties.length&&attempts<8000;j++){
+        if(parties[i].players[0]?.server!==parties[j].players[0]?.server)continue;
+        for(let a=0;a<parties[i].players.length&&attempts<8000;a++)for(let b=0;b<parties[j].players.length&&attempts<8000;b++){
+          const from=parties[i].players[a],to=parties[j].players[b];
+          if(attempts<3)
+          if(Catalog.profile(from).duty!==Catalog.profile(to).duty)continue;
+          attempts++;
+          const next=[...parties],left=[...parties[i].players],right=[...parties[j].players];[left[a],right[b]]=[right[b],left[a]];
+          if(new Set(left.map(r=>r.accountId)).size!==left.length||new Set(right.map(r=>r.accountId)).size!==right.length)continue;
+          next[i]={...parties[i],players:left};next[j]={...parties[j],players:right};
+          if(!locked.every(id=>next[0].players.some(r=>r.id===id)))continue;
+          const candidate=score(next);if(!better(candidate,bestScore))continue;
+          if(next.filter(p=>raidGongzhanStatus(p.players).covered).length<parties.filter(p=>raidGongzhanStatus(p.players).covered).length)continue;
+          const first=rebuild(next[i]),second=rebuild(next[j]);if(!first||!second)continue;
+          next[i]=first;next[j]=second;best=next;bestScore=candidate;
+        }
+      }
+      if(!best)break;parties=best;current=bestScore;
+    }
+    const dps=all.filter(r=>Catalog.profile(r).duty==='dps'),strongThreshold=dps.length?roleOutputPower(dps[Math.max(0,Math.ceil(dps.length/3)-1)],basis):Infinity;
+    const gear=all.filter(r=>Number.isFinite(r.score)&&r.score>0).map(r=>r.score).sort((a,b)=>a-b),lowThreshold=gear.length?gear[Math.max(0,Math.ceil(gear.length/3)-1)]:-Infinity;
+    return parties.map(p=>({...p,powerStats:raidPartyStats(p.players,basis),strongDps:p.players.filter(r=>Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold).map(r=>r.id),noviceIds:p.players.filter(r=>Number.isFinite(r.score)&&r.score>0&&r.score<=lowThreshold&&!(Catalog.profile(r).duty==='dps'&&roleOutputPower(r,basis)>=strongThreshold)).map(r=>r.id)}));
+  }
   // New candidate plans require full raids; legacy templates and saved plans keep their own rules.
   function planningTask(task){return task.partyRule==='raid10'&&!externalParty(task)?{...task,fillCompanionSlots:true}:task;}
   function savedPartyTask(task,plan){const snapshot=plan.taskSnapshots?.[task.id];if(task.partyRule==='daily5')task={...task,dailyDualTeams:snapshot?.dailyDualTeams??plan.rulesSnapshot?.dailyDualTeams??false};if(snapshot)task={...task,...Object.fromEntries(['dailyDualTeams','dailyBatchPriorities','raidMode','partyRule','difficulty','dungeonId','dungeonName','raidTeams','raidPlayerSeats','fillCompanionSlots','allowCompanions','preferRanged','runs','companionLimit','tank','heal'].filter(k=>snapshot[k]!==undefined).map(k=>[k,snapshot[k]])),...(snapshot.partyRule==='raid10'?{raidSize:raidCapacity(snapshot)}:{})};if(externalParty(plan.rulesSnapshot)||plan.teamConfigs?.length&&plan.teamConfigs.every(externalParty))task={...task,raidMode:'external'};return task.partyRule==='raid10'&&plan.rulesSnapshot?.fillCompanionSlots===true?planningTask(task):task;}
@@ -546,10 +604,42 @@
     const gongzhanMode=true,buffTotal=raidGongzhanStatus(available).count;let requireGongzhan=!coverAll&&buffTotal>=configs.length,maxGongzhan=!coverAll&&buffTotal<configs.length?1:Infinity,gongzhanSearchLimited=false;
     const profiles=new Map(available.map(r=>[r.id,Catalog.profile(r)])),owned=new Map(available.map(r=>[r.id,Catalog.owned(r)])),cache=new Map(),failed=new Set();
     let visits=0,limited=false,best=[],solution=null;
-    const tick=()=>{if(++visits>300000){limited=true;return false;}return true;};
+    const visitLimit=!coverAll&&t.partyRule==='raid10'&&configs.length>=3?60000:300000;
+    const tick=()=>{if(++visits>visitLimit){limited=true;return false;}return true;};
     const coverage=ps=>ps.reduce((n,p)=>n+p.players.length,0);
     function remember(path){if((coverAll?coverage(path)>coverage(best):path.length>best.length)||((coverAll?coverage(path)===coverage(best):path.length===best.length)&&coverage(path)>coverage(best)))best=[...path];}
     const sizesFor=q=>coverAll?Array.from({length:Math.min(5,cap)},(_,i)=>Math.min(5,cap)-i):q.raidPlayerSeats==='auto'?[8,7].filter(n=>n<=cap):[q.raidPlayerSeats].filter(n=>n<=cap);
+    // Fast partition for three or more ten-player teams. The exact search can hit its
+    // visit budget on large pools; this greedy seed is then refined by balanceRaidParties.
+    function greedyTeams(){
+      const groups=new Map();for(const r of available){if(!groups.has(r.server))groups.set(r.server,[]);groups.get(r.server).push(r);}
+      let pool=[...available],teams=[];
+      for(const [index,config] of configs.entries()){
+        const q=partyTask(t,config?.playerSeats==='auto'?undefined:config);
+        if(q.tankMode==='companion')return null;
+        const size=config?.playerSeats==='auto'?(t.raidPlayerSeats==='auto'?8:t.raidPlayerSeats):(Number.isInteger(config?.playerSeats)?config.playerSeats:(t.raidPlayerSeats==='auto'?8:t.raidPlayerSeats));
+        const counts={};for(const r of pool)counts[r.server]=(counts[r.server]||0)+1;
+        const server=Object.entries(counts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0];if(!server)return null;
+        const chosen=[],accounts=new Set(),rangeCount={melee:0,ranged:0};
+        const pick=(duty,preferRange)=>{
+          const rows=pool.filter(r=>r.server===server&&!accounts.has(r.accountId)&&!chosen.includes(r)&&Catalog.profile(r).duty===duty);
+          return rows.sort((a,b)=>Number(Catalog.profile(b).range===preferRange)-Number(Catalog.profile(a).range===preferRange)||(b.score||0)-(a.score||0)||a.id.localeCompare(b.id))[0];
+        };
+        const needTank=Math.max(0,q.tank||0),needHeal=Math.max(0,q.heal||0);
+        for(let i=0;i<needTank;i++){const r=pick('tank');if(!r){if(q.tankMode==='player')return null;break;}chosen.push(r);accounts.add(r.accountId);}
+        for(let i=0;i<needHeal;i++){const r=pick('heal');if(!r)break;chosen.push(r);accounts.add(r.accountId);}
+        while(chosen.length<size){
+          const prefer=rangeCount.melee<=rangeCount.ranged?'melee':'ranged',r=pick('dps',prefer)||pick('dps');
+          if(!r)return null;chosen.push(r);accounts.add(r.accountId);const range=Catalog.profile(r).range;if(range in rangeCount)rangeCount[range]++;
+        }
+        if(index===0&&locked.some(id=>!chosen.some(r=>r.id===id)))return null;
+        let companions;
+        try{companions=companionAssignments(q,chosen,10);if(!companions)return null;validateParty(q,chosen,companions,capacity);}catch{return null;}
+        teams.push({players:chosen,companions,totalSlots:10,capacity:10,teamConfig:config?{...config}:undefined,teamIndex:index,teamName:config?.name});
+        const used=new Set(chosen.map(r=>r.id));pool=pool.filter(r=>!used.has(r.id));
+      }
+      return teams.length===configs.length?teams:null;
+    }
     function* candidates(pool,q,required,config,index,previous=[],reserveBuffs=0){
       const poolBuffs=pool.filter(r=>raidGongzhanStatus([r]).covered).length;
       const worldTail=q.partyRule==='daily5'&&pool.length<=2;
@@ -627,10 +717,10 @@
     }
     if(coverAll&&cap>0){const freq={};for(const r of available)freq[r.accountId]=(freq[r.accountId]||0)+1;const lower=Math.max(Math.ceil(available.length/cap),0,0,...Object.values(freq));for(let groups=lower;groups<=available.length&&!limited;groups++){requireGongzhan=buffTotal>=groups;maxGongzhan=buffTotal<groups?1:Infinity;failed.clear();if(search(available,[],groups,0))break;if(requireGongzhan&&!limited){requireGongzhan=false;failed.clear();best=[];if(search(available,[],groups,0))break;}}}
     else if(!coverAll){search(available,[],configs.length,0);if(requireGongzhan&&!solution){gongzhanSearchLimited=limited;requireGongzhan=false;visits=0;limited=false;failed.clear();best=[];search(available,[],configs.length,0);}}
-    let parties=solution||best;
+    let parties=solution||best,searchLimited=limited,greedyUsed=false;
     // Keep useful partial output when full coverage is impossible or the search is bounded.
-    const searchLimited=limited;
-    if(!solution){limited=false;visits=0;let pool=[...available],partial=[];for(let i=0;i<(coverAll?available.length:configs.length)&&pool.length&&!limited;i++){
+    if(!solution&&!coverAll&&t.partyRule==='raid10'&&raidCapacity(t)===10&&configs.length>=3){const greedy=greedyTeams();if(greedy){parties=greedy;greedyUsed=true;searchLimited=false;limited=false;}}
+    if(!solution&&!parties.length){limited=false;visits=0;let pool=[...available],partial=[];for(let i=0;i<(coverAll?available.length:configs.length)&&pool.length&&!limited;i++){
       const config=coverAll?undefined:configs[i],q=partyTask(t,config?.playerSeats==='auto'?undefined:config),p=candidates(pool,q,i===0?locked:[],config,i,partial.at(-1)?.players).next().value;
       if(!p){if(coverAll)break;continue;}partial.push(p);const used=new Set(p.players.map(r=>r.id));pool=pool.filter(r=>!used.has(r.id));
     }if((coverAll?coverage(partial)>coverage(parties):partial.length>parties.length))parties=partial;
@@ -642,15 +732,29 @@
     parties=optimizeTaskBatches({...t,gongzhanMaxPerTeam:maxGongzhan,requireGongzhanPerTeam:gongzhanMode&&parties.length>0&&parties.every(p=>raidGongzhanStatus(p.players).covered)},parties.map(p=>p.players),capacity,parties,locked).parties;
     if(t.partyRule==='daily5'){const tanks=parties.map(p=>p.players.filter(r=>Catalog.profile(r).duty==='tank').length),totalT=tanks.reduce((a,b)=>a+b,0);if(tanks.some(n=>n>1))reasons.push(totalT>parties.length?'玩家 T '+totalT+' 名，超过 '+parties.length+' 支队伍，允许同队多 T。':'当前分配仍有多 T 队伍，请复核账号、区服、固定成员与侠客职责。');}
     if(!coverAll)parties=optimizeRaidMode({...t,gongzhanMaxPerTeam:maxGongzhan},parties,available,capacity,locked);
+    if(t.partyRule==='raid10'&&raidCapacity(t)===10&&parties.length>1){
+      const before=JSON.stringify(parties.map(p=>p.players.map(r=>r.id)));
+      const rebuildBalance=p=>{try{
+        const q=partyTask(t,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig);
+        validateDailyGongzhan({...q,gongzhanMaxPerTeam:maxGongzhan},p.players);
+        const companions=companionAssignments(q,p.players,10);if(!companions)return null;
+        validateParty(q,p.players,companions,capacity);
+        for(const other of t.routePartyTasks||[]){const oq=partyTask(other,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig);validateParty(oq,p.players,partyCompanions(oq,p.players,companions),capacity);}
+        return {...p,companions};
+      }catch{return null;}};
+      parties=balanceRaidParties(parties,rebuildBalance,locked);
+      if(JSON.stringify(parties.map(p=>p.players.map(r=>r.id)))!==before)reasons.push('已按门派增益、远近战与输出平衡 '+parties.length+' 支队伍；账号连续使用与首队锁定优先。');
+    }
     for(const p of parties)validateParty(partyTask(t,p.teamConfig?.playerSeats==='auto'?undefined:p.teamConfig),p.players,p.companions,capacity);
     if(gongzhanMode){reasons.push(...raidGongzhanWarnings(parties.map(p=>p.players)));if(gongzhanSearchLimited&&parties.some(p=>!raidGongzhanStatus(p.players).covered))reasons.push('共战分配搜索达到上限，请复核缺少共战的队伍。');}
     const used=new Set(parties.flatMap(p=>p.players.map(r=>r.id))),unassigned=roles.filter(r=>!used.has(r.id));
     if(unassigned.some(r=>r.gongzhanBuff===true))reasons.push('部分共战角色未安排，请检查职责、账号与区服限制；共战充足时允许同队多人，不为多余共战增加队伍。');
     if(unassigned.length)reasons.push('未安排 '+unassigned.length+' 个角色：'+unassigned.map(r=>r.name).join('、')+'。请复核账号互斥、区服、职责、侠客归属与并行上限。');
     if(!solution&&coverAll)reasons.push('未找到覆盖全部角色的方案；可调整成员职责或侠客资料后重算。');
-    if(searchLimited||limited)reasons.push('搜索达到上限，当前建议未保证完整或最优；请调整逐队配置或缩小角色范围后重算。');
+    if(greedyUsed)reasons.push('已用快速分队生成 '+parties.length+' 支队伍，再按门派增益、远近战与输出平衡。');
+    else if(searchLimited||limited)reasons.push('搜索达到上限，当前建议未保证完整或最优；请调整逐队配置或缩小角色范围后重算。');
     if(!coverAll)for(const [i,c]of configs.entries())if(!parties.some(p=>p.teamIndex===i))reasons.push(c.name+' 未生成：需要 '+c.playerSeats+' 名玩家（'+({auto:'自动补 T',player:'玩家 T',companion:'侠客 T'}[c.tankMode]||'自动补 T')+'），请复核剩余 CD、召请者和并行上限 '+cap+'。');
-    if(!solution&&!coverAll){reasons.push('目标 '+configs.length+' 队，仅生成 '+parties.length+' 队。');if(t.fillCompanionSlots)reasons.push('每队必须由玩家与已拥有侠客补满 10 席；请检查侠客数量、同名互斥、召请上限和所需职责。');}
+    if(!solution&&!coverAll&&!greedyUsed){reasons.push('目标 '+configs.length+' 队，仅生成 '+parties.length+' 队。');if(t.fillCompanionSlots)reasons.push('每队必须由玩家与已拥有侠客补满 10 席；请检查侠客数量、同名互斥、召请上限和所需职责。');}
     if(t.partyRule==='raid10'&&t.raidMode&&t.raidMode!=='legacy'){if(available.some(r=>Catalog.profile(r).duty==='dps'&&!Number.isFinite(r.referenceDps)))reasons.push('部分角色缺少参考 DPS，输出指数使用装分参考；未推算真实 DPS，也不计侠客或共战增益。');if(t.raidMode==='mentor'&&parties.some(p=>!p.strongDps?.length||!p.noviceIds?.length))reasons.push('部分队伍无法同时安排强力 DPS 与已知低装分角色，请复核成员、账号和职责限制。');if(t.raidMode==='output'&&locked.length)reasons.push('首队固定成员保持在首队，在不增加登录与换角次数的前提下优先配置输出。');}
     return {teams:parties.map(p=>p.players),parties,unassigned,reasons,powerBasis:t.partyRule==='raid10'&&t.raidMode&&t.raidMode!=='legacy'?modeBasis:undefined};
   }
@@ -864,7 +968,7 @@
   function scopeMatches(id,selected){if(Array.isArray(selected))return !selected.length||selected.includes(id);return !selected||id===selected;}
   function eligible(s,t,scope={}) {t=taskForVersion(s,t);return s.roles.filter(r=>r.enabled!==false&&isMaxLevel(s,r)&&t.roleIds.includes(r.id)&&s.accounts.some(a=>a.id===r.accountId&&a.enabled!==false)&&(!t.requiresCamp||['hao','e'].includes(r.camp))&&(!scope.group||s.accounts.find(a=>a.id===r.accountId)?.group===scope.group)&&scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)&&(r.level??0)>=(t.minLevel||0)&&(r.score??0)>=(t.minScore||0));}
   function cdKey(t){return t.dungeonId?'raid_'+t.dungeonId+'_'+(t.difficulty||'10人普通'):t.id;}
-  function getProgress(s,t,r,date) {const key=cdKey(t),period=cycle(t,date);return s.progress.find(p=>p.roleId===r.id&&(p.cdKeySnapshot||cdKey(s.tasks.find(x=>x.id===p.taskId)||{}))===key&&p.cycle===period);}
+  function getProgress(s,t,r,date) {const key=cdKey(t),period=cycle(t,date);return progressLookup(s).get(r.id+'|'+key+'|'+period);}
   // Completion facts consume targets/CD, but never enter income or timing samples.
   // Completion/execution facts are derived from the whole workspace and were rebuilt on
   // every lookup; memoize per state object and invalidate together with the view cache.
@@ -873,9 +977,29 @@
   function markDirty(){dataRevision++;}
   function computeCompletionRecords(s){if(!s.plans.some(p=>p.completionFacts?.length))return [];const measured=new Set(),whole=new Set();for(const r of s.records)if(r.planId){const key=r.planId+'|'+r.taskId;if(!r.planBatchIndices)whole.add(key);else for(const i of r.planBatchIndices)measured.add(key+'|'+i);}return s.plans.flatMap(p=>(p.completionFacts||[]).filter(f=>!whole.has(p.id+'|'+f.taskId)&&!measured.has(p.id+'|'+f.taskId+'|'+f.planBatchIndices[0])));}
   function recordFactsFor(s){const cached=recordFacts.get(s);if(cached&&cached.rev===dataRevision&&cached.records===s.records&&cached.plans===s.plans&&cached.recordsLength===s.records.length&&cached.plansLength===s.plans.length)return cached;const completion=computeCompletionRecords(s),entry={rev:dataRevision,records:s.records,plans:s.plans,recordsLength:s.records.length,plansLength:s.plans.length,completion,execution:[...s.records,...completion]};recordFacts.set(s,entry);return entry;}
+  // Index execution CD rows and manual progress by role so forecast loops do not
+  // rescan every record for each batch.
+  let cdLookupCache=null,progressLookupCache=null;
+  function cdLookup(s){
+    const facts=recordFactsFor(s);
+    if(cdLookupCache&&cdLookupCache.facts===facts&&cdLookupCache.rev===dataRevision)return cdLookupCache.map;
+    const map=new Map();
+    for(const r of facts.execution){
+      if(!r.dungeonId)continue;
+      const key=cdKey({dungeonId:r.dungeonId,difficulty:r.difficulty});
+      for(const id of r.roleIds||[]){const k=key+'|'+id;const list=map.get(k);if(list)list.push(r);else map.set(k,[r]);}
+    }
+    cdLookupCache={facts,rev:dataRevision,map};return map;
+  }
+  function progressLookup(s){
+    if(progressLookupCache&&progressLookupCache.rows===s.progress&&progressLookupCache.tasks===s.tasks)return progressLookupCache.map;
+    const map=new Map(),tasks=new Map(s.tasks.map(t=>[t.id,t]));
+    for(const p of s.progress){const key=cdKey(p.cdKeySnapshot?{dungeonId:p.cdKeySnapshot.dungeonId,difficulty:p.cdKeySnapshot.difficulty}:tasks.get(p.taskId)||{});const k=p.roleId+'|'+key+'|'+p.cycle;map.set(k,p);}
+    progressLookupCache={rows:s.progress,tasks:s.tasks,map};return map;
+  }
   function completionRecords(s){return recordFactsFor(s).completion;}
   function executionRecords(s){return recordFactsFor(s).execution;}
-  function cdRecord(s,t,roleId,date){if(!t.dungeonId)return null;const key=cdKey(t),period=cycle(t,date);return executionRecords(s).find(r=>{const source=r.dungeonId?{dungeonId:r.dungeonId,difficulty:r.difficulty}:null;return source&&cdKey(source)===key&&r.roleIds.includes(roleId)&&(r.cycle||cycle(t,r.date))===period;});}
+  function cdRecord(s,t,roleId,date){if(!t.dungeonId)return null;const key=cdKey(t),period=cycle(t,date);return (cdLookup(s).get(key+'|'+roleId)||[]).find(r=>(r.cycle||cycle(t,r.date))===period);}
   function effectiveProgress(s,t,r,when,lookup){
     const manual=lookup?lookup.manual.get(r.id):getProgress(s,t,r,when),target=manual?.target??t.target,period=lookup?.period||cycle(t,when);
     const records=lookup?lookup.records.get(r.id)||[]:executionRecords(s).filter(x=>x.roleIds.includes(r.id)&&(x.dungeonId?cdKey(x)===cdKey(t):x.taskId===t.id)&&(x.cycle||cycle(t,x.startedAt||x.date))===period);
@@ -1058,18 +1182,21 @@
     return {...t,gold:t.gold/100*(c.raidBoxEquipmentGold??100),shared:bosses*100+(t.shared-bosses*100)/100*(c.raidEquipmentGold??100)};
   }
   function confirmedForecast(s,start,end,scope={}){
-    const usage=new Map(),warnings=[],participation=[],rows=new Map(s.tasks.map(t=>[t.id,[]]));
-    for(const p of [...s.plans].filter(p=>!p.cancelled&&p.date<=end).sort((a,b)=>instant(a.startedAt||a.date)-instant(b.startedAt||b.date)||(a.createdAt||'').localeCompare(b.createdAt||''))){
+    const usage=new Map(),warnings=[],participation=[],rows=new Map(s.tasks.map(t=>[t.id,[]])),execution=executionRecords(s),taskById=new Map(s.tasks.map(t=>[t.id,t])),roleById=new Map(s.roles.map(r=>[r.id,r]));
+    const forecastStarted=performance.now();let forecastPlan=0,forecastEligible=0,forecastBatch=0,forecastPrice=0;
+    const scopedRoleIds=scope.role||scope.account?new Set(s.roles.filter(r=>scopeMatches(r.id,scope.role)&&scopeMatches(r.accountId,scope.account)).map(r=>r.id)):null;
+    for(const p of [...s.plans].filter(p=>!p.cancelled&&p.date<=end&&p.date>=addDays(start,-1)).sort((a,b)=>instant(a.startedAt||a.date)-instant(b.startedAt||b.date)||(a.createdAt||'').localeCompare(b.createdAt||''))){
+      if(scopedRoleIds&&!p.batches.some(batch=>batch.some(id=>scopedRoleIds.has(id))))continue;
       for(const taskId of p.routeTaskIds||[p.taskId]){
-        const when=instant(planStart(s,p,taskId)),taskWhen=new Date(when).toISOString(),taskDate=dateKey(new Date(when)),current=s.tasks.find(t=>t.id===taskId);if(!current)continue;
-        const t=historicalRewardTask(taskForVersion(s,p.taskSnapshots?.[taskId]||current),s.config),validationTask=taskForVersion(s,{...current,...p.taskSnapshots?.[taskId],enabled:current.enabled}),batches=[],fullBatches=[],fullBatchIndices=[],selectedIds=new Set(),done=new Set(recordedBatchIndices(s,p,taskId)),full=eligible(s,validationTask),selected=new Set(eligible(s,validationTask,scope).map(r=>r.id));
+        const planStarted=performance.now();const when=instant(planStart(s,p,taskId)),taskWhen=new Date(when).toISOString(),taskDate=dateKey(new Date(when)),current=taskById.get(taskId);forecastPlan+=performance.now()-planStarted;if(!current)continue;
+        const eligibleStarted=performance.now();const t=historicalRewardTask(taskForVersion(s,p.taskSnapshots?.[taskId]||current),s.config),validationTask=taskForVersion(s,{...current,...p.taskSnapshots?.[taskId],enabled:current.enabled}),batches=[],fullBatches=[],fullBatchIndices=[],selectedIds=new Set(),done=new Set(recordedBatchIndices(s,p,taskId)),full=eligible(s,validationTask),selected=new Set(eligible(s,validationTask,scope).map(r=>r.id));forecastEligible+=performance.now()-eligibleStarted;
         for(const [i,ids]of p.batches.entries()){
           if(p.closedBatches?.[taskId]?.includes(i))continue;
-          const completed=done.has(i),event=executionRecords(s).find(r=>r.planId===p.id&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(i)));
+          const completed=done.has(i),event=execution.find(r=>r.planId===p.id&&r.taskId===taskId&&(!r.planBatchIndices||r.planBatchIndices.includes(i)));
           const key=id=>[id,cdKey(t),event?.cycle||cycle(t,taskWhen)].join('|');
           // Completed batches are evidence. Current membership, caps, manual
           // progress and duty edits must never erase their confirmed baseline.
-          const allowed=completed?ids.map(id=>{const r=s.roles.find(r=>r.id===id);return r&&{...r,accountId:event?.roleAccounts?.[id]||r.accountId};}).filter(Boolean):ids.map(id=>full.find(r=>r.id===id)).filter(r=>{
+          const allowed=completed?ids.map(id=>{const r=roleById.get(id);return r&&{...r,accountId:event?.roleAccounts?.[id]||r.accountId};}).filter(Boolean):ids.map(id=>full.find(r=>r.id===id)).filter(r=>{
             if(!r)return false;const progress=getProgress(s,validationTask,r,taskWhen),record=cdRecord(s,validationTask,r.id,taskWhen);
             return progress?.status!=='skipped'&&(usage.get(key(r.id))||0)<(progress?.target??validationTask.target)&&(!record||record.planId===p.id);
           });
@@ -1090,13 +1217,19 @@
             for(const r of allowed)if(scoped.has(r.id))selectedIds.add(r.id);batches.push(allowed);
           }catch(e){if(taskDate>=start&&taskDate<=end)warnings.push(t.name+'：'+e.message+'，该批次未计入预测');}
         }
-        const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
-        const result=scopedPrediction(pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches),selectedIds);
+        const batchStarted=performance.now();const scopedTask={...t,enabled:true,prepare:batches.includes(fullBatches[0])?t.prepare:0,otherCost:batches.includes(fullBatches[0])?t.otherCost:0};
+        const result=scopedPrediction(pricePrediction(s,t,calculateBatches(scopedTask,batches,pricingConfig(s,new Date(when))),new Date(when),fullBatches),selectedIds);forecastPrice+=performance.now()-batchStarted;
         if(taskDate>=start&&taskDate<=end){rows.get(taskId).push(result);if(![scope.role,scope.account,scope.group].some(v=>Array.isArray(v)?v.length:!!v)&&fullBatches.length)participation.push({planId:p.id,taskId,date:taskDate,startedAt:new Date(when).toISOString(),prepare:t.prepare||0,batchMinutes:t.minutes/t.efficiency,batchWaveIndices:fullBatches.map((_,i)=>dailyExecutionWaves(t,fullBatches,s.config).findIndex(w=>w.includes(i))),batchIndices:fullBatchIndices,onlinePerVisit:t.minutes/t.efficiency+t.onlineExtra,batches:fullBatches.map(batch=>batch.map(r=>({roleId:r.id,accountId:r.accountId}))),result});}
       }
     }
     const tasks=s.tasks.filter(t=>t.enabled||rows.get(t.id)?.length).map(task=>({task,...sum(rows.get(task.id)||[],s.config),hasData:true}));
-    const seen=new Set();let unassignedTargets=0;for(const d of dates(start,end))for(const t of s.tasks.filter(t=>t.enabled&&t.days.includes(weekday(d))))for(const r of eligible(s,t,scope)){const key=[r.id,cdKey(t),cycle(t,d)].join('|');if(seen.has(key))continue;seen.add(key);const p=getProgress(s,t,r,d);if(p?.status==='skipped')continue;unassignedTargets+=Math.max(0,(p?.target??t.target)-Math.max(p?.completed||0,usage.get(key)||0));}
+    const seen=new Set(),targetRoles=new Map();let unassignedTargets=0;
+    for(const d of dates(start,end))for(const t of s.tasks.filter(t=>t.enabled&&t.days.includes(weekday(d)))){
+      let roles=targetRoles.get(t.id);if(!roles){roles=eligible(s,t,scope);targetRoles.set(t.id,roles);}
+      for(const r of roles){const key=[r.id,cdKey(t),cycle(t,d)].join('|');if(seen.has(key))continue;seen.add(key);const p=getProgress(s,t,r,d);if(p?.status==='skipped')continue;unassignedTargets+=Math.max(0,(p?.target??t.target)-Math.max(p?.completed||0,usage.get(key)||0));}
+    }
+    const mark=(label,ms)=>globalThis.WorkbenchBoot?.timing?.(label,ms);
+    mark('预测-开始',forecastPlan);mark('预测-资格',forecastEligible);mark('预测-收益',forecastPrice);mark('预测-总计',performance.now()-forecastStarted);
     return {...sum(tasks,s.config),tasks,participation,hasData:true,unassignedTargets,forecastWarnings:[...new Set(warnings)],start,end};
   }
   function incomeRecords(s){
@@ -1506,6 +1639,25 @@
     };
     return canonical(snapshot(key,a))===canonical(snapshot(key,b));
   }
+  // Imported archives may have been exported in another time zone or older build.
+  // Derive completion day and refresh cycle from the recorded Beijing instant when
+  // they disagree; amounts, members and plan membership are left untouched.
+  function normalizeDateFields(state){
+    let repaired=0;
+    const fix=(row,task)=>{
+      if(!row?.startedAt)return;
+      const at=new Date(row.startedAt);if(!Number.isFinite(at.getTime()))return;
+      const date=dateKey(at);if(row.date!==date){row.date=date;repaired++;}
+      if(task){const expected=cycle(task,row.startedAt);if(row.cycle!==expected){row.cycle=expected;repaired++;}}
+    };
+    for(const p of state.plans||[]){
+      const t=(id)=>state.tasks.find(x=>x.id===id);
+      fix(p,t(p.taskId));
+      for(const f of p.completionFacts||[])fix(f,f.cycleSnapshot||f.cdSnapshot||t(f.taskId));
+    }
+    for(const r of state.records||[])fix(r,r.cdSnapshot||state.tasks.find(t=>t.id===r.taskId));
+    return repaired;
+  }
   function merge(current,incoming) {
     validateState(incoming);incoming=freezeHistory(upgradeState(JSON.parse(JSON.stringify(incoming))));const next=freezeHistory(JSON.parse(JSON.stringify(current))),stats={added:0,updated:0,skipped:0,old:0};
     // Backups contain the final workspace plus an audit journal, not a sequence
@@ -1540,6 +1692,9 @@
       if(!existing){next[key].push(item);stats.added++;continue;}
       if(JSON.stringify(existing)===JSON.stringify(item)){stats.skipped++;continue;}
       if(key==='materials'&&item.updatedAt&&(!existing.updatedAt||item.updatedAt>existing.updatedAt)){const fields=['itemId','server','pricingMode','priceQuoteId','unitPrice','priceDate','priceSource','priceValidForHours','updatedAt'];for(const name of fields)if(name in item)existing[name]=item[name];stats.updated++;continue;}
+      // A newer plan snapshot replaces the whole plan. Mixing a new batch list with
+      // local start times or completion facts corrupts schedule dates.
+      if(key==='plans'&&item.updatedAt&&(!existing.updatedAt||item.updatedAt>existing.updatedAt)){next[key][next[key].indexOf(existing)]=item;stats.updated++;continue;}
       // Explicitly revised measurements can round-trip through a newer backup.
       // Ordinary imported measurements and financial events remain immutable.
       if(key==='records'&&item.correctionRevision>(existing.correctionRevision||0)&&item.updatedAt&&(!existing.updatedAt||item.updatedAt>=existing.updatedAt)&&Array.isArray(item.corrections)&&item.corrections.length===item.correctionRevision){Object.assign(existing,item);stats.updated++;continue;}
@@ -1549,7 +1704,8 @@
     // Preserve unknown top-level extension fields and explicitly keep active local configuration.
     for(const [key,value] of Object.entries(incoming))if(!(key in next))next[key]=value;
     for(const key of ['balanceSnapshots'])if(Array.isArray(incoming[key])){next[key]??=[];for(const x of incoming[key])if(!next[key].some(y=>y.id===x.id)){next[key].push(x);stats.added++;}}
-    validateState(next);return {next,stats};
+    const repaired=normalizeDateFields(next);
+    validateState(next);return {next,stats:{...stats,repaired}};
   }
-  return {markDirty,dailyExecutionWaves,distributionSwarm,distributionStats,dailyBatchRules,dailyBatchPriorities,dailyPartySynergy,lifeSkillsAnalysis,confirmMeasurements,matchedTaskComparison,executionMatrix,reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionDeadline,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
+  return {markDirty,dailyExecutionWaves,raidBatchRules,distributionSwarm,distributionStats,dailyBatchRules,dailyBatchPriorities,dailyPartySynergy,lifeSkillsAnalysis,confirmMeasurements,matchedTaskComparison,executionMatrix,reviewAnalysis,reviewPeriod,periodReview,roleCombatAnalysis,combatStatCatalog,validateCombatStats,accountRoleAnalysis,lifeSkillCatalog,lifeSkillSource,validateLifeSkills,scopeMatches,externalParty,clone,LEVEL_SEASON,CURRENT_LEVEL_CAP,migrateRoleLevel,goldBalanceCheck,goldDateRange,goldAssetReport,goldBalanceTrend,goldLedgerGroups,merchantUnits,revalueMerchantRecord,calibrateMerchant,raidCapacity,partyCompanions,gongzhanAllocationPolicy,validateGongzhanBatches,timerActiveSegments,raidClearBossCount,raidExecutionTask,batchRoleAllocation,recordBatches,allocatedRecord,scopedPrediction,recordPricing,resourceDateRange,resourceRange,resourceBatches,resourcePeriod,confirmedGoldEvents,partialMeasurementRecord,planExecutionDeadline,planExecutionValid,planTaskOverdue,dungeonRewardDefaults,dungeonRewards,capturePlanForecasts,sameHistoryRow,validateDailyGongzhan,raidModes,raidGongzhanStatus,raidGongzhanWarnings,raidPowerBasis,roleOutputPower,raidPartyStats,partyStats,planningTask,savedPartyTask,completionRecords,executionRecords,effectiveProgress,recordedBatchIndices,pendingBatchIndices,reservedCount,availableCount,availableRoles,validatePlanCapacity,recordAccount,freezeRecord,freezeHistory,VERSION,id,dateKey,addDays,weekday,weekStart,dates,cycle,cdKey,cdRecord,canRun,selectedRecordRoles,scopedRecord,blank,demo,number,validateConfig,validateTask,withPartyRule,partyTask,validateTeamConfig,upgradeState,companionAssignments,validateParty,partyCandidates,batchTransition,batchSwitchCost,optimizeTaskBatches,splitBatches,costs,calculateRole,teamCandidates,calculateTeam,calculateBatches,pricingConfig,pricePrediction,executionPricing,planStart,confirmedForecast,levelCap,isMaxLevel,taskForVersion,eligible,getProgress,remainingRoles,plan,scheduled,routePlan,sum,recordResult,incomeRecords,summary,completion,cashSummary,budget,balance,ledgerIncome,validateState,merge,inScope};
 });
