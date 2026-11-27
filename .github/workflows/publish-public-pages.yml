@@ -53,6 +53,8 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .pages-site
+      - name: Wait for Pages artifact availability
+        run: sleep 20
       - name: Deploy both independent snapshots
         id: deploy
         uses: actions/deploy-pages@v4
