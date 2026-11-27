@@ -1,14 +1,14 @@
 {
-  "id": "45aa209a4313e90faca7110070f165f7f3420f3e4c3174a202cad1adffe4bb35",
-  "version": "0.13.0-dev.7",
+  "id": "b68569602eab005fc2b9e7c5a972fcda4359d684192fab4f4b3d5e3cc9087b98",
+  "version": "0.13.0-dev.8",
   "channel": "dev",
-  "sourceCommit": "d68aec8dcb603c80c10464709cab60661cd1d15c",
-  "sourceTimestamp": 1795786468,
+  "sourceCommit": "09bad78f0cd9a2e53c425f5d9adb2f9b926b446e",
+  "sourceTimestamp": 1795786709,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "优化总览最佳效率与榜单计算，减少首屏阻塞"
+      "Pages 部署前等待产物索引可用，避免立即读取失败"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 372,
-      "sha256": "98cbbb51411be88b3f7e59228539a49877fa235a27e2db5e4634e64ae66202a1"
+      "bytes": 378,
+      "sha256": "a74bf6f900c6fd263d5bdf3375eb1c36897981b66485a5d46afcd6165a42e7f2"
     }
   ]
 }
