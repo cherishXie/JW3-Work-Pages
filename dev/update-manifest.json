@@ -1,14 +1,14 @@
 {
-  "id": "9ca5340d3bc9f634f1f603c101acb242f407cd8f24865f894ed6791d404f6cd8",
-  "version": "0.13.0-dev.103",
+  "id": "3d077d22b9395d7b41469bc983cc68d7527855bc996173c69167cdda1fa51796",
+  "version": "0.14.0-dev.104",
   "channel": "dev",
-  "sourceCommit": "bd4afc1877f901409a1502ab553f41ec83a1e9ed",
-  "sourceTimestamp": 1795788719,
+  "sourceCommit": "e788393b1bb0a95db3091e3eb58b29f83db0bf79",
+  "sourceTimestamp": 1795789253,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "修复大档案启动解码缓慢：超过 1 MB 的档案改为 gzip 压缩普通 JSON 保存，启动只需解压与 JSON.parse，不再展开共享节点；写入时记录本地校验标记，匹配的档案跳过重复全量校验，校验失败或外部改动仍会完整校验。旧共享节点档案首次读取后自动迁移，本机 2.2 MB 压缩档案二次启动读取由约 13–18 秒降到约 0.5 秒。"
+      "Release 0.14.0: 岛屿界面、十人分队、25人CD、批次计时与存储启动优化"
     ]
   },
   "files": [
@@ -219,8 +219,8 @@
     },
     {
       "name": "version.js",
-      "bytes": 731,
-      "sha256": "b7463f58bf22834e17dd6c61bd2fddbc2321a4ac31e2b622a21f7c0518e61ebf"
+      "bytes": 403,
+      "sha256": "429dd427d59073bd61dfe22b9f25759bae4615dbc0e9b352030c4118b7a8a3f4"
     }
   ]
 }
