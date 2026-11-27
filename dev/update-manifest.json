@@ -1,14 +1,14 @@
 {
-  "id": "762d7a45bddb5f5e2f018f820eac339edc4085c29808c63ef449d72d218eb3cd",
-  "version": "0.13.0-dev.102",
+  "id": "21747eb37b746143067c39d10db5086a913f7caa044c8c19a98c536372ab7815",
+  "version": "0.13.0-dev.9",
   "channel": "dev",
-  "sourceCommit": "09bad78f0cd9a2e53c425f5d9adb2f9b926b446e",
-  "sourceTimestamp": 1795786709,
+  "sourceCommit": "bd4afc1877f901409a1502ab553f41ec83a1e9ed",
+  "sourceTimestamp": 1795788719,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "Pages 部署前等待产物索引可用，避免立即读取失败"
+      "修复大档案启动解码缓慢：超过 1 MB 的档案改为 gzip 压缩普通 JSON 保存，启动只需解压与 JSON.parse，不再展开共享节点；写入时记录本地校验标记，匹配的档案跳过重复全量校验，校验失败或外部改动仍会完整校验。旧共享节点档案首次读取后自动迁移，本机 2.2 MB 压缩档案二次启动读取由约 13–18 秒降到约 0.5 秒。"
     ]
   },
   "files": [
@@ -154,8 +154,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 226764,
-      "sha256": "69966ea1627dff56875bbc6d408cbbbda7ee21b3c4910abe70519c643567c5e9"
+      "bytes": 227025,
+      "sha256": "22768936ca03ad047f8f3ba5e8313915f0ddca48d1db72940a254472acc20af1"
     },
     {
       "name": "operations.js",
@@ -169,8 +169,8 @@
     },
     {
       "name": "storage.js",
-      "bytes": 9386,
-      "sha256": "84e45bce4efd9f86536abef372723c7960e45e96fccc890c3b54731d2d5c13c8"
+      "bytes": 11462,
+      "sha256": "fe24cb2f058af5cb2ab97b41cbca5b4e5ab61a2b5e657709e39691bc61ef7375"
     },
     {
       "name": "storage-worker.js",
@@ -214,13 +214,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 862367,
-      "sha256": "08d21410c6433ba0d468c1d4c9a835b75e919a0d1c8ef6a380ea0f6109f30a7b"
+      "bytes": 862697,
+      "sha256": "2c83a9b7feec44cb5156a2f396c7844f94e7a02d8f20559c62ba759b573d061d"
     },
     {
       "name": "version.js",
-      "bytes": 380,
-      "sha256": "87bd5881e292d84e934d7c1bf74908ca46dbfd5489d6f6c20545c09c5c0c7925"
+      "bytes": 729,
+      "sha256": "b6c541a6fd4f19e53d6ebd17838afad007ad4d2ce83b499938c73ac77dae4baf"
     }
   ]
 }

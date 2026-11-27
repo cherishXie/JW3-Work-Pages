@@ -25,9 +25,9 @@
   const duty=d=>({tank:'坦克',heal:'治疗',dps:'输出'}[d]||'未知');
   const dayLabels=['周日','周一','周二','周三','周四','周五','周六'];
   globalThis.WorkbenchBoot?.stage('正在读取本地档案');
-  let storageError='',storageReadError=false,state,dataStore=Store.empty(),migrated=false,startupSource;
+  let storageError='',storageReadError=false,state,dataStore=Store.empty(),migrated=false,encodingCompact=false,startupSource;
   const readStarted=performance.now();
-  try{startupSource={current:localStorage.getItem(KEY),legacy:KEY===Store.KEY?localStorage.getItem(Store.LEGACY_KEY):null};const loaded=await Store.readAsync(localStorage,KEY);dataStore=loaded.store;migrated=loaded.migrated;state=dataStore.active?M.clone(dataStore.active):M.blank();}catch(e){storageReadError=true;state=M.blank();storageError='本地数据读取失败：'+e.message+'。原存储未覆盖，可导出原始数据或重置。';}
+  try{startupSource={current:localStorage.getItem(KEY),legacy:KEY===Store.KEY?localStorage.getItem(Store.LEGACY_KEY):null};const loaded=await Store.readAsync(localStorage,KEY);dataStore=loaded.store;migrated=loaded.migrated;encodingCompact=!!loaded.compact;state=dataStore.active?M.clone(dataStore.active):M.blank();}catch(e){storageReadError=true;state=M.blank();storageError='本地数据读取失败：'+e.message+'。原存储未覆盖，可导出原始数据或重置。';}
   globalThis.WorkbenchBoot?.timing?.('读取本地档案',performance.now()-readStarted);
   globalThis.WorkbenchBoot?.stage('正在整理任务与收益记录');
   const rulesUpgraded=!storageError&&(state.levelSeason!==M.LEVEL_SEASON||state.roles.some(r=>r.gongzhanBuff==null)||state.partyRulesVersion!==3||state.workflowVersion!==2||state.plans.some(p=>p.requiresReview!==undefined));
@@ -3411,6 +3411,7 @@
   render();
   globalThis.WorkbenchBoot?.timing?.('生成工作台视图',performance.now()-renderStarted);
   requestAnimationFrame(()=>globalThis.WorkbenchBoot?.finish());
+  if(encodingCompact)setTimeout(async()=>{try{if(localStorage.getItem(KEY)!==startupSource.current)return;await Store.writeAsync(localStorage,dataStore,KEY);startupSource.current=localStorage.getItem(KEY);}catch{/* Keep the archive usable; the next save retries. */}},2500);
   }
   // Paint the startup screen before synchronous archive migration and first calculations.
   const launch=()=>requestAnimationFrame(()=>setTimeout(()=>startWorkbench().catch(error=>globalThis.WorkbenchBoot?.fail(error)),0));

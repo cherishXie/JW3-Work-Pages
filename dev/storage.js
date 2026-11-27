@@ -70,6 +70,11 @@
   }
   function quotaError(e){return e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22||e?.code===1014;}
   const GZIP_PREFIX='gzip1:';
+  const VALIDATION_KEY=':validated-v1';
+  // Local integrity marker: data written by this app was validated on save. A
+  // matching FNV-1a checksum lets startup skip the expensive full revalidation.
+  function checksum(text){let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}return text.length+':'+(h>>>0).toString(16);}
+  function markValidated(storage,key,raw){try{storage.setItem(key+VALIDATION_KEY,checksum(raw));}catch{/* quota is handled by the archive write */}}
   function bytesToBase64(bytes){let out='';const chunk=0x8000;for(let i=0;i<bytes.length;i+=chunk)out+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));return btoa(out);}
   function base64ToBytes(text){const bin=atob(text);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out;}
   async function gzipText(text){
@@ -86,43 +91,57 @@
   async function readAsync(storage,key=KEY){
     const raw=storage.getItem(key);
     if(raw===null)return read(storage,key);
-    if(raw.startsWith(GZIP_PREFIX)){
-      const json=await gunzipText(raw);
-      return {store:validate(unpack(JSON.parse(json))),migrated:false};
+    const trusted=storage.getItem(key+VALIDATION_KEY)===checksum(raw);
+    if(trusted){
+      const parsed=raw.startsWith(GZIP_PREFIX)?JSON.parse(await gunzipText(raw)):JSON.parse(raw);
+      return {store:unpack(parsed),migrated:false,compact:parsed?.storageEncoding==='shared-json-v1',validated:true};
     }
-    return {store:validate(unpack(JSON.parse(raw))),migrated:false};
+    if(raw.startsWith(GZIP_PREFIX)){
+      const json=await gunzipText(raw),parsed=JSON.parse(json),store=validate(unpack(parsed));
+      markValidated(storage,key,raw);return {store,migrated:false,compact:parsed?.storageEncoding==='shared-json-v1'};
+    }
+    const parsed=JSON.parse(raw),store=validate(unpack(parsed));
+    markValidated(storage,key,raw);return {store,migrated:false,compact:parsed?.storageEncoding==='shared-json-v1'};
   }
   async function writeAsync(storage,store,key=KEY){
     const raw=JSON.stringify(validate(store));
-    try{storage.setItem(key,raw);return;}catch(e){if(!quotaError(e))throw e;}
+    // Large archives are stored as gzip of the ordinary JSON. JSON.parse is much
+    // faster at startup than expanding the shared-node encoding.
+    if(raw.length>1_000_000&&typeof CompressionStream==='function'){
+      try{const compressed=await gzipText(raw);storage.setItem(key,compressed);markValidated(storage,key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
+    }else try{storage.setItem(key,raw);markValidated(storage,key,raw);return;}catch(e){if(!quotaError(e))throw e;}
     const compact=JSON.stringify(pack(JSON.parse(raw)));
-    if(compact.length<raw.length){try{storage.setItem(key,compact);return;}catch(e){if(!quotaError(e))throw e;}}
-    const text=compact.length<raw.length?compact:raw;
-    const compressed=await gzipText(text);
-    try{storage.setItem(key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
+    if(compact.length<raw.length){try{storage.setItem(key,compact);markValidated(storage,key,compact);return;}catch(e){if(!quotaError(e))throw e;}}
+    const compressed=await gzipText(raw);
+    try{storage.setItem(key,compressed);markValidated(storage,key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
     throw new Error('浏览器本地存储空间不足，压缩后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
   }
   async function writePreparedAsync(storage,prepared,key=KEY){
+    // The worker already prepared raw and shared-node JSON. For large archives,
+    // gzip the raw form so startup only needs decompression and JSON.parse.
+    if(prepared.raw.length>1_000_000&&typeof CompressionStream==='function'){
+      try{const compressed=await gzipText(prepared.raw);storage.setItem(key,compressed);markValidated(storage,key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
+    }
     try{writePrepared(storage,prepared,key);return;}catch(e){
       if(!quotaError(e)&&!/存储空间不足/.test(e.message))throw e;
     }
     const text=prepared.compact&&prepared.compact.length<prepared.raw.length?prepared.compact:prepared.raw;
     const compressed=await gzipText(text);
-    try{storage.setItem(key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
+    try{storage.setItem(key,compressed);markValidated(storage,key,compressed);return;}catch(e){if(!quotaError(e))throw e;}
     throw new Error('浏览器本地存储空间不足，压缩后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
   }
   // Prepared by the same storage implementation in a worker. setItem remains atomic.
   function writePrepared(storage,prepared,key=KEY){
-    try{storage.setItem(key,prepared.raw);return;}catch(e){if(!quotaError(e))throw e;}
-    if(prepared.compact&&prepared.compact.length<prepared.raw.length){try{storage.setItem(key,prepared.compact);return;}catch(e){if(!quotaError(e))throw e;}}
+    try{storage.setItem(key,prepared.raw);markValidated(storage,key,prepared.raw);return;}catch(e){if(!quotaError(e))throw e;}
+    if(prepared.compact&&prepared.compact.length<prepared.raw.length){try{storage.setItem(key,prepared.compact);markValidated(storage,key,prepared.compact);return;}catch(e){if(!quotaError(e))throw e;}}
     throw new Error('浏览器本地存储空间不足，无损去重后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
   }
   function write(storage,store,key=KEY){
     const raw=JSON.stringify(validate(store));
-    try{storage.setItem(key,raw);return;}catch(e){if(!quotaError(e))throw e;}
+    try{storage.setItem(key,raw);markValidated(storage,key,raw);return;}catch(e){if(!quotaError(e))throw e;}
     const compact=JSON.stringify(pack(JSON.parse(raw)));
     if(compact.length<raw.length){
-      try{storage.setItem(key,compact);return;}catch(e){if(!quotaError(e))throw e;}
+      try{storage.setItem(key,compact);markValidated(storage,key,compact);return;}catch(e){if(!quotaError(e))throw e;}
     }
     // setItem is atomic. Never remove the previous value or discard archives.
     throw new Error('浏览器本地存储空间不足，无损去重后仍无法保存；原数据已保留。请先导出全部日期档案备份，再在数据和验证中管理历史档案');
