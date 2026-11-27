@@ -1,14 +1,19 @@
 {
-  "id": "6057cfe1a8feed4773b7d073e3fdf923dd94b307966bd2b43e36dd2936ec26d2",
-  "version": "0.13.0-dev.99",
+  "id": "be587669bea17df66cbad8f7a009549d619c35db8cbe74f1720624743e1a643d",
+  "version": "0.13.0-dev.100",
   "channel": "dev",
-  "sourceCommit": "e72942f7963907c06df1c99d9566bd58087e72c4",
-  "sourceTimestamp": 1795771935,
+  "sourceCommit": "3f6a1080fc333347178121514e47c6b77e877899",
+  "sourceTimestamp": 1795785498,
   "protocol": 2,
   "releaseNotes": {
     "title": "本次更新",
     "items": [
-      "修复总览指标卡迷你趋势线与“金币与人民币 / 当前期间”“较上期”说明文字重叠：为趋势线预留独立区域，说明文字按可用宽度换行；767px 以下保持原有纵向布局。"
+      "任务批次当前批次卡新增开始、暂停 / 继续与结束计时按钮，十人副本和普通任务批次都可直接停表，不必先打开登记完成；结束时间与耗时保留在执行草稿中，登记时预填。",
+      "任务查漏新增「25 人副本 CD」总览：优先展示当前赛季最新 25 人本，显示本周已用、可安排、已分配与刷新时间；未分配角色的任务可直接进入分配，较早赛季折叠；角色视图拆分 25 人与 10 人副本 CD。",
+      "十人副本新增按队伍数量的自动分队平衡：2 队优先平衡输出，3 队及以上优先分散门派增益与远近战，再均衡输出与装分；始终优先账号连续使用、共战覆盖与首队锁定，职责、侠客与账号互斥校验不变；自动模式默认使用均衡策略。",
+      "导入合并按北京时间实际开始时刻修正完成日期与刷新周期，较新排程整条替换以避免旧开始时间与新批次混用；复制本批名单按页面展示的账号切换顺序输出。",
+      "启动页增加阶段进度条、百分比和网络状态提示：离线或网络较慢时说明本机档案未受影响，并保留重试、导出备份与重新下载入口；启动阶段耗时可在诊断信息中查看。",
+      "性能：按角色 / 账号范围跳过无关排程，缓存任务资格、CD 与进度索引，开始时刻、导入合并与总览榜单改用单次汇总；宽屏档案下总览首屏阻塞明显下降，任务查漏不再重复扫描全部历史记录。"
     ]
   },
   "files": [
@@ -119,13 +124,13 @@
     },
     {
       "name": "index.html",
-      "bytes": 7747,
-      "sha256": "7e8892a821c76e8431b88895a7e5078514b0d09a29eea3ab3a2e09ed63b86ba8"
+      "bytes": 8825,
+      "sha256": "dd3d478a6492b5ecb756a77fc6c23177e6a02658857d81df8c0b4dfee6126a4f"
     },
     {
       "name": "boot.js",
-      "bytes": 5720,
-      "sha256": "bb00936e12a31404be1af7f3236340858032e04fd60b2dcbdd79071b00ef6943"
+      "bytes": 8505,
+      "sha256": "5b234a682e0857e40b506ddf2d2684696f69a9f54de22d8ab00f884eb89a6583"
     },
     {
       "name": "platform.js",
@@ -134,8 +139,8 @@
     },
     {
       "name": "styles.css",
-      "bytes": 437619,
-      "sha256": "608712f2b6bbfee9c4cffca04aa21bbb45016c0e0be7516ac17cfdc404e2ae6b"
+      "bytes": 440255,
+      "sha256": "7a2cac832c567ddef7cda76cd03a3ba2057d97af2e2ff4d3953ecf12658944c2"
     },
     {
       "name": "themes.js",
@@ -154,8 +159,8 @@
     },
     {
       "name": "model.js",
-      "bytes": 212873,
-      "sha256": "e1d403b847c89adffbd6fa7eb648a1faceb25d7605bb5c066849698ada3a7a6c"
+      "bytes": 225607,
+      "sha256": "8323e22a26b4ae9ee1401036d0b1e77ed06d50843c8421321cd318055b173971"
     },
     {
       "name": "operations.js",
@@ -169,8 +174,8 @@
     },
     {
       "name": "storage.js",
-      "bytes": 9218,
-      "sha256": "dfcd867207af54742694e839c0b1f24df42ee451d0cdef99fd26947387daf9ab"
+      "bytes": 9386,
+      "sha256": "84e45bce4efd9f86536abef372723c7960e45e96fccc890c3b54731d2d5c13c8"
     },
     {
       "name": "storage-worker.js",
@@ -179,8 +184,8 @@
     },
     {
       "name": "verification.js",
-      "bytes": 58037,
-      "sha256": "b57105a403a56de4ac2d0537a1b93631385e707de37a2ccb632cb3e86b880763"
+      "bytes": 60961,
+      "sha256": "98ccf4a470b2867e48eb754bee6e81d40a90ca49212813aa0b1bfb3fc0984ff7"
     },
     {
       "name": "vendor/jszip.min.js",
@@ -189,8 +194,8 @@
     },
     {
       "name": "daily.js",
-      "bytes": 59869,
-      "sha256": "1dd5d0976994ed0cde1fe0e36c20287c657a7197e10144bfda405e2874cbfcdc"
+      "bytes": 60151,
+      "sha256": "7292717e6b8b62e01eb10353c5dc592d1438a84a9899e21cfe3c2a777c875569"
     },
     {
       "name": "execution.js",
@@ -214,13 +219,13 @@
     },
     {
       "name": "app.js",
-      "bytes": 855611,
-      "sha256": "20ac54f3cce3d1cd187971bb94e2b479d3a866aff3d1b6c21257a74e8efe0d28"
+      "bytes": 862318,
+      "sha256": "0c93ce55d83cc26769b98e178499130bf007e66beed2b2cfd9d157e3915422aa"
     },
     {
       "name": "version.js",
-      "bytes": 535,
-      "sha256": "06f0ec034da6e830abc6c6cae738c1195cf8df07f9ce44f07d5d94d87230ef4d"
+      "bytes": 1833,
+      "sha256": "0110dafa21211248b15cde299c05d3568a39ca2292a437d21538636f074f2297"
     }
   ]
 }

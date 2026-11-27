@@ -53,18 +53,20 @@
     if(value?.storageEncoding!=='shared-json-v1')return value;
     const {nodes,root}=value;
     if(!Array.isArray(nodes))throw new Error('本地去重数据格式无效');
-    const decoded=[];
+    const total=nodes.length,decoded=[];
+    const reference=(value,limit)=>Array.isArray(value)&&value.length===1&&Number.isInteger(value[0])&&value[0]>=0&&value[0]<limit;
     function decode(value,limit){
       if(value===null||typeof value!=='object')return value;
-      if(!Array.isArray(value)||value.length!==1||!Number.isInteger(value[0])||value[0]<0||value[0]>=limit)throw new Error('本地去重数据引用无效');
-      // Each occurrence must be independent, as in an ordinary JSON round trip.
-      return copy(decoded[value[0]]);
+      if(!reference(value,limit))throw new Error('本地去重数据引用无效');
+      return decoded[value[0]];
     }
     for(const node of nodes){
       if(!node||typeof node!=='object')throw new Error('本地去重数据节点无效');
       decoded.push(Array.isArray(node)?node.map(v=>decode(v,decoded.length)):Object.fromEntries(Object.entries(node).map(([k,v])=>[k,decode(v,decoded.length)])));
     }
-    return decode(root,decoded.length);
+    // One JSON round trip breaks structural sharing for every occurrence. This is
+    // substantially faster than cloning each shared subtree during decode.
+    return JSON.parse(JSON.stringify(decode(root,total)));
   }
   function quotaError(e){return e?.name==='QuotaExceededError'||e?.name==='NS_ERROR_DOM_QUOTA_REACHED'||e?.code===22||e?.code===1014;}
   const GZIP_PREFIX='gzip1:';

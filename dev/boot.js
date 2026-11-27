@@ -1,27 +1,39 @@
 /* Startup diagnostics and recovery. Application caches never contain user archives. */
 (() => {
   const started=performance.now(),motion=matchMedia('(prefers-reduced-motion: reduce)');
-  let ready=false,failed=false,failure,last='正在加载工作台',timer,exit;
-  const el=id=>document.getElementById(id),message=error=>error?.message||String(error||'浏览器未提供错误详情');
-  function stage(text){if(failed)return;last=text;if(el('boot-status'))el('boot-status').textContent=text;}
+  let ready=false,failed=false,failure,last='正在加载工作台',timer,exit,progress=4;
+  const timings={},el=id=>document.getElementById(id),message=error=>error?.message||String(error||'浏览器未提供错误详情');
+  const STAGE_PROGRESS={'正在加载工作台组件':8,'正在读取本地档案':22,'正在整理任务与收益记录':30,'正在迁移赛季与任务规则':40,'正在整理历史收益归属':48,'正在准备默认任务':58,'正在整理已确认排程':68,'正在生成工作台视图':82,'工作台已就绪':100};
+  function setProgress(value){progress=Math.max(progress,Math.min(100,Math.round(value)));const track=el('boot-track'),bar=el('boot-progress-bar'),percent=el('boot-percent');if(bar)bar.style.width=progress+'%';if(track){track.setAttribute('aria-valuenow',String(progress));track.classList.toggle('is-waiting',progress<100&&!failed);}if(percent)percent.textContent=progress+'%';}
+  function stage(text,percent){if(failed)return;last=text;if(el('boot-status'))el('boot-status').textContent=text;if(percent!=null)setProgress(percent);else if(STAGE_PROGRESS[text])setProgress(STAGE_PROGRESS[text]);}
+  function timing(label,ms){if(!label||!Number.isFinite(ms))return;timings[label]=(timings[label]||0)+ms;}
   function recovery(){if(el('boot-retry'))el('boot-retry').hidden=false;if(el('boot-recovery'))el('boot-recovery').hidden=false;if(el('boot-repair'))el('boot-repair').hidden=!['http:','https:'].includes(location.protocol);}
-  function tick(){const elapsed=performance.now()-started;if(el('boot-elapsed'))el('boot-elapsed').textContent='已等待 '+Math.floor(elapsed/1000)+' 秒';if(elapsed>15000){recovery();if(el('boot-hint')){el('boot-hint').hidden=false;el('boot-hint').textContent='启动用时较长，可先导出原始备份；重新下载应用只清理此页面的应用缓存，不删除本机档案。';}}}
+  function connectionHint(){
+    if(ready)return;const node=el('boot-network');if(!node)return;const elapsed=performance.now()-started;
+    const offline=navigator.onLine===false,slow=['slow-2g','2g'].includes(navigator.connection?.effectiveType);
+    if(offline){node.hidden=false;node.dataset.state='offline';node.textContent='网络已断开，正在使用本机缓存；已加载的组件仍可继续。本机档案不受影响。';}
+    else if(slow||elapsed>20000){node.hidden=false;node.dataset.state=slow?'slow':'slow';node.textContent=slow?'网络较慢，正在等待应用组件，可保持本页打开。':'组件加载时间较长，正在等待网络响应；本机档案已保留，可稍后重试。';}
+    else node.hidden=true;
+  }
+  function tick(){const elapsed=performance.now()-started;if(el('boot-elapsed'))el('boot-elapsed').textContent='已等待 '+Math.floor(elapsed/1000)+' 秒';if(!ready&&progress<96&&elapsed>6000)setProgress(Math.min(96,progress+.4));connectionHint();if(elapsed>15000){recovery();if(el('boot-hint')){el('boot-hint').hidden=false;el('boot-hint').textContent='启动用时较长，可先导出原始备份；重新下载应用只清理此页面的应用缓存，不删除本机档案。';}}}
   function fail(error){
     if(ready)return;if(!failed){failed=true;failure=error;}clearInterval(timer);
     if(el('boot-status'))el('boot-status').textContent='工作台未能启动';
     el('workbench-boot')?.setAttribute('aria-busy','false');
+    if(el('boot-track')){el('boot-track').classList.remove('is-waiting');el('boot-track').classList.add('is-failed');}
     if(el('boot-error'))el('boot-error').hidden=false;
     if(el('boot-error-detail'))el('boot-error-detail').textContent=last+'\n'+message(failure);
-    if(el('boot-hint')){el('boot-hint').hidden=false;el('boot-hint').textContent='本机原始档案仍保留。请先导出备份，再尝试重新加载或重新下载应用。';}
+    if(el('boot-hint')){el('boot-hint').hidden=false;el('boot-hint').textContent=navigator.onLine===false?'网络已断开，无法下载应用组件；本机原始档案仍保留。连接网络后可重试，或先导出备份。':'本机原始档案仍保留。请先导出备份，再尝试重新加载或重新下载应用。';}
+    if(el('boot-network')){el('boot-network').hidden=false;el('boot-network').dataset.state=navigator.onLine===false?'offline':'slow';el('boot-network').textContent=navigator.onLine===false?'当前离线：请连接网络后重试。本机档案未被删除。':'网络请求未完成：请检查网络或稍后重试。本机档案未被删除。';}
     recovery();
   }
-  function finish(){if(ready)return;ready=true;failed=false;clearInterval(timer);document.dispatchEvent(new Event('workbench:ready'));const root=el('workbench-boot');if(!root)return;stage('工作台已就绪');root.setAttribute('aria-busy','false');document.body.classList.add('workbench-ready');const cleanup=()=>root.remove();if(!motion.matches&&typeof root.animate==='function'){exit=root.animate([{opacity:1},{opacity:0}],{duration:320,easing:'ease-out'});exit.finished.catch(()=>{}).finally(cleanup);}else cleanup();}
+  function finish(){if(ready)return;ready=true;failed=false;clearInterval(timer);setProgress(100);if(el('boot-track'))el('boot-track').classList.remove('is-waiting');document.dispatchEvent(new Event('workbench:ready'));const root=el('workbench-boot');if(!root)return;stage('工作台已就绪');root.setAttribute('aria-busy','false');document.body.classList.add('workbench-ready');const cleanup=()=>root.remove();if(!motion.matches&&typeof root.animate==='function'){exit=root.animate([{opacity:1},{opacity:0}],{duration:320,easing:'ease-out'});exit.finished.catch(()=>{}).finally(cleanup);}else cleanup();}
   const modules=new Map(),globals={zip:'JSZip',ocr:'Tesseract',verification:'Verification'};
   function loadModule(name){
     if(!Object.prototype.hasOwnProperty.call(globals,name))return Promise.reject(new Error('未知工作台组件'));
     if(globalThis[globals[name]])return Promise.resolve();
     if(!modules.has(name)){const source=document.querySelector('script[data-workbench-module="'+name+'"]');if(!source)return Promise.reject(new Error('组件未打包，请刷新工作台'));
-      modules.set(name,new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=source.getAttribute('src');script.onload=()=>resolve();script.onerror=()=>{modules.delete(name);script.remove();reject(new Error('工作台组件加载失败，请重试'));};document.head.append(script);}));}
+      modules.set(name,new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=source.getAttribute('src');script.onload=()=>resolve();script.onerror=()=>{modules.delete(name);script.remove();reject(new Error(navigator.onLine===false?'网络已断开，工作台组件未能加载；请连接网络后重试':'工作台组件加载失败，请检查网络后重试'));};document.head.append(script);}));}
     return modules.get(name);
   }
   function backup(){
@@ -36,7 +48,7 @@
     if('caches'in globalThis)for(const key of await caches.keys())if(key.startsWith(prefix))await caches.delete(key);
     const url=new URL(location.href);url.searchParams.set('startup-recovery',Date.now());location.replace(url.href);
   }
-  globalThis.WorkbenchBoot={stage,fail,finish,started,loadModule};
+  globalThis.WorkbenchBoot={stage,fail,finish,started,timing,timings,loadModule};
   window.addEventListener('error',event=>{if(event.error||event.message)fail(event.error||event.message);});
   window.addEventListener('unhandledrejection',event=>fail(event.reason));
   document.addEventListener('load',event=>{if(event.target.tagName==='SCRIPT'&&!ready){const name=(event.target.getAttribute('src')||'').split('/').pop();stage(name?.startsWith('app.js')?'正在准备本地档案':'正在加载工作台组件');}},true);
@@ -48,4 +60,6 @@
   });
   document.addEventListener('DOMContentLoaded',()=>{if(failed)fail(failure);else{stage(last);tick();if(!ready)timer=setInterval(tick,1000);}});
   motion.addEventListener?.('change',()=>{if(motion.matches)exit?.cancel();});
+  window.addEventListener('online',()=>{if(el('boot-network'))connectionHint();});
+  window.addEventListener('offline',()=>{if(el('boot-network'))connectionHint();});
 })();

@@ -96,16 +96,21 @@
   now=new Date(Math.floor(now.getTime()/1000)*1000);
   const copy=M.clone(s),p=copy.plans.find(p=>p.id===planId);if(!p)throw new Error('排程不存在');
   const task=p.taskSnapshots?.[taskId]||copy.tasks.find(t=>t.id===taskId);
-  if(task?.partyRule!=='raid10'||!['start','pause','resume'].includes(action))throw new Error('请选择十人副本的计时操作');
+  if(!task||!['start','pause','resume','end'].includes(action))throw new Error('请选择任务批次的计时操作');
   if((p.completionFacts||[]).some(f=>f.taskId===taskId&&f.planBatchIndices.includes(index)))throw new Error('本批已登记完成，不能继续计时');
   const saved=p.executionDrafts?.find(d=>d.taskId===taskId&&d.index===index&&JSON.stringify(d.roleIds)===JSON.stringify(p.batches[index]))?.values||{};
   const values={...saved,...input,timerPauses:M.clone(saved.timerPauses||[])},paused=values.timerPauses.at(-1)?.endedAt===null,at=now.toISOString(),day=M.dateKey(now),time=new Date(now.getTime()+8*3600000).toISOString().slice(11,19);
   const start=executionTiming(values.date||p.date,values).startedAt;
   if(start)values.startedAt=start;
   if(action==='start'){
-   if(start)throw new Error('计时已开始，请使用暂停或继续计时');
-   if(M.cycle(task,M.planStart(copy,p,taskId))!==M.cycle(task,at))throw new Error('已跨副本刷新周期，请先调整排程日期');
+   if(start)throw new Error('计时已开始，请使用暂停、继续或结束计时');
+   if(M.cycle(task,M.planStart(copy,p,taskId))!==M.cycle(task,at))throw new Error('已跨任务刷新周期，请先调整排程日期');
    values.date=day;values.startTime=time;values.startedAt=at;values.endDate=day;values.endTime='';delete values.endedAt;
+  }else if(action==='end'){
+   if(!start)throw new Error('请先开始计时');
+   if(values.endedAt)throw new Error('计时已结束，请登记本批完成或调整排程');
+   if(paused)values.timerPauses.at(-1).endedAt=at;
+   values.endedAt=at;values.endDate=day;values.endTime=time;
   }else{
    if(!start)throw new Error('请先开始计时');
    if(Date.parse(at)<Date.parse(start))throw new Error('当前时刻早于本次开始时间');

@@ -3094,3 +3094,40 @@ html[data-color-mode="dark"] .wb-hero{
   .insight-workbench .insight-metric>small,
   .insight-workbench .insight-metric>.metric-delta{padding-right:100px}
 }
+
+/* Ten-player raid division strategy ---------------------------------------- */
+.raid-balance-strategy{
+  margin-top:10px;padding:10px 12px;
+  border:1.5px solid var(--island-teal-line);border-radius:14px;
+  background:var(--island-teal-soft);
+}
+.raid-balance-strategy b{font-size:13px;color:var(--island-ink)}
+.raid-balance-strategy .pill{background:var(--island-paper);border-color:var(--island-teal-line);color:var(--island-teal-deep)}
+.raid-balance-strategy ul{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 14px;margin:8px 0 0;padding:0}
+.raid-balance-strategy li{display:flex;gap:6px;min-width:0;font-size:12px;line-height:1.6;color:var(--island-ink-3)}
+.raid-balance-strategy li strong{flex:none;font-weight:700;color:var(--island-ink-2)}
+.raid-power-note span{line-height:1.6}
+@media(max-width:767px){.raid-balance-strategy ul{grid-template-columns:1fr}}
+
+/* Task gap: 25-player raid weekly CD overview -------------------------------- */
+.raid25-gap{margin-bottom:12px}
+.raid25-gap .panel-head{padding:0;align-items:flex-start}
+.raid25-gap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px}
+.raid25-card{display:grid;gap:7px;padding:10px 12px;border:1.5px solid var(--island-line);border-radius:14px;background:var(--island-cream);min-width:0}
+.raid25-card header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
+.raid25-card header div{min-width:0}
+.raid25-card strong{display:block;font-size:13px;font-weight:800;color:var(--island-ink);overflow-wrap:anywhere}
+.raid25-card small{display:block;margin-top:2px;font-size:12px;color:var(--island-ink-3)}
+.raid25-card .pill{flex:none;background:var(--island-paper);border-color:var(--island-teal-line);color:var(--island-teal-deep)}
+.raid25-card p{margin:0;font-size:12px;color:var(--island-ink-2)}
+.raid25-card .progress{height:6px}
+.raid25-card footer{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.raid25-card footer>span{font-size:12px;color:var(--island-ink-3)}
+.raid25-card footer>div{display:flex;gap:6px;margin-left:auto}
+.raid25-older{margin-top:8px;border-top:1.5px dashed var(--island-line);padding-top:8px}
+.raid25-older>summary{font-size:12px;font-weight:700;color:var(--island-ink-3);cursor:pointer}
+@media(max-width:767px){.raid25-gap-grid{grid-template-columns:1fr}}
+
+/* Batch timer actions stay visible on the current batch card. */
+.execution-timer-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}
+.execution-timer .execution-timer-actions .small{min-height:30px}
