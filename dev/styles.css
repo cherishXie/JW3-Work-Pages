@@ -3087,3 +3087,10 @@ html[data-color-mode="dark"] .wb-hero{
   .sidebar{border-radius:0 24px 24px 0;border-right:2px solid var(--island-line);box-shadow:18px 0 50px -26px rgba(43,35,26,.55)}
   html[data-color-mode="dark"] .sidebar{box-shadow:18px 0 50px -20px rgba(0,0,0,.8)}
 }
+
+/* Reserve the sparkline lane so KPI captions and deltas never sit under it. */
+@media(min-width:768px){
+  .insight-workbench .insight-metric{padding-bottom:14px}
+  .insight-workbench .insight-metric>small,
+  .insight-workbench .insight-metric>.metric-delta{padding-right:100px}
+}
